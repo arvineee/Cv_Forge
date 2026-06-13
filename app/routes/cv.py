@@ -171,27 +171,37 @@ def upload():
             parsed = {}
 
         personal = parsed.get("personal_info") or {}
-        # Use name from parsed personal_info as resume title if available
         parsed_name = (
             personal.get("full_name")
             or f"{personal.get('first_name','')} {personal.get('last_name','')}".strip()
         )
         resume_title = f"{parsed_name}'s CV" if parsed_name else f"Uploaded: {filename[:100]}"
 
-        # Normalize work experience: ensure each entry has 'job_title' key
-        # so both the builder UI and PDF service can read it
+        # Normalize work experience — support both 'title' and 'job_title' keys
         raw_work = parsed.get("work_experience") or []
         normalized_work = []
         for job in raw_work:
             if isinstance(job, dict):
                 normalized_work.append({
-                    "job_title":  job.get("title") or job.get("job_title") or "",
-                    "company":    job.get("company") or "",
-                    "start_date": job.get("start_date") or "",
-                    "end_date":   job.get("end_date") or "Present",
-                    "description":job.get("description") or "",
-                    "achievements": [],
+                    "job_title":   job.get("job_title") or job.get("title") or "",
+                    "company":     job.get("company") or "",
+                    "location":    job.get("location") or "",
+                    "start_date":  job.get("start_date") or "",
+                    "end_date":    job.get("end_date") or "Present",
+                    "description": job.get("description") or "",
+                    "achievements":job.get("achievements") or [],
                 })
+
+        # Build custom_sections to store all new fields the parser captured
+        # that don't have dedicated Resume model columns
+        custom_sections = {
+            "skill_groups":  parsed.get("skill_groups") or [],
+            "achievements":  parsed.get("achievements") or [],
+            "interests":     parsed.get("interests") or [],
+            "publications":  parsed.get("publications") or [],
+            "volunteer":     parsed.get("volunteer") or "",
+            "extra_sections":parsed.get("extra_sections") or {},
+        }
 
         resume = Resume(
             user_id=current_user.id,
@@ -200,12 +210,23 @@ def upload():
             original_filename=filename,
             original_file_path=safe_name,
             personal_info=personal,
-            professional_summary=parsed.get("professional_summary"),
+            professional_summary=parsed.get("professional_summary") or parsed.get("objective"),
             work_experience=normalized_work,
             education=parsed.get("education") or [],
             skills=parsed.get("skills") or [],
-            certifications=parsed.get("extra_sections", {}).get("certifications", []),
-            custom_sections=parsed.get("extra_sections") or {},
+            certifications=parsed.get("certifications") or [],
+            languages=parsed.get("languages") or [],
+            awards=parsed.get("awards") or [],
+            projects=[
+                {
+                    "name": p.get("name",""),
+                    "description": p.get("description",""),
+                    "url": p.get("url",""),
+                }
+                for p in (parsed.get("projects") or [])
+                if isinstance(p, dict)
+            ],
+            custom_sections=custom_sections,
         )
         db.session.add(resume)
         db.session.flush()
