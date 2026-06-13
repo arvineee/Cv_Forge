@@ -1,0 +1,59 @@
+{% extends "base_dashboard.html" %}
+{% block title %}{{ letter.title }}{% endblock %}
+{% block page_title %}{{ letter.title }}{% endblock %}
+{% block page_subtitle %}{{ letter.job_title }}{% if letter.company_name %} at {{ letter.company_name }}{% endif %}{% endblock %}
+{% block page_actions %}
+  <a href="{{ url_for('cover_letter.download', letter_id=letter.id, fmt='pdf') }}"
+     class="inline-flex items-center gap-2 px-4 py-2 rounded-lg gradient-brand text-white text-sm font-semibold hover:opacity-90 transition">
+    Download PDF
+  </a>
+  <a href="{{ url_for('cover_letter.download', letter_id=letter.id, fmt='txt') }}"
+     class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 bg-white text-sm font-medium hover:bg-gray-50 transition">
+    Download TXT
+  </a>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl">
+  <div class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+    <div class="px-8 py-6 border-b border-gray-100 flex items-center justify-between gap-4">
+      <div class="text-sm text-gray-500 space-y-0.5">
+        <p>Tone: <span class="capitalize font-medium text-gray-700">{{ letter.tone }}</span></p>
+        <p>Created: {{ letter.created_at.strftime('%d %b %Y') }}</p>
+      </div>
+      <form method="POST" action="{{ url_for('cover_letter.delete_letter', letter_id=letter.id) }}"
+            onsubmit="return confirm('Delete this cover letter?')">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <button type="submit" class="text-sm text-red-400 hover:text-red-600 transition">Delete</button>
+      </form>
+    </div>
+
+    <!-- XSS-safe: escape content first, then replace newlines -->
+    <div class="px-8 py-8" id="letter-content"
+         x-data="{editing: false, content: {{ letter.content | tojson }}}">
+
+      <div x-show="!editing" class="prose prose-sm max-w-none text-gray-700 leading-relaxed whitespace-pre-line">
+        <span x-text="content"></span>
+      </div>
+
+      <textarea x-show="editing" x-cloak x-model="content"
+                class="w-full h-96 p-4 text-sm text-gray-700 border border-gray-200 rounded-lg resize-y focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono leading-relaxed"></textarea>
+
+      <div class="mt-4 flex gap-3">
+        <button @click="editing=!editing"
+                class="px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 transition font-medium"
+                x-text="editing ? 'Preview' : 'Edit'"></button>
+        <button x-show="editing" x-cloak
+                @click="fetch('{{ url_for('cover_letter.edit_letter', letter_id=letter.id) }}', {
+                  method:'POST',
+                  headers:{'Content-Type':'application/json','X-CSRFToken':'{{ csrf_token() }}'},
+                  body:JSON.stringify({content:content})
+                }).then(()=>{editing=false})"
+                class="px-4 py-2 text-sm gradient-brand text-white rounded-lg hover:opacity-90 transition font-medium">
+          Save
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,68 @@
+{% extends "base_dashboard.html" %}
+{% block title %}Pricing Plans — Admin{% endblock %}
+{% block page_title %}Pricing Plans{% endblock %}
+{% block page_subtitle %}Edit plans that appear on the pricing page{% endblock %}
+{% block page_actions %}
+  <a href="{{ url_for('admin.pricing_new') }}"
+     class="inline-flex items-center gap-2 px-4 py-2 rounded-lg gradient-brand text-white text-sm font-semibold hover:opacity-90 transition">
+    + New Plan
+  </a>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+  {% for plan in plans %}
+  <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+    <div class="flex items-start justify-between gap-4">
+      <div class="flex-1">
+        <div class="flex items-center gap-3 mb-2">
+          <h3 class="font-semibold text-gray-900">{{ plan.name }}</h3>
+          <span class="text-xs font-mono text-gray-400">{{ plan.slug }}</span>
+          {% if plan.is_popular %}
+          <span class="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-semibold rounded-full">Popular</span>
+          {% endif %}
+          {% if not plan.is_active %}
+          <span class="px-2 py-0.5 bg-gray-100 text-gray-500 text-xs rounded-full">Inactive</span>
+          {% endif %}
+        </div>
+        <div class="flex flex-wrap gap-4 text-sm text-gray-600">
+          <span class="font-semibold">KES {{ plan.price_kes }}/{{ plan.billing_period }}</span>
+          <span>CV limit: {{ plan.daily_cv_limit }}/day</span>
+          <span>ATS: {{ plan.daily_ats_limit }}/day</span>
+          <span>DOCX: {{ '✓' if plan.allow_docx else '✗' }}</span>
+          <span>Coach: {{ '✓' if plan.allow_career_coach else '✗' }}</span>
+        </div>
+        {% if plan.features %}
+        <div class="mt-2 flex flex-wrap gap-1.5">
+          {% for feat in plan.features[:4] %}
+          <span class="text-xs bg-gray-50 text-gray-600 px-2 py-0.5 rounded">{{ feat }}</span>
+          {% endfor %}
+          {% if plan.features|length > 4 %}
+          <span class="text-xs text-gray-400">+{{ plan.features|length - 4 }} more</span>
+          {% endif %}
+        </div>
+        {% endif %}
+      </div>
+      <div class="flex gap-2 flex-shrink-0">
+        <a href="{{ url_for('admin.pricing_edit', plan_id=plan.id) }}"
+           class="px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 transition font-medium">
+          Edit
+        </a>
+        <form method="POST" action="{{ url_for('admin.pricing_delete', plan_id=plan.id) }}"
+              onsubmit="return confirm('Delete plan {{ plan.name }}?')">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+          <button type="submit"
+                  class="px-3 py-1.5 text-sm border border-red-100 text-red-500 rounded-lg hover:bg-red-50 transition">
+            Delete
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="text-center py-12 text-gray-400">
+    No plans yet. <a href="{{ url_for('admin.pricing_new') }}" class="text-blue-600 hover:underline">Create one</a>.
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

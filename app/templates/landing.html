@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+{% block title %}CVForge AI — Professional CV Builder for African Professionals{% endblock %}
+{% block meta_description %}Build an ATS-optimized CV in minutes with AI. Designed for African job seekers. Pay with M-Pesa.{% endblock %}
+
+{% block body %}
+<!-- NAV -->
+<nav class="sticky top-0 z-50 bg-white/90 backdrop-blur-sm border-b border-gray-100">
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
+    <a href="{{ url_for('main.index') }}" class="flex items-center gap-2 font-bold text-xl text-gray-900">
+      <div class="w-8 h-8 rounded-lg gradient-brand flex items-center justify-center text-white font-black text-xs">CV</div>
+      CVForge AI
+    </a>
+    <div class="hidden md:flex items-center gap-6 text-sm font-medium text-gray-600">
+      <a href="{{ url_for('main.pricing') }}" class="hover:text-gray-900 transition">Pricing</a>
+      <a href="{{ url_for('templates_gallery.index') }}" class="hover:text-gray-900 transition">Templates</a>
+      <a href="{{ url_for('main.about') }}" class="hover:text-gray-900 transition">About</a>
+    </div>
+    <div class="flex items-center gap-3">
+      {% if current_user.is_authenticated %}
+      <a href="{{ url_for('dashboard.index') }}"
+         class="px-4 py-2 gradient-brand text-white text-sm font-semibold rounded-lg hover:opacity-90 transition">
+        Dashboard
+      </a>
+      {% else %}
+      <a href="{{ url_for('auth.login') }}"
+         class="text-sm font-medium text-gray-700 hover:text-gray-900 transition hidden sm:inline">Sign In</a>
+      <a href="{{ url_for('auth.register') }}"
+         class="px-4 py-2 gradient-brand text-white text-sm font-semibold rounded-lg hover:opacity-90 transition">
+        Get Started Free
+      </a>
+      {% endif %}
+    </div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="bg-white pt-20 pb-24 px-4">
+  <div class="max-w-4xl mx-auto text-center">
+    <span class="inline-block px-3 py-1 bg-blue-50 text-blue-700 text-xs font-semibold rounded-full mb-6 uppercase tracking-wide">
+      AI-Powered · M-Pesa Payments · Built for Kenya
+    </span>
+    <h1 class="text-4xl sm:text-5xl lg:text-6xl font-black text-gray-900 leading-tight mb-6">
+      Your CV should open<br class="hidden sm:block"/>
+      <span class="bg-clip-text text-transparent gradient-brand">every door.</span>
+    </h1>
+    <p class="text-lg text-gray-500 mb-10 max-w-2xl mx-auto leading-relaxed">
+      CVForge AI writes, optimizes, and formats your CV to beat ATS systems and impress hiring managers —
+      in minutes, not hours.
+    </p>
+    <div class="flex flex-col sm:flex-row gap-4 justify-center">
+      <a href="{{ url_for('auth.register') }}"
+         class="px-8 py-4 gradient-brand text-white font-bold rounded-xl text-base hover:opacity-90 transition shadow-lg shadow-blue-200">
+        Build My CV Free →
+      </a>
+      <a href="{{ url_for('main.pricing') }}"
+         class="px-8 py-4 border-2 border-gray-200 text-gray-700 font-bold rounded-xl text-base hover:border-gray-300 hover:bg-gray-50 transition">
+        See Pricing
+      </a>
+    </div>
+    <p class="text-xs text-gray-400 mt-4">No credit card · Pay with M-Pesa · Cancel anytime</p>
+  </div>
+</section>
+
+<!-- SOCIAL PROOF NUMBERS -->
+<section class="bg-gray-50 py-12 px-4 border-y border-gray-100">
+  <div class="max-w-4xl mx-auto grid grid-cols-3 gap-6 text-center">
+    {% for value, label in [('10,000+','CVs Created'),('92%','Interview Rate'),('2 min','Average Build Time')] %}
+    <div>
+      <p class="text-3xl font-black text-gray-900">{{ value }}</p>
+      <p class="text-sm text-gray-500 mt-1">{{ label }}</p>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="py-24 px-4 bg-white">
+  <div class="max-w-5xl mx-auto">
+    <div class="text-center mb-16">
+      <h2 class="text-3xl font-black text-gray-900 mb-4">Everything you need to land the job</h2>
+      <p class="text-gray-500 text-lg">From first draft to final download — AI handles the hard parts.</p>
+    </div>
+    <div class="grid md:grid-cols-3 gap-6">
+      {% for emoji, title, desc in [
+        ('🤖', 'AI Content Writer', 'Paste your experience and AI turns it into powerful bullet points with action verbs and metrics.'),
+        ('📊', 'ATS Score Checker', 'Instantly see how your CV scores against any job description and get specific improvement tips.'),
+        ('✉️', 'Cover Letter Generator', 'Generate a tailored cover letter for any job in under 30 seconds.'),
+        ('🎨', '12+ Pro Templates', 'Professional designs for every industry — from tech to finance to creative roles.'),
+        ('📱', 'M-Pesa Payments', 'Subscribe with a simple STK push. No credit card needed. Cancel anytime.'),
+        ('📄', 'PDF & DOCX Export', 'Download your CV in both formats. DOCX for editing, PDF for applying.'),
+      ] %}
+      <div class="bg-gray-50 rounded-2xl p-6 border border-gray-100 hover:border-blue-200 hover:bg-blue-50/30 transition-colors">
+        <span class="text-3xl mb-4 block">{{ emoji }}</span>
+        <h3 class="font-bold text-gray-900 mb-2">{{ title }}</h3>
+        <p class="text-sm text-gray-500 leading-relaxed">{{ desc }}</p>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="py-24 px-4 bg-gray-50 border-y border-gray-100">
+  <div class="max-w-4xl mx-auto text-center">
+    <h2 class="text-3xl font-black text-gray-900 mb-4">Three steps to your best CV</h2>
+    <p class="text-gray-500 mb-16">No design skills or writing talent required.</p>
+    <div class="grid md:grid-cols-3 gap-10">
+      {% for num, title, desc in [
+        ('1', 'Fill in your details', 'Use our guided builder or upload your existing CV. Takes 2 minutes.'),
+        ('2', 'AI optimizes everything', 'Our AI rewrites your content, scores your ATS compatibility, and suggests improvements.'),
+        ('3', 'Download & apply', 'Get your polished CV as a PDF or DOCX. Ready to send.'),
+      ] %}
+      <div class="flex flex-col items-center">
+        <div class="w-12 h-12 rounded-full gradient-brand flex items-center justify-center text-white font-black text-lg mb-4">
+          {{ num }}
+        </div>
+        <h3 class="font-bold text-gray-900 mb-2">{{ title }}</h3>
+        <p class="text-sm text-gray-500">{{ desc }}</p>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- PRICING PREVIEW -->
+<section class="py-24 px-4 bg-white">
+  <div class="max-w-4xl mx-auto text-center">
+    <h2 class="text-3xl font-black text-gray-900 mb-4">Simple pricing, no surprises</h2>
+    <p class="text-gray-500 mb-12">Pay with M-Pesa. Cancel anytime.</p>
+    <div class="grid md:grid-cols-{{ plans|length }} gap-6 mb-8">
+      {% for plan in plans %}
+      <div class="rounded-2xl border {% if plan.is_popular %}border-blue-400 ring-2 ring-blue-100 shadow-lg{% else %}border-gray-100 shadow-sm{% endif %} p-6 text-left bg-white relative">
+        {% if plan.is_popular %}
+        <span class="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 gradient-brand text-white text-xs font-bold rounded-full">Most Popular</span>
+        {% endif %}
+        <p class="font-bold text-gray-900 text-lg">{{ plan.name }}</p>
+        <p class="mt-2 mb-4">
+          {% if plan.price_kes == 0 %}
+          <span class="text-3xl font-black">Free</span>
+          {% else %}
+          <span class="text-3xl font-black">KES {{ plan.price_kes }}</span>
+          <span class="text-gray-400 text-sm">/{{ plan.billing_period }}</span>
+          {% endif %}
+        </p>
+        <ul class="space-y-2 mb-6">
+          {% for feat in (plan.features or [])[:4] %}
+          <li class="flex items-start gap-2 text-sm text-gray-600">
+            <svg class="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+            </svg>
+            {{ feat }}
+          </li>
+          {% endfor %}
+        </ul>
+        <a href="{{ url_for('auth.register') }}"
+           class="block w-full text-center py-2.5 rounded-xl text-sm font-semibold transition
+           {% if plan.is_popular %}gradient-brand text-white hover:opacity-90{% else %}border border-gray-200 text-gray-700 hover:bg-gray-50{% endif %}">
+          Get Started
+        </a>
+      </div>
+      {% endfor %}
+    </div>
+    <a href="{{ url_for('main.pricing') }}" class="text-sm text-blue-600 hover:underline">See full feature comparison →</a>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="py-24 px-4 gradient-brand">
+  <div class="max-w-2xl mx-auto text-center text-white">
+    <h2 class="text-3xl font-black mb-4">Ready to land that job?</h2>
+    <p class="text-blue-100 text-lg mb-8">Join thousands of professionals who've upgraded their CV with AI.</p>
+    <a href="{{ url_for('auth.register') }}"
+       class="inline-block px-8 py-4 bg-white text-blue-700 font-bold rounded-xl hover:bg-blue-50 transition shadow-lg">
+      Start Building Free →
+    </a>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="bg-gray-900 text-gray-400 py-12 px-4">
+  <div class="max-w-5xl mx-auto grid md:grid-cols-4 gap-8">
+    <div>
+      <div class="flex items-center gap-2 mb-3">
+        <div class="w-7 h-7 rounded-lg gradient-brand flex items-center justify-center text-white font-black text-xs">CV</div>
+        <span class="font-bold text-white">CVForge AI</span>
+      </div>
+      <p class="text-sm leading-relaxed">AI-powered CV builder designed for African professionals. Pay with M-Pesa.</p>
+    </div>
+    <div>
+      <p class="font-semibold text-white text-sm mb-3">Product</p>
+      <ul class="space-y-2 text-sm">
+        <li><a href="{{ url_for('templates_gallery.index') }}" class="hover:text-white transition">Templates</a></li>
+        <li><a href="{{ url_for('main.pricing') }}" class="hover:text-white transition">Pricing</a></li>
+      </ul>
+    </div>
+    <div>
+      <p class="font-semibold text-white text-sm mb-3">Company</p>
+      <ul class="space-y-2 text-sm">
+        <li><a href="{{ url_for('main.about') }}" class="hover:text-white transition">About</a></li>
+      </ul>
+    </div>
+    <div>
+      <p class="font-semibold text-white text-sm mb-3">Account</p>
+      <ul class="space-y-2 text-sm">
+        <li><a href="{{ url_for('auth.login') }}" class="hover:text-white transition">Sign In</a></li>
+        <li><a href="{{ url_for('auth.register') }}" class="hover:text-white transition">Sign Up Free</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="max-w-5xl mx-auto mt-10 pt-6 border-t border-gray-800 text-center text-xs">
+    © {{ 2025 }} CVForge AI. Built in Kenya 🇰🇪
+  </div>
+</footer>
+{% endblock %}

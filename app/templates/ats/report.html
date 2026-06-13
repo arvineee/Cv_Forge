@@ -1,0 +1,87 @@
+{% extends "base_dashboard.html" %}
+{% block title %}ATS Report{% endblock %}
+{% block page_title %}ATS Analysis Report{% endblock %}
+{% block page_subtitle %}{{ resume.title if resume else 'Job Description Analysis' }}{% endblock %}
+{% block page_actions %}
+  <a href="{{ url_for('ats.index') }}" class="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50 transition">
+    ← New Check
+  </a>
+{% endblock %}
+
+{% block content %}
+{% set score = report_data.get('ats_score', report.score) %}
+<div class="grid lg:grid-cols-3 gap-6">
+  <!-- Score card -->
+  <div class="lg:col-span-1">
+    <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-6 text-center">
+      <div class="relative w-32 h-32 mx-auto mb-4">
+        <svg class="w-32 h-32 -rotate-90" viewBox="0 0 120 120">
+          <circle cx="60" cy="60" r="50" fill="none" stroke="#f3f4f6" stroke-width="10"/>
+          <circle cx="60" cy="60" r="50" fill="none" stroke-width="10"
+            stroke="{{ '#22c55e' if score >= 80 else '#eab308' if score >= 60 else '#ef4444' }}"
+            stroke-dasharray="{{ (score / 100) * 314.16 }} 314.16"
+            stroke-linecap="round"/>
+        </svg>
+        <div class="absolute inset-0 flex flex-col items-center justify-center">
+          <span class="text-3xl font-black text-gray-900">{{ score }}</span>
+          <span class="text-xs text-gray-400 font-medium">ATS Score</span>
+        </div>
+      </div>
+      <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-bold
+        {% if score >= 80 %}bg-green-100 text-green-700
+        {% elif score >= 60 %}bg-yellow-100 text-yellow-700
+        {% else %}bg-red-100 text-red-700{% endif %}">
+        Grade: {{ report_data.get('grade', report.grade) }}
+      </div>
+      {% if report_data.get('summary') %}
+      <p class="text-xs text-gray-500 mt-4 leading-relaxed">{{ report_data.get('summary') }}</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Details -->
+  <div class="lg:col-span-2 space-y-4">
+    {% if report_data.get('matched_keywords') %}
+    <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+      <h3 class="font-semibold text-gray-900 text-sm mb-3">✅ Matched Keywords</h3>
+      <div class="flex flex-wrap gap-2">
+        {% for kw in report_data.get('matched_keywords', []) %}
+        <span class="px-2.5 py-1 bg-green-50 text-green-700 text-xs rounded-full font-medium">{{ kw }}</span>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if report_data.get('missing_keywords') %}
+    <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+      <h3 class="font-semibold text-gray-900 text-sm mb-3">❌ Missing Keywords</h3>
+      <div class="flex flex-wrap gap-2">
+        {% for kw in report_data.get('missing_keywords', []) %}
+        <span class="px-2.5 py-1 bg-red-50 text-red-600 text-xs rounded-full font-medium">{{ kw }}</span>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if report_data.get('suggestions') %}
+    <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+      <h3 class="font-semibold text-gray-900 text-sm mb-3">💡 Suggestions</h3>
+      <div class="space-y-2">
+        {% for s in report_data.get('suggestions', []) %}
+        <div class="flex items-start gap-3 p-3 rounded-lg
+          {% if s.get('priority') == 'high' %}bg-red-50{% elif s.get('priority') == 'medium' %}bg-yellow-50{% else %}bg-gray-50{% endif %}">
+          <span class="text-xs font-bold uppercase px-1.5 py-0.5 rounded flex-shrink-0 mt-0.5
+            {% if s.get('priority') == 'high' %}bg-red-100 text-red-600
+            {% elif s.get('priority') == 'medium' %}bg-yellow-100 text-yellow-600
+            {% else %}bg-gray-100 text-gray-500{% endif %}">
+            {{ s.get('priority', 'low') }}
+          </span>
+          <p class="text-sm text-gray-700">{{ s.get('text', s) }}</p>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

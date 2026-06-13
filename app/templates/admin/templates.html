@@ -1,0 +1,53 @@
+{% extends "base_dashboard.html" %}
+{% block title %}CV Templates — Admin{% endblock %}
+{% block page_title %}CV Templates{% endblock %}
+{% block page_subtitle %}Manage templates available to users{% endblock %}
+{% block page_actions %}
+  <a href="{{ url_for('admin.template_new') }}"
+     class="inline-flex items-center gap-2 px-4 py-2 rounded-lg gradient-brand text-white text-sm font-semibold hover:opacity-90 transition">
+    + New Template
+  </a>
+{% endblock %}
+
+{% block content %}
+<div class="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
+  {% for t in templates %}
+  <div class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden card-hover">
+    <!-- Color swatch -->
+    <div class="h-16 flex items-center justify-center" style="background-color: {{ t.accent_color }}">
+      <span class="text-white font-bold text-sm">{{ t.name }}</span>
+    </div>
+    <div class="p-4">
+      <div class="flex items-center justify-between gap-2 mb-1">
+        <p class="font-medium text-gray-900 text-sm">{{ t.name }}</p>
+        <div class="flex gap-1">
+          {% if t.is_premium %}
+          <span class="text-xs px-1.5 py-0.5 bg-yellow-100 text-yellow-700 rounded font-semibold">Pro</span>
+          {% endif %}
+          {% if not t.is_active %}
+          <span class="text-xs px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded">Off</span>
+          {% endif %}
+        </div>
+      </div>
+      <p class="text-xs text-gray-400 mb-1 capitalize">{{ t.category }} · {{ t.font_style }}</p>
+      <p class="text-xs text-gray-500 mb-3 line-clamp-2">{{ t.description or '—' }}</p>
+      <p class="text-xs text-gray-400 mb-3">Used {{ t.use_count }} times</p>
+      <div class="flex gap-2">
+        <a href="{{ url_for('admin.template_edit', template_id=t.id) }}"
+           class="flex-1 text-center text-xs py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition font-medium">
+          Edit
+        </a>
+        <form method="POST" action="{{ url_for('admin.template_toggle', template_id=t.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+          <button type="submit"
+                  class="text-xs py-1.5 px-3 border rounded-lg hover:bg-gray-50 transition font-medium
+                  {% if t.is_active %}border-red-100 text-red-400{% else %}border-green-100 text-green-500{% endif %}">
+            {{ 'Disable' if t.is_active else 'Enable' }}
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,43 @@
+{% extends "base_dashboard.html" %}
+{% block title %}Admin Dashboard{% endblock %}
+{% block page_title %}Admin Dashboard{% endblock %}
+{% block page_subtitle %}Platform overview{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+  {% for label, value, color in [
+    ('Total Users', total_users, 'blue'),
+    ('Pro Users', pro_users, 'purple'),
+    ('Premium Users', premium_users, 'indigo'),
+    ('Revenue (KES)', total_revenue, 'green'),
+  ] %}
+  <div class="bg-white rounded-xl p-5 border border-gray-100 shadow-sm">
+    <p class="text-sm text-gray-500">{{ label }}</p>
+    <p class="text-3xl font-bold text-{{ color }}-600 mt-1">{{ value }}</p>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="grid md:grid-cols-2 gap-6">
+  <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+    <h2 class="font-semibold mb-4">AI Usage Today</h2>
+    <p class="text-4xl font-bold text-blue-600">{{ daily_ai_usage }}</p>
+    <p class="text-sm text-gray-400 mt-1">API calls made today</p>
+  </div>
+
+  <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+    <h2 class="font-semibold mb-4">Quick Links</h2>
+    <div class="space-y-2">
+      {% for label, endpoint in [
+        ('Manage Users', 'admin.users'),
+        ('Pricing Plans', 'admin.pricing'),
+        ('CV Templates', 'admin.templates'),
+        ('Payments', 'admin.payments'),
+      ] %}
+      <a href="{{ url_for(endpoint) }}"
+         class="block text-sm text-blue-600 hover:underline py-1">{{ label }} →</a>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}

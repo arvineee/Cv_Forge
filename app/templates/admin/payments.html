@@ -1,0 +1,53 @@
+{% extends "base_dashboard.html" %}
+{% block title %}Payments — Admin{% endblock %}
+{% block page_title %}Payments{% endblock %}
+{% block page_subtitle %}All payment records{% endblock %}
+
+{% block content %}
+<div class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
+        <tr>
+          <th class="px-4 py-3 text-left">Date</th>
+          <th class="px-4 py-3 text-left">User</th>
+          <th class="px-4 py-3 text-left">Plan</th>
+          <th class="px-4 py-3 text-left">Amount</th>
+          <th class="px-4 py-3 text-left">Status</th>
+          <th class="px-4 py-3 text-left">Transaction ID</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-50">
+        {% for p in payments %}
+        <tr class="hover:bg-gray-50">
+          <td class="px-4 py-3 text-gray-500">{{ p.created_at.strftime('%d %b %Y %H:%M') }}</td>
+          <td class="px-4 py-3">
+            <p class="font-medium text-gray-900">{{ p.user.full_name }}</p>
+            <p class="text-xs text-gray-400">{{ p.user.email }}</p>
+          </td>
+          <td class="px-4 py-3 capitalize font-medium text-gray-900">
+            {{ p.subscription.plan if p.subscription else '—' }}
+          </td>
+          <td class="px-4 py-3 font-semibold">KES {{ p.amount }}</td>
+          <td class="px-4 py-3">
+            <span class="px-2 py-0.5 rounded-full text-xs font-semibold
+              {% if p.status == 'success' %}bg-green-100 text-green-700
+              {% elif p.status == 'pending' %}bg-yellow-100 text-yellow-700
+              {% else %}bg-red-100 text-red-700{% endif %}">
+              {{ p.status }}
+            </span>
+          </td>
+          <td class="px-4 py-3 text-xs font-mono text-gray-400">
+            {{ p.lipana_transaction_id or p.lipana_checkout_request_id or '—' }}
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="6" class="px-4 py-12 text-center text-gray-400">No payments yet.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

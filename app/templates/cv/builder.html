@@ -1,0 +1,399 @@
+{% extends "base_dashboard.html" %}
+{% block title %}CV Builder{% endblock %}
+{% block page_title %}{% if resume %}Edit: {{ resume.title }}{% else %}New CV{% endif %}{% endblock %}
+
+{% block content %}
+<div x-data="cvBuilder()" x-init="init()" class="max-w-4xl">
+
+  <!-- Step progress -->
+  <div class="flex items-center gap-1 mb-8 overflow-x-auto pb-2">
+    {% set steps = ['Personal','Summary','Experience','Education','Skills','Certifications','Projects','Review'] %}
+    {% for s in steps %}
+    <button @click="goToStep({{ loop.index }})"
+            class="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold flex-shrink-0 transition"
+            :class="currentStep === {{ loop.index }} ? 'gradient-brand text-white' :
+                    currentStep > {{ loop.index }} ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'">
+      <span x-show="currentStep > {{ loop.index }}">✓</span>
+      {{ s }}
+    </button>
+    {% if not loop.last %}
+    <div class="w-4 h-px bg-gray-200 flex-shrink-0"></div>
+    {% endif %}
+    {% endfor %}
+  </div>
+
+  <div class="grid lg:grid-cols-5 gap-6">
+    <!-- Form panel -->
+    <div class="lg:col-span-3 bg-white rounded-xl border border-gray-100 shadow-sm">
+
+      <!-- Step 1: Personal Info -->
+      <div x-show="currentStep === 1" class="p-6 space-y-4">
+        <h2 class="font-bold text-gray-900">Personal Information</h2>
+        <div class="grid sm:grid-cols-2 gap-4">
+          {% for name, label, placeholder in [
+            ('full_name','Full Name','e.g. Wanjiru Kamau'),
+            ('job_title','Job Title / Headline','e.g. Software Engineer'),
+            ('email','Email','wanjiru@example.com'),
+            ('phone','Phone','e.g. 0712 345678'),
+            ('location','Location','e.g. Nairobi, Kenya'),
+            ('linkedin','LinkedIn URL','linkedin.com/in/...'),
+          ] %}
+          <div>
+            <label class="block text-xs font-semibold text-gray-700 mb-1">{{ label }}</label>
+            <input type="text" x-model="data.personal_info.{{ name }}" placeholder="{{ placeholder }}"
+                   @change="autosave('personal_info', data.personal_info)"
+                   class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Step 2: Summary -->
+      <div x-show="currentStep === 2" class="p-6 space-y-4">
+        <div class="flex items-center justify-between">
+          <h2 class="font-bold text-gray-900">Professional Summary</h2>
+          <button @click="aiAssist('professional_summary', data.professional_summary)"
+                  :disabled="aiLoading"
+                  class="text-xs px-3 py-1.5 gradient-brand text-white rounded-lg hover:opacity-90 transition disabled:opacity-50">
+            <span x-show="!aiLoading">✨ AI Write</span>
+            <span x-show="aiLoading" x-cloak>Thinking…</span>
+          </button>
+        </div>
+        <textarea x-model="data.professional_summary" rows="6"
+                  @change="autosave('professional_summary', data.professional_summary)"
+                  placeholder="A brief, powerful summary of your professional background, key skills, and career goals (3-4 sentences)..."
+                  class="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"></textarea>
+        <p class="text-xs text-gray-400" x-text="(data.professional_summary || '').length + ' / 600 chars'"></p>
+      </div>
+
+      <!-- Step 3: Experience -->
+      <div x-show="currentStep === 3" class="p-6 space-y-4">
+        <div class="flex items-center justify-between">
+          <h2 class="font-bold text-gray-900">Work Experience</h2>
+          <button @click="addExperience()" class="text-xs px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition font-medium">
+            + Add Job
+          </button>
+        </div>
+        <template x-for="(job, i) in data.work_experience" :key="i">
+          <div class="border border-gray-200 rounded-xl p-4 space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold text-gray-500" x-text="'Position ' + (i+1)"></span>
+              <button @click="removeItem('work_experience', i)" class="text-red-400 hover:text-red-600 text-xs">Remove</button>
+            </div>
+            <div class="grid sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Job Title *</label>
+                <input type="text" x-model="job.job_title" placeholder="e.g. Senior Developer"
+                       @change="autosave('work_experience', data.work_experience)"
+                       class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Company *</label>
+                <input type="text" x-model="job.company" placeholder="e.g. Safaricom"
+                       @change="autosave('work_experience', data.work_experience)"
+                       class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Start Date</label>
+                <input type="text" x-model="job.start_date" placeholder="Jan 2022"
+                       @change="autosave('work_experience', data.work_experience)"
+                       class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">End Date</label>
+                <input type="text" x-model="job.end_date" placeholder="Present"
+                       @change="autosave('work_experience', data.work_experience)"
+                       class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+              </div>
+            </div>
+            <div>
+              <div class="flex items-center justify-between mb-1">
+                <label class="text-xs font-medium text-gray-600">Responsibilities & Achievements</label>
+                <button @click="aiAssist('work_experience', job.description, i)"
+                        class="text-xs text-blue-600 hover:underline">✨ AI Improve</button>
+              </div>
+              <textarea x-model="job.description" rows="4"
+                        @change="autosave('work_experience', data.work_experience)"
+                        placeholder="• Led a team of 5 engineers to deliver X project&#10;• Increased performance by 40%&#10;• Built Y feature used by 10,000+ users"
+                        class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y font-mono"></textarea>
+            </div>
+          </div>
+        </template>
+        <button x-show="data.work_experience.length === 0" @click="addExperience()"
+                class="w-full py-3 border-2 border-dashed border-gray-200 rounded-xl text-sm text-gray-400 hover:border-blue-300 hover:text-blue-500 transition">
+          + Add your first work experience
+        </button>
+      </div>
+
+      <!-- Step 4: Education -->
+      <div x-show="currentStep === 4" class="p-6 space-y-4">
+        <div class="flex items-center justify-between">
+          <h2 class="font-bold text-gray-900">Education</h2>
+          <button @click="addEducation()" class="text-xs px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition font-medium">
+            + Add
+          </button>
+        </div>
+        <template x-for="(edu, i) in data.education" :key="i">
+          <div class="border border-gray-200 rounded-xl p-4 space-y-3">
+            <div class="flex justify-between items-center">
+              <span class="text-xs font-semibold text-gray-500" x-text="'Education ' + (i+1)"></span>
+              <button @click="removeItem('education', i)" class="text-red-400 hover:text-red-600 text-xs">Remove</button>
+            </div>
+            <div class="grid sm:grid-cols-2 gap-3">
+              {% for field, placeholder in [('degree','e.g. BSc Computer Science'),('institution','e.g. University of Nairobi'),('year','e.g. 2020'),('grade','e.g. Second Upper')] %}
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">{{ field|title }}</label>
+                <input type="text" x-model="edu.{{ field }}" placeholder="{{ placeholder }}"
+                       @change="autosave('education', data.education)"
+                       class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+        </template>
+      </div>
+
+      <!-- Step 5: Skills -->
+      <div x-show="currentStep === 5" class="p-6 space-y-4">
+        <div class="flex items-center justify-between">
+          <h2 class="font-bold text-gray-900">Skills</h2>
+          <button @click="aiAssist('skills', data.professional_summary)"
+                  :disabled="aiLoading"
+                  class="text-xs px-3 py-1.5 gradient-brand text-white rounded-lg hover:opacity-90 transition disabled:opacity-50">
+            ✨ AI Suggest
+          </button>
+        </div>
+        <div class="flex flex-wrap gap-2 min-h-12 p-3 border border-gray-200 rounded-xl">
+          <template x-for="(skill, i) in data.skills" :key="i">
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-50 text-blue-700 text-sm rounded-full">
+              <span x-text="skill"></span>
+              <button @click="removeItem('skills', i)" class="text-blue-400 hover:text-blue-700 font-bold leading-none">×</button>
+            </span>
+          </template>
+        </div>
+        <div class="flex gap-2">
+          <input type="text" x-model="newSkill" placeholder="Type a skill and press Enter"
+                 @keydown.enter.prevent="addSkill()"
+                 class="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+          <button @click="addSkill()" class="px-4 py-2 gradient-brand text-white rounded-lg text-sm font-medium hover:opacity-90 transition">Add</button>
+        </div>
+      </div>
+
+      <!-- Step 6: Certifications -->
+      <div x-show="currentStep === 6" class="p-6 space-y-4">
+        <h2 class="font-bold text-gray-900">Certifications <span class="text-gray-400 font-normal text-sm">(optional)</span></h2>
+        <template x-for="(cert, i) in data.certifications" :key="i">
+          <div class="flex gap-2 items-start">
+            <input type="text" x-model="data.certifications[i]" placeholder="e.g. AWS Certified Developer"
+                   @change="autosave('certifications', data.certifications)"
+                   class="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+            <button @click="removeItem('certifications', i)" class="text-red-400 hover:text-red-600 mt-2">×</button>
+          </div>
+        </template>
+        <button @click="data.certifications.push('')"
+                class="text-sm text-blue-600 hover:underline font-medium">+ Add Certification</button>
+      </div>
+
+      <!-- Step 7: Projects -->
+      <div x-show="currentStep === 7" class="p-6 space-y-4">
+        <h2 class="font-bold text-gray-900">Projects <span class="text-gray-400 font-normal text-sm">(optional)</span></h2>
+        <template x-for="(proj, i) in data.projects" :key="i">
+          <div class="border border-gray-200 rounded-xl p-4 space-y-3">
+            <div class="flex justify-between">
+              <span class="text-xs font-semibold text-gray-500" x-text="'Project ' + (i+1)"></span>
+              <button @click="removeItem('projects', i)" class="text-red-400 text-xs">Remove</button>
+            </div>
+            <input type="text" x-model="proj.name" placeholder="Project name"
+                   @change="autosave('projects', data.projects)"
+                   class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+            <textarea x-model="proj.description" rows="2" placeholder="Brief description..."
+                      @change="autosave('projects', data.projects)"
+                      class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"></textarea>
+            <input type="text" x-model="proj.url" placeholder="URL (optional)"
+                   @change="autosave('projects', data.projects)"
+                   class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+          </div>
+        </template>
+        <button @click="data.projects.push({name:'',description:'',url:''})"
+                class="text-sm text-blue-600 hover:underline font-medium">+ Add Project</button>
+      </div>
+
+      <!-- Step 8: Review -->
+      <div x-show="currentStep === 8" class="p-6 space-y-5">
+        <h2 class="font-bold text-gray-900">Review & Finish</h2>
+        <div class="space-y-3">
+          {% for label, field in [('Name','personal_info.full_name'),('Job Title','personal_info.job_title'),('Summary (chars)','professional_summary')] %}
+          <div class="flex justify-between text-sm">
+            <span class="text-gray-500">{{ label }}</span>
+            <span class="font-medium text-gray-900 truncate max-w-xs"
+                  x-text="{% if '.' in field %}data.{{ field.split('.')[0] }}?.{{ field.split('.')[1] }} || '—'{% else %}(data.{{ field }}?.length || 0) + ' chars'{% endif %}"></span>
+          </div>
+          {% endfor %}
+          <div class="flex justify-between text-sm">
+            <span class="text-gray-500">Experience entries</span>
+            <span class="font-medium" x-text="data.work_experience.length"></span>
+          </div>
+          <div class="flex justify-between text-sm">
+            <span class="text-gray-500">Skills</span>
+            <span class="font-medium" x-text="data.skills.length"></span>
+          </div>
+        </div>
+        <div class="flex gap-3 pt-2">
+          {% if resume %}
+          <a href="{{ url_for('cv.download', resume_id=resume.id, fmt='pdf') }}"
+             class="flex-1 text-center py-3 gradient-brand text-white font-semibold rounded-xl hover:opacity-90 transition text-sm">
+            Download PDF
+          </a>
+          {% if current_user.is_premium %}
+          <a href="{{ url_for('cv.download', resume_id=resume.id, fmt='docx') }}"
+             class="flex-1 text-center py-3 border border-gray-200 font-semibold rounded-xl hover:bg-gray-50 transition text-sm">
+            Download DOCX
+          </a>
+          {% endif %}
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Nav buttons -->
+      <div class="px-6 pb-6 flex justify-between items-center border-t border-gray-100 pt-4 mt-2">
+        <button @click="prevStep()" x-show="currentStep > 1"
+                class="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50 transition">
+          ← Back
+        </button>
+        <span x-show="currentStep === 1"></span>
+        <div class="flex items-center gap-3">
+          <span class="text-xs text-gray-400" x-show="lastSaved" x-text="'Saved ' + lastSaved"></span>
+          <button @click="nextStep()" x-show="currentStep < 8"
+                  class="px-5 py-2 gradient-brand text-white rounded-lg text-sm font-semibold hover:opacity-90 transition">
+            Next →
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live preview panel -->
+    <div class="lg:col-span-2 hidden lg:block">
+      <div class="sticky top-24 bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+        <div class="px-4 py-3 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+          <span class="text-xs font-semibold text-gray-600">Live Preview</span>
+          <span class="text-xs text-gray-400" x-text="currentStep + '/8'"></span>
+        </div>
+        <div class="p-4 text-xs space-y-3 max-h-96 overflow-y-auto">
+          <div x-show="data.personal_info.full_name" class="text-center border-b border-gray-100 pb-3">
+            <p class="font-bold text-gray-900" x-text="data.personal_info.full_name"></p>
+            <p class="text-blue-600" x-text="data.personal_info.job_title"></p>
+            <p class="text-gray-400" x-text="[data.personal_info.email, data.personal_info.phone, data.personal_info.location].filter(Boolean).join(' · ')"></p>
+          </div>
+          <div x-show="data.professional_summary">
+            <p class="font-bold text-gray-700 text-xs uppercase tracking-wide mb-1">Summary</p>
+            <p class="text-gray-600 leading-relaxed" x-text="data.professional_summary"></p>
+          </div>
+          <div x-show="data.work_experience.length > 0">
+            <p class="font-bold text-gray-700 text-xs uppercase tracking-wide mb-1">Experience</p>
+            <template x-for="job in data.work_experience.slice(0,2)">
+              <div class="mb-1.5">
+                <p class="font-semibold text-gray-800" x-text="job.job_title + (job.company ? ' · ' + job.company : '')"></p>
+                <p class="text-gray-400" x-text="[job.start_date, job.end_date].filter(Boolean).join(' – ')"></p>
+              </div>
+            </template>
+          </div>
+          <div x-show="data.skills.length > 0">
+            <p class="font-bold text-gray-700 text-xs uppercase tracking-wide mb-1">Skills</p>
+            <p class="text-gray-600" x-text="data.skills.slice(0,6).join(', ')"></p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function cvBuilder() {
+  return {
+    currentStep: {{ step or 1 }},
+    aiLoading: false,
+    lastSaved: '',
+    newSkill: '',
+    resumeId: {{ resume.id if resume else 'null' }},
+    data: {
+      personal_info: {{ (resume.personal_info or {})|tojson }},
+      professional_summary: {{ (resume.professional_summary or '')|tojson }},
+      work_experience: {{ (resume.work_experience or [])|tojson }},
+      education: {{ (resume.education or [])|tojson }},
+      skills: {{ (resume.skills or [])|tojson }},
+      certifications: {{ (resume.certifications or [])|tojson }},
+      projects: {{ (resume.projects or [])|tojson }},
+    },
+
+    init() {
+      if (!this.resumeId) {
+        fetch('{{ url_for("cv.create_cv") }}', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+          body: 'csrf_token={{ csrf_token() }}&title=New CV'
+        }).then(r => {
+          this.resumeId = r.url.match(/\/cv\/builder\/(\d+)/)?.[1];
+        });
+      }
+    },
+
+    goToStep(n) { this.currentStep = n; },
+    nextStep() { if (this.currentStep < 8) this.currentStep++; },
+    prevStep() { if (this.currentStep > 1) this.currentStep--; },
+
+    addExperience() {
+      this.data.work_experience.push({job_title:'',company:'',start_date:'',end_date:'Present',description:''});
+    },
+    addEducation() {
+      this.data.education.push({degree:'',institution:'',year:'',grade:''});
+    },
+    removeItem(section, i) {
+      this.data[section].splice(i, 1);
+      this.autosave(section, this.data[section]);
+    },
+    addSkill() {
+      if (this.newSkill.trim()) {
+        this.data.skills.push(this.newSkill.trim());
+        this.newSkill = '';
+        this.autosave('skills', this.data.skills);
+      }
+    },
+
+    autosave(section, content) {
+      if (!this.resumeId) return;
+      fetch(`/cv/builder/${this.resumeId}/save`, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json','X-CSRFToken':'{{ csrf_token() }}'},
+        body: JSON.stringify({section, content})
+      }).then(r => r.json()).then(d => {
+        this.lastSaved = new Date().toLocaleTimeString();
+      }).catch(() => {});
+    },
+
+    aiAssist(section, context) {
+      if (!this.resumeId || this.aiLoading) return;
+      this.aiLoading = true;
+      fetch(`/cv/builder/${this.resumeId}/ai-assist`, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json','X-CSRFToken':'{{ csrf_token() }}'},
+        body: JSON.stringify({section, context: String(context || '')})
+      }).then(r => r.json()).then(d => {
+        if (d.error) { alert(d.error); return; }
+        if (section === 'professional_summary') {
+          this.data.professional_summary = d.result;
+          this.autosave('professional_summary', d.result);
+        } else if (section === 'skills') {
+          try {
+            const skills = JSON.parse(d.result);
+            if (Array.isArray(skills)) {
+              this.data.skills = [...new Set([...this.data.skills, ...skills])];
+              this.autosave('skills', this.data.skills);
+            }
+          } catch(e) {}
+        }
+      }).finally(() => { this.aiLoading = false; });
+    },
+  };
+}
+</script>
+{% endblock %}

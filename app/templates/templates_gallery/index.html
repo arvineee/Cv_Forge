@@ -1,0 +1,65 @@
+{% extends "base_dashboard.html" %}
+{% block title %}Templates{% endblock %}
+{% block page_title %}CV Templates{% endblock %}
+{% block page_subtitle %}{{ templates|length }} professional designs{% endblock %}
+
+{% block content %}
+<!-- Category filter -->
+<div class="flex flex-wrap gap-2 mb-6">
+  <a href="{{ url_for('templates_gallery.index') }}"
+     class="px-4 py-1.5 rounded-full text-sm font-medium transition
+     {% if active_category == 'all' %}gradient-brand text-white{% else %}bg-white border border-gray-200 text-gray-600 hover:bg-gray-50{% endif %}">
+    All
+  </a>
+  {% for cat in categories %}
+  <a href="{{ url_for('templates_gallery.index', category=cat) }}"
+     class="px-4 py-1.5 rounded-full text-sm font-medium capitalize transition
+     {% if active_category == cat %}gradient-brand text-white{% else %}bg-white border border-gray-200 text-gray-600 hover:bg-gray-50{% endif %}">
+    {{ cat }}
+  </a>
+  {% endfor %}
+</div>
+
+<div class="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+  {% for t in templates %}
+  <div class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden card-hover group">
+    <!-- Preview swatch showing template accent color -->
+    <div class="h-32 relative flex flex-col items-center justify-center"
+         style="background: linear-gradient(135deg, {{ t.accent_color }}22 0%, {{ t.accent_color }}44 100%)">
+      <div class="w-16 h-1 rounded mb-1.5" style="background-color:{{ t.accent_color }}"></div>
+      <div class="w-24 h-0.5 bg-gray-200 rounded mb-1"></div>
+      <div class="w-20 h-0.5 bg-gray-200 rounded mb-1"></div>
+      <div class="w-24 h-0.5 bg-gray-200 rounded"></div>
+      {% if t.is_premium %}
+      <div class="absolute top-2 right-2">
+        <span class="text-xs font-bold px-2 py-0.5 rounded-full"
+              style="background-color:{{ t.accent_color }}; color:white">Pro</span>
+      </div>
+      {% endif %}
+    </div>
+    <div class="p-4">
+      <p class="font-semibold text-gray-900 text-sm">{{ t.name }}</p>
+      <p class="text-xs text-gray-400 capitalize mt-0.5 mb-3">{{ t.category }} · used {{ t.use_count }}×</p>
+      {% if t.description %}
+      <p class="text-xs text-gray-500 mb-3 line-clamp-2">{{ t.description }}</p>
+      {% endif %}
+      {% if t.is_premium and not current_user.is_premium %}
+      <a href="{{ url_for('billing.plans') }}"
+         class="block w-full text-center text-xs py-2 rounded-lg font-semibold"
+         style="background-color:{{ t.accent_color }}22; color:{{ t.accent_color }}">
+        ⚡ Upgrade to Use
+      </a>
+      {% else %}
+      <a href="{{ url_for('cv.new_cv') }}?template_id={{ t.id }}"
+         class="block w-full text-center text-xs py-2 rounded-lg text-white font-semibold hover:opacity-90 transition"
+         style="background-color:{{ t.accent_color }}">
+        Use Template
+      </a>
+      {% endif %}
+    </div>
+  </div>
+  {% else %}
+  <div class="col-span-full text-center py-12 text-gray-400">No templates in this category.</div>
+  {% endfor %}
+</div>
+{% endblock %}

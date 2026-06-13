@@ -1,0 +1,48 @@
+{% extends "base_dashboard.html" %}
+{% block title %}Payment Pending{% endblock %}
+{% block page_title %}Payment in Progress{% endblock %}
+{% block page_subtitle %}Waiting for M-Pesa confirmation{% endblock %}
+
+{% block content %}
+<div class="max-w-md mx-auto text-center py-8" x-data="{checking: false}"
+     x-init="setInterval(() => {
+       fetch('{{ url_for('billing.payment_status', reference=subscription.payment_reference) }}')
+         .then(r => r.json())
+         .then(d => { if(d.redirect) window.location = d.redirect; });
+     }, 5000)">
+
+  <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 mb-6">
+    <div class="w-16 h-16 rounded-full bg-yellow-100 flex items-center justify-center mx-auto mb-4">
+      <svg class="w-8 h-8 text-yellow-500 animate-spin" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+      </svg>
+    </div>
+    <h2 class="text-xl font-bold text-gray-900 mb-2">Waiting for Payment</h2>
+    <p class="text-gray-500 text-sm mb-4">
+      An M-Pesa prompt has been sent to your phone.<br/>
+      Enter your PIN to complete the payment.
+    </p>
+    <div class="bg-gray-50 rounded-xl p-4 text-left text-sm space-y-2">
+      <div class="flex justify-between">
+        <span class="text-gray-500">Plan</span>
+        <span class="font-semibold capitalize">{{ subscription.plan }}</span>
+      </div>
+      <div class="flex justify-between">
+        <span class="text-gray-500">Amount</span>
+        <span class="font-semibold">KES {{ subscription.amount }}</span>
+      </div>
+      <div class="flex justify-between">
+        <span class="text-gray-500">Reference</span>
+        <span class="font-mono text-xs">{{ subscription.payment_reference }}</span>
+      </div>
+    </div>
+  </div>
+
+  <p class="text-xs text-gray-400">This page will update automatically when payment is confirmed.</p>
+  <p class="text-xs text-gray-400 mt-1">
+    Having trouble?
+    <a href="{{ url_for('billing.plans') }}" class="text-blue-600 hover:underline">Try again</a>
+  </p>
+</div>
+{% endblock %}

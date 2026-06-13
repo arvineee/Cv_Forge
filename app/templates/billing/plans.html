@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Pricing Plans{% endblock %}
+{% block body %}
+<div class="min-h-screen bg-gray-50 py-16 px-4">
+  <div class="max-w-5xl mx-auto">
+    <div class="text-center mb-12">
+      <h1 class="text-4xl font-bold text-gray-900">Simple, transparent pricing</h1>
+      <p class="text-gray-500 mt-3 text-lg">Cancel anytime. Pay with M-Pesa.</p>
+    </div>
+
+    <div class="grid md:grid-cols-{{ plans|length }} gap-6">
+      {% for plan in plans %}
+      <div class="bg-white rounded-2xl border {% if plan.is_popular %}border-blue-400 shadow-xl ring-2 ring-blue-100{% else %}border-gray-100 shadow-sm{% endif %} p-7 flex flex-col relative">
+        {% if plan.is_popular %}
+        <div class="absolute -top-3.5 left-1/2 -translate-x-1/2">
+          <span class="px-4 py-1.5 gradient-brand text-white text-xs font-bold rounded-full shadow">
+            Most Popular
+          </span>
+        </div>
+        {% endif %}
+
+        <div class="mb-6">
+          <h2 class="text-xl font-bold text-gray-900">{{ plan.name }}</h2>
+          <div class="mt-3 flex items-end gap-1">
+            {% if plan.price_kes == 0 %}
+            <span class="text-4xl font-bold text-gray-900">Free</span>
+            {% else %}
+            <span class="text-4xl font-bold text-gray-900">KES {{ plan.price_kes }}</span>
+            <span class="text-gray-400 mb-1">/{{ plan.billing_period }}</span>
+            {% endif %}
+          </div>
+        </div>
+
+        <ul class="space-y-3 mb-8 flex-1">
+          {% for feature in (plan.features or []) %}
+          <li class="flex items-start gap-2.5 text-sm text-gray-600">
+            <svg class="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+            </svg>
+            {{ feature }}
+          </li>
+          {% endfor %}
+        </ul>
+
+        {% if plan.price_kes == 0 %}
+        <a href="{{ url_for('auth.register') }}"
+           class="block w-full text-center py-3 border border-gray-200 rounded-xl font-semibold text-gray-700 hover:bg-gray-50 transition text-sm">
+          Get Started Free
+        </a>
+        {% else %}
+        <div x-data="{open: false}" class="relative">
+          <button @click="open=!open"
+                  class="w-full py-3 gradient-brand text-white font-semibold rounded-xl hover:opacity-90 transition text-sm">
+            Subscribe — KES {{ plan.price_kes }}
+          </button>
+          <div x-show="open" x-cloak @click.away="open=false"
+               class="absolute bottom-full mb-2 left-0 right-0 bg-white rounded-xl border border-gray-200 shadow-xl p-4">
+            <form method="POST" action="{{ url_for('billing.subscribe', plan_slug=plan.slug) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+              <label class="block text-xs font-medium text-gray-700 mb-1">M-Pesa Phone Number</label>
+              <input type="tel" name="phone" placeholder="07XXXXXXXX" required
+                     class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 mb-3"/>
+              <button type="submit"
+                      class="w-full py-2.5 gradient-brand text-white font-semibold rounded-lg text-sm hover:opacity-90 transition">
+                Pay with M-Pesa
+              </button>
+            </form>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+
+    <p class="text-center text-xs text-gray-400 mt-8">
+      Secure payments via Lipana M-Pesa. No credit card needed.
+    </p>
+  </div>
+</div>
+{% endblock %}

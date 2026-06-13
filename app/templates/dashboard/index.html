@@ -1,0 +1,114 @@
+{% extends "base_dashboard.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Welcome back, {{ current_user.first_name or 'there' }} 👋{% endblock %}
+{% block page_subtitle %}Here's what's happening with your CVs today.{% endblock %}
+
+{% block page_actions %}
+  <a href="{{ url_for('cv.new_cv') }}"
+     class="inline-flex items-center gap-2 px-4 py-2 rounded-lg gradient-brand text-white text-sm font-semibold hover:opacity-90 transition">
+    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+    </svg>
+    New CV
+  </a>
+{% endblock %}
+
+{% block content %}
+<!-- Stats row -->
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+  {% set stats = [
+    ('My CVs', resumes|length, 'text-blue-600', 'bg-blue-50'),
+    ('Cover Letters', cover_letters|length, 'text-purple-600', 'bg-purple-50'),
+    ('ATS Score', (recent_report.score ~ '%') if recent_report else '—', 'text-green-600', 'bg-green-50'),
+    ('AI Used Today', daily_ai_used, 'text-orange-600', 'bg-orange-50'),
+  ] %}
+  {% for label, value, text_cls, bg_cls in stats %}
+  <div class="bg-white rounded-xl p-5 border border-gray-100 shadow-sm">
+    <p class="text-sm text-gray-500 font-medium">{{ label }}</p>
+    <p class="text-3xl font-bold mt-1 {{ text_cls }}">{{ value }}</p>
+  </div>
+  {% endfor %}
+</div>
+
+{% if not current_user.is_premium %}
+<div class="mb-6 p-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex items-center justify-between gap-4">
+  <div>
+    <p class="font-semibold">Unlock unlimited AI generations</p>
+    <p class="text-blue-100 text-sm mt-0.5">Upgrade to Pro — from KES 799/month</p>
+  </div>
+  <a href="{{ url_for('billing.plans') }}"
+     class="flex-shrink-0 px-4 py-2 bg-white text-blue-700 font-semibold text-sm rounded-lg hover:bg-blue-50 transition">
+    Upgrade →
+  </a>
+</div>
+{% endif %}
+
+<div class="grid lg:grid-cols-2 gap-6">
+  <!-- Recent CVs -->
+  <div class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+      <h2 class="font-semibold text-gray-900">Recent CVs</h2>
+      <a href="{{ url_for('cv.list_cvs') }}" class="text-sm text-blue-600 hover:underline">View all</a>
+    </div>
+    {% if resumes %}
+    <ul class="divide-y divide-gray-50">
+      {% for resume in resumes %}
+      <li class="flex items-center justify-between px-6 py-3 hover:bg-gray-50 transition-colors">
+        <div class="min-w-0">
+          <p class="font-medium text-gray-900 truncate text-sm">{{ resume.title }}</p>
+          <p class="text-xs text-gray-400 mt-0.5">{{ resume.updated_at.strftime('%d %b %Y') }}</p>
+        </div>
+        <div class="flex items-center gap-2 flex-shrink-0 ml-4">
+          {% if resume.ats_score %}
+          <span class="text-xs font-semibold px-2 py-1 rounded-full
+            {% if resume.ats_score >= 80 %}bg-green-100 text-green-700
+            {% elif resume.ats_score >= 60 %}bg-yellow-100 text-yellow-700
+            {% else %}bg-red-100 text-red-700{% endif %}">
+            {{ resume.ats_score }}%
+          </span>
+          {% endif %}
+          <a href="{{ url_for('cv.builder', resume_id=resume.id) }}"
+             class="text-xs text-blue-600 hover:underline font-medium">Edit</a>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <div class="text-center py-12 px-6">
+      <svg class="w-12 h-12 text-gray-200 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+      </svg>
+      <p class="text-gray-400 text-sm mb-3">No CVs yet</p>
+      <a href="{{ url_for('cv.new_cv') }}"
+         class="inline-block px-4 py-2 text-sm gradient-brand text-white rounded-lg font-medium hover:opacity-90">
+        Create your first CV
+      </a>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Quick actions -->
+  <div class="space-y-4">
+    {% set actions = [
+      (url_for('cv.upload'), '⬆️', 'Upload & Revamp CV', 'Upload an existing CV and let AI improve it', 'bg-blue-50 hover:bg-blue-100'),
+      (url_for('cover_letter.new_letter'), '✉️', 'Generate Cover Letter', 'AI-tailored to any job in seconds', 'bg-purple-50 hover:bg-purple-100'),
+      (url_for('ats.index'), '📊', 'ATS Score Checker', 'Check how your CV ranks against job descriptions', 'bg-green-50 hover:bg-green-100'),
+      (url_for('templates_gallery.index'), '🎨', 'Browse Templates', 'Professional designs for every industry', 'bg-orange-50 hover:bg-orange-100'),
+    ] %}
+    {% for href, emoji, title, desc, cls in actions %}
+    <a href="{{ href }}"
+       class="flex items-center gap-4 p-4 rounded-xl border border-gray-100 {{ cls }} transition-colors group">
+      <span class="text-2xl">{{ emoji }}</span>
+      <div>
+        <p class="font-semibold text-gray-900 text-sm">{{ title }}</p>
+        <p class="text-xs text-gray-500 mt-0.5">{{ desc }}</p>
+      </div>
+      <svg class="w-4 h-4 ml-auto text-gray-300 group-hover:text-gray-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+      </svg>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,81 @@
+{% extends "base_dashboard.html" %}
+{% block title %}Users — Admin{% endblock %}
+{% block page_title %}Users{% endblock %}
+{% block page_subtitle %}{{ pagination.total }} total users{% endblock %}
+
+{% block content %}
+<form method="GET" class="mb-6 flex gap-3">
+  <input type="text" name="q" value="{{ q }}" placeholder="Search email or name..."
+         class="flex-1 border border-gray-200 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+  <button type="submit" class="px-4 py-2 gradient-brand text-white rounded-lg text-sm font-medium">Search</button>
+</form>
+
+<div class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
+        <tr>
+          <th class="px-4 py-3 text-left">User</th>
+          <th class="px-4 py-3 text-left">Plan</th>
+          <th class="px-4 py-3 text-left">Joined</th>
+          <th class="px-4 py-3 text-left">Status</th>
+          <th class="px-4 py-3 text-left">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-50">
+        {% for user in pagination.items %}
+        <tr class="hover:bg-gray-50">
+          <td class="px-4 py-3">
+            <p class="font-medium text-gray-900">{{ user.full_name }}</p>
+            <p class="text-gray-400 text-xs">{{ user.email }}</p>
+          </td>
+          <td class="px-4 py-3">
+            <span class="px-2 py-0.5 rounded-full text-xs font-semibold capitalize
+              {% if user.plan == 'premium' %}bg-indigo-100 text-indigo-700
+              {% elif user.plan == 'pro' %}bg-purple-100 text-purple-700
+              {% else %}bg-gray-100 text-gray-600{% endif %}">
+              {{ user.plan }}
+            </span>
+          </td>
+          <td class="px-4 py-3 text-gray-500">{{ user.created_at.strftime('%d %b %Y') }}</td>
+          <td class="px-4 py-3">
+            <span class="text-xs {% if user.is_active %}text-green-600{% else %}text-red-500{% endif %} font-medium">
+              {{ 'Active' if user.is_active else 'Inactive' }}
+            </span>
+          </td>
+          <td class="px-4 py-3">
+            <div class="flex gap-2">
+              <form method="POST" action="{{ url_for('admin.impersonate', user_id=user.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <button type="submit" class="text-xs text-blue-600 hover:underline">Login as</button>
+              </form>
+              <form method="POST" action="{{ url_for('admin.toggle_user_active', user_id=user.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <button type="submit" class="text-xs {% if user.is_active %}text-red-400{% else %}text-green-500{% endif %} hover:underline">
+                  {{ 'Deactivate' if user.is_active else 'Activate' }}
+                </button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if pagination.pages > 1 %}
+<div class="mt-4 flex justify-center gap-2">
+  {% for page in pagination.iter_pages() %}
+    {% if page %}
+    <a href="{{ url_for('admin.users', page=page, q=q) }}"
+       class="px-3 py-1.5 text-sm rounded-lg {% if page == pagination.page %}gradient-brand text-white{% else %}border border-gray-200 hover:bg-gray-50{% endif %}">
+      {{ page }}
+    </a>
+    {% else %}
+    <span class="px-2 py-1.5 text-gray-300">…</span>
+    {% endif %}
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

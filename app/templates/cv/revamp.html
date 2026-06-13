@@ -1,0 +1,53 @@
+{% extends "base_dashboard.html" %}
+{% block title %}AI Revamp{% endblock %}
+{% block page_title %}AI Revamp{% endblock %}
+{% block page_subtitle %}Let AI rewrite your CV to be more impactful and ATS-friendly{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl">
+  <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-6 mb-6">
+    <div class="flex items-start gap-4 mb-6">
+      <div class="w-12 h-12 rounded-xl gradient-brand flex items-center justify-center flex-shrink-0">
+        <span class="text-white text-xl">✨</span>
+      </div>
+      <div>
+        <h2 class="font-semibold text-gray-900">AI-Powered Revamp</h2>
+        <p class="text-sm text-gray-500 mt-1">
+          Our AI will analyze <strong>{{ resume.title }}</strong>, rewrite your summary with stronger language,
+          optimize bullet points with action verbs and metrics, and improve your skills section — all
+          while keeping your version history safe.
+        </p>
+      </div>
+    </div>
+
+    {% if not current_user.is_premium %}
+    <div class="mb-4 p-3 bg-yellow-50 border border-yellow-100 rounded-lg text-sm text-yellow-700">
+      ⚡ Free plan: 3 AI operations/day.
+      <a href="{{ url_for('billing.plans') }}" class="font-semibold underline">Upgrade for unlimited access.</a>
+    </div>
+    {% endif %}
+
+    <form method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+      <button type="submit"
+              class="w-full py-3 px-6 gradient-brand text-white font-semibold rounded-xl hover:opacity-90 transition text-sm">
+        ✨ Revamp with AI Now
+      </button>
+    </form>
+  </div>
+
+  <div class="bg-gray-50 rounded-xl border border-dashed border-gray-200 p-6">
+    <h3 class="font-medium text-gray-700 mb-3 text-sm">What the AI will improve</h3>
+    <ul class="space-y-2 text-sm text-gray-600">
+      {% for item in [
+        '📝 Professional summary — more impactful and keyword-rich',
+        '💼 Work experience — stronger action verbs and quantified achievements',
+        '🛠 Skills — optimized for ATS scanners',
+        '✅ Overall language — clear, confident, and professional',
+      ] %}
+      <li class="flex gap-2">{{ item }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+{% endblock %}

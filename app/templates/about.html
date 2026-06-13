@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}About CVForge AI{% endblock %}
+{% block body %}
+<nav class="sticky top-0 z-50 bg-white/90 backdrop-blur-sm border-b border-gray-100">
+  <div class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+    <a href="{{ url_for('main.index') }}" class="flex items-center gap-2 font-bold text-xl text-gray-900">
+      <div class="w-8 h-8 rounded-lg gradient-brand flex items-center justify-center text-white font-black text-xs">CV</div>
+      CVForge AI
+    </a>
+    <div class="flex gap-3">
+      <a href="{{ url_for('auth.login') }}" class="text-sm font-medium text-gray-600 hover:text-gray-900 transition">Sign In</a>
+      <a href="{{ url_for('auth.register') }}" class="px-4 py-2 gradient-brand text-white text-sm font-semibold rounded-lg hover:opacity-90 transition">
+        Get Started Free
+      </a>
+    </div>
+  </div>
+</nav>
+
+<section class="py-24 px-4 bg-white">
+  <div class="max-w-3xl mx-auto">
+    <h1 class="text-4xl font-black text-gray-900 mb-6">Our Mission</h1>
+    <p class="text-lg text-gray-600 leading-relaxed mb-6">
+      CVForge AI was built with a single conviction: African professionals are world-class, and their CVs
+      should reflect that. Too many talented people lose opportunities not because of their skills, but because
+      their CV fails the first filter — an automated ATS scanner that never sees the human behind the document.
+    </p>
+    <p class="text-lg text-gray-600 leading-relaxed mb-6">
+      We built CVForge to close that gap. Using the same AI technology that powers Fortune 500 hiring tools,
+      we give every job seeker — from a fresh graduate in Nairobi to a senior engineer in Lagos — the ability
+      to build a CV that gets through the door.
+    </p>
+    <p class="text-lg text-gray-600 leading-relaxed mb-12">
+      No design skills needed. No expensive career coaches. Just powerful AI, professional templates,
+      and M-Pesa payments that work for everyone.
+    </p>
+
+    <h2 class="text-2xl font-bold text-gray-900 mb-6">What we believe</h2>
+    <div class="space-y-5 mb-16">
+      {% for title, desc in [
+        ('Your opportunity shouldn\'t depend on who you know.', 'A great CV levels the playing field. We make it easy for anyone to create one.'),
+        ('AI should work for you, not against you.', 'Most ATS systems reject good candidates on technicalities. We help you beat those systems.'),
+        ('Price shouldn\'t be a barrier.', 'Our free plan is genuinely useful. Pro plans start at KES 799 — less than a bowl of ugali and nyama choma.'),
+      ] %}
+      <div class="flex gap-4">
+        <div class="w-1.5 h-1.5 rounded-full bg-blue-500 mt-3 flex-shrink-0"></div>
+        <div>
+          <p class="font-semibold text-gray-900">{{ title }}</p>
+          <p class="text-gray-500 text-sm mt-1">{{ desc }}</p>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="bg-gray-50 rounded-2xl p-8 border border-gray-100 text-center">
+      <p class="text-2xl font-black text-gray-900 mb-2">Ready to build your best CV?</p>
+      <p class="text-gray-500 mb-6">Free to start. No credit card required.</p>
+      <a href="{{ url_for('auth.register') }}"
+         class="inline-block px-8 py-3 gradient-brand text-white font-bold rounded-xl hover:opacity-90 transition">
+        Get Started Free →
+      </a>
+    </div>
+  </div>
+</section>
+
+<footer class="bg-gray-900 text-gray-400 py-8 px-4 text-center text-sm">
+  © 2025 CVForge AI · Built in Kenya 🇰🇪 ·
+  <a href="{{ url_for('main.index') }}" class="hover:text-white transition">Home</a>
+</footer>
+{% endblock %}

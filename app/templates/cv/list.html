@@ -1,0 +1,100 @@
+{% extends "base_dashboard.html" %}
+{% block title %}My CVs{% endblock %}
+{% block page_title %}My CVs{% endblock %}
+{% block page_subtitle %}Manage and download your resumes{% endblock %}
+{% block page_actions %}
+  <a href="{{ url_for('cv.upload') }}"
+     class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 bg-white text-sm font-medium hover:bg-gray-50 transition">
+    Upload CV
+  </a>
+  <a href="{{ url_for('cv.new_cv') }}"
+     class="inline-flex items-center gap-2 px-4 py-2 rounded-lg gradient-brand text-white text-sm font-semibold hover:opacity-90 transition">
+    + New CV
+  </a>
+{% endblock %}
+
+{% block content %}
+{% if resumes %}
+<div class="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
+  {% for resume in resumes %}
+  <div class="bg-white rounded-xl border border-gray-100 shadow-sm card-hover p-5 flex flex-col">
+    <div class="flex items-start justify-between gap-3 mb-3">
+      <div class="min-w-0">
+        <h3 class="font-semibold text-gray-900 truncate">{{ resume.title }}</h3>
+        <p class="text-xs text-gray-400 mt-0.5">
+          Updated {{ resume.updated_at.strftime('%d %b %Y') }}
+          · <span class="capitalize">{{ resume.source or 'builder' }}</span>
+        </p>
+      </div>
+      {% if resume.ats_score %}
+      <span class="flex-shrink-0 text-sm font-bold px-2.5 py-1 rounded-full
+        {% if resume.ats_score >= 80 %}bg-green-100 text-green-700
+        {% elif resume.ats_score >= 60 %}bg-yellow-100 text-yellow-700
+        {% else %}bg-red-100 text-red-700{% endif %}">
+        {{ resume.ats_score }}%
+      </span>
+      {% endif %}
+    </div>
+
+    <div class="flex flex-wrap gap-1.5 mb-4">
+      <span class="text-xs px-2 py-0.5 rounded-full
+        {% if resume.status == 'complete' %}bg-green-100 text-green-700
+        {% elif resume.status == 'draft' %}bg-gray-100 text-gray-500
+        {% else %}bg-blue-100 text-blue-700{% endif %} capitalize">
+        {{ resume.status }}
+      </span>
+    </div>
+
+    <div class="mt-auto flex gap-2 flex-wrap">
+      <a href="{{ url_for('cv.builder', resume_id=resume.id) }}"
+         class="flex-1 text-center text-sm py-2 px-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition font-medium text-gray-700">
+        Edit
+      </a>
+      <a href="{{ url_for('cv.download', resume_id=resume.id, fmt='pdf') }}"
+         class="flex-1 text-center text-sm py-2 px-3 rounded-lg gradient-brand text-white hover:opacity-90 transition font-medium">
+        PDF
+      </a>
+      {% if current_user.is_premium %}
+      <a href="{{ url_for('cv.download', resume_id=resume.id, fmt='docx') }}"
+         class="flex-1 text-center text-sm py-2 px-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition font-medium text-gray-700">
+        DOCX
+      </a>
+      {% endif %}
+    </div>
+    <div class="flex gap-2 mt-2">
+      <a href="{{ url_for('cv.compare_versions', resume_id=resume.id) }}"
+         class="text-xs text-gray-400 hover:text-gray-600 transition">Versions</a>
+      <span class="text-gray-200">|</span>
+      <a href="{{ url_for('cv.revamp', resume_id=resume.id) }}"
+         class="text-xs text-blue-500 hover:text-blue-700 transition font-medium">✨ AI Revamp</a>
+      <span class="text-gray-200">|</span>
+      <form method="POST" action="{{ url_for('cv.delete', resume_id=resume.id) }}"
+            onsubmit="return confirm('Delete this CV? This cannot be undone.')">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <button type="submit" class="text-xs text-red-400 hover:text-red-600 transition">Delete</button>
+      </form>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="text-center py-24">
+  <svg class="w-16 h-16 text-gray-200 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+  </svg>
+  <h3 class="text-xl font-semibold text-gray-700 mb-2">No CVs yet</h3>
+  <p class="text-gray-400 mb-6">Create your first professional CV powered by AI</p>
+  <div class="flex justify-center gap-3">
+    <a href="{{ url_for('cv.new_cv') }}"
+       class="px-6 py-3 rounded-xl gradient-brand text-white font-semibold hover:opacity-90 transition">
+      Build from Scratch
+    </a>
+    <a href="{{ url_for('cv.upload') }}"
+       class="px-6 py-3 rounded-xl border border-gray-200 bg-white font-semibold hover:bg-gray-50 transition">
+      Upload Existing CV
+    </a>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

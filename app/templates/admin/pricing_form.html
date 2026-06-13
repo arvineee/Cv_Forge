@@ -1,0 +1,79 @@
+{% extends "base_dashboard.html" %}
+{% block title %}{{ 'Edit' if plan else 'New' }} Plan — Admin{% endblock %}
+{% block page_title %}{{ 'Edit' if plan else 'New' }} Pricing Plan{% endblock %}
+{% block page_actions %}
+  <a href="{{ url_for('admin.pricing') }}"
+     class="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50 transition">
+    ← Back
+  </a>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl">
+  <form method="POST" class="bg-white rounded-xl border border-gray-100 shadow-sm divide-y divide-gray-100">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
+    <div class="p-6 grid sm:grid-cols-2 gap-4">
+      {% macro field(label, name, value='', type='text', placeholder='', required=False) %}
+      <div>
+        <label class="block text-xs font-semibold text-gray-700 mb-1">{{ label }}{% if required %} *{% endif %}</label>
+        <input type="{{ type }}" name="{{ name }}" value="{{ value }}"
+               placeholder="{{ placeholder }}" {% if required %}required{% endif %}
+               class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+      </div>
+      {% endmacro %}
+
+      {{ field('Plan Name', 'name', plan.name if plan else '', required=True, placeholder='e.g. Pro') }}
+      {{ field('Slug (unique ID)', 'slug', plan.slug if plan else '', required=True, placeholder='e.g. pro') }}
+      {{ field('Price (KES)', 'price_kes', plan.price_kes if plan else 0, type='number', required=True) }}
+
+      <div>
+        <label class="block text-xs font-semibold text-gray-700 mb-1">Billing Period</label>
+        <select name="billing_period"
+                class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          {% for val, label in [('month','Monthly'),('year','Yearly'),('forever','One-time / Free')] %}
+          <option value="{{ val }}" {{ 'selected' if plan and plan.billing_period == val }}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {{ field('Sort Order', 'sort_order', plan.sort_order if plan else 0, type='number') }}
+      {{ field('Daily CV Limit', 'daily_cv_limit', plan.daily_cv_limit if plan else 3, type='number') }}
+      {{ field('Daily Cover Letter Limit', 'daily_cover_letter_limit', plan.daily_cover_letter_limit if plan else 3, type='number') }}
+      {{ field('Daily ATS Limit', 'daily_ats_limit', plan.daily_ats_limit if plan else 5, type='number') }}
+    </div>
+
+    <div class="p-6">
+      <label class="block text-xs font-semibold text-gray-700 mb-1">Features (one per line)</label>
+      <textarea name="features" rows="6" placeholder="Unlimited AI generations&#10;All templates&#10;PDF & DOCX download"
+                class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500">{{ '\n'.join(plan.features) if plan and plan.features else '' }}</textarea>
+    </div>
+
+    <div class="p-6 flex flex-wrap gap-6">
+      {% for name, label, checked in [
+        ('is_active', 'Active (visible to users)', plan.is_active if plan else True),
+        ('is_popular', 'Mark as Popular', plan.is_popular if plan else False),
+        ('allow_docx', 'Allow DOCX Download', plan.allow_docx if plan else False),
+        ('allow_version_history', 'Allow Version History', plan.allow_version_history if plan else False),
+        ('allow_career_coach', 'Allow Career Coach', plan.allow_career_coach if plan else False),
+      ] %}
+      <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+        <input type="checkbox" name="{{ name }}" value="1" {% if checked %}checked{% endif %}
+               class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"/>
+        {{ label }}
+      </label>
+      {% endfor %}
+    </div>
+
+    <div class="p-6 flex gap-3">
+      <button type="submit"
+              class="px-6 py-2.5 gradient-brand text-white font-semibold rounded-lg text-sm hover:opacity-90 transition">
+        {{ 'Save Changes' if plan else 'Create Plan' }}
+      </button>
+      <a href="{{ url_for('admin.pricing') }}"
+         class="px-6 py-2.5 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50 transition">
+        Cancel
+      </a>
+    </div>
+  </form>
+</div>
+{% endblock %}

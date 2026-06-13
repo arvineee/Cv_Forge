@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}{{ personal.get('full_name', 'Resume') }} — CVForge{% endblock %}
+{% block body %}
+<div class="min-h-screen bg-gray-50 py-10 px-4">
+  <div class="max-w-3xl mx-auto">
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      <!-- Header -->
+      <div class="gradient-brand px-8 py-10 text-white">
+        <h1 class="text-3xl font-bold">{{ personal.get('full_name', 'Professional') }}</h1>
+        {% if personal.get('job_title') %}
+        <p class="text-blue-100 text-lg mt-1">{{ personal.get('job_title') }}</p>
+        {% endif %}
+        <div class="flex flex-wrap gap-4 mt-4 text-sm text-blue-100">
+          {% if personal.get('email') %}
+          <span>📧 {{ personal.get('email') }}</span>
+          {% endif %}
+          {% if personal.get('phone') %}
+          <span>📞 {{ personal.get('phone') }}</span>
+          {% endif %}
+          {% if personal.get('location') %}
+          <span>📍 {{ personal.get('location') }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="px-8 py-8 space-y-8">
+        {% if resume.professional_summary %}
+        <section>
+          <h2 class="text-sm font-bold text-gray-400 uppercase tracking-widest mb-3">Summary</h2>
+          <p class="text-gray-700 leading-relaxed">{{ resume.professional_summary }}</p>
+        </section>
+        {% endif %}
+
+        {% if resume.work_experience %}
+        <section>
+          <h2 class="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4">Experience</h2>
+          <div class="space-y-5">
+            {% for job in resume.work_experience %}
+            <div class="border-l-2 border-blue-200 pl-4">
+              <div class="flex items-start justify-between gap-4">
+                <div>
+                  <p class="font-semibold text-gray-900">{{ job.get('job_title', job.get('title', '')) }}</p>
+                  <p class="text-blue-700 font-medium text-sm">{{ job.get('company', '') }}</p>
+                </div>
+                <p class="text-xs text-gray-400 flex-shrink-0 mt-1">
+                  {{ job.get('start_date', '') }}{% if job.get('end_date') %} – {{ job.get('end_date') }}{% endif %}
+                </p>
+              </div>
+              {% if job.get('description') %}
+              <p class="text-gray-600 text-sm mt-2 leading-relaxed">{{ job.get('description') }}</p>
+              {% endif %}
+              {% if job.get('achievements') %}
+              <ul class="mt-2 space-y-1">
+                {% for ach in job.get('achievements', []) %}
+                <li class="text-sm text-gray-600 flex gap-2"><span class="text-blue-400 mt-1">•</span>{{ ach }}</li>
+                {% endfor %}
+              </ul>
+              {% endif %}
+            </div>
+            {% endfor %}
+          </div>
+        </section>
+        {% endif %}
+
+        {% if resume.education %}
+        <section>
+          <h2 class="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4">Education</h2>
+          <div class="space-y-3">
+            {% for edu in resume.education %}
+            <div class="flex items-start justify-between gap-4">
+              <div>
+                <p class="font-semibold text-gray-900">{{ edu.get('degree', '') }}</p>
+                <p class="text-gray-500 text-sm">{{ edu.get('institution', '') }}</p>
+              </div>
+              <p class="text-xs text-gray-400 flex-shrink-0 mt-1">{{ edu.get('year', edu.get('end_date', '')) }}</p>
+            </div>
+            {% endfor %}
+          </div>
+        </section>
+        {% endif %}
+
+        {% if resume.skills %}
+        <section>
+          <h2 class="text-sm font-bold text-gray-400 uppercase tracking-widest mb-3">Skills</h2>
+          <div class="flex flex-wrap gap-2">
+            {% for skill in resume.skills %}
+            <span class="px-3 py-1 bg-blue-50 text-blue-700 text-sm rounded-full font-medium">{{ skill }}</span>
+            {% endfor %}
+          </div>
+        </section>
+        {% endif %}
+      </div>
+
+      <div class="px-8 py-4 bg-gray-50 border-t border-gray-100 text-center">
+        <p class="text-xs text-gray-400">
+          Created with <a href="{{ url_for('main.index') }}" class="text-blue-600 hover:underline font-medium">CVForge AI</a>
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,93 @@
+{% extends "base_dashboard.html" %}
+{% block title %}{{ 'Edit' if template else 'New' }} Template — Admin{% endblock %}
+{% block page_title %}{{ 'Edit' if template else 'New' }} CV Template{% endblock %}
+{% block page_actions %}
+  <a href="{{ url_for('admin.templates') }}"
+     class="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50 transition">
+    ← Back
+  </a>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl">
+  <form method="POST" class="bg-white rounded-xl border border-gray-100 shadow-sm divide-y divide-gray-100">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
+    <div class="p-6 grid sm:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-xs font-semibold text-gray-700 mb-1">Template Name *</label>
+        <input type="text" name="name" value="{{ template.name if template else '' }}" required
+               class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-700 mb-1">Slug (URL-safe) *</label>
+        <input type="text" name="slug" value="{{ template.slug if template else '' }}" required
+               placeholder="e.g. modern-blue"
+               class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-700 mb-1">Category</label>
+        <select name="category"
+                class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          {% for cat in ['professional','minimal','creative','executive','technical'] %}
+          <option value="{{ cat }}" {{ 'selected' if template and template.category == cat }}>{{ cat|title }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-700 mb-1">Font Style</label>
+        <select name="font_style"
+                class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          {% for fs in ['modern','classic','minimal'] %}
+          <option value="{{ fs }}" {{ 'selected' if template and template.font_style == fs }}>{{ fs|title }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-700 mb-1">Accent Color</label>
+        <div class="flex gap-2">
+          <input type="color" name="accent_color"
+                 value="{{ template.accent_color if template else '#2563eb' }}"
+                 class="w-10 h-10 border border-gray-200 rounded-lg cursor-pointer"/>
+          <input type="text" value="{{ template.accent_color if template else '#2563eb' }}" readonly
+                 class="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-500"/>
+        </div>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-700 mb-1">Sort Order</label>
+        <input type="number" name="sort_order" value="{{ template.sort_order if template else 0 }}"
+               class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+      </div>
+      <div class="sm:col-span-2">
+        <label class="block text-xs font-semibold text-gray-700 mb-1">Description</label>
+        <textarea name="description" rows="2"
+                  class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">{{ template.description if template else '' }}</textarea>
+      </div>
+    </div>
+
+    <div class="p-6 flex flex-wrap gap-6">
+      {% for name, label, checked in [
+        ('is_active', 'Active', template.is_active if template else True),
+        ('is_premium', 'Pro users only', template.is_premium if template else False),
+      ] %}
+      <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+        <input type="checkbox" name="{{ name }}" value="1" {% if checked %}checked{% endif %}
+               class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"/>
+        {{ label }}
+      </label>
+      {% endfor %}
+    </div>
+
+    <div class="p-6 flex gap-3">
+      <button type="submit"
+              class="px-6 py-2.5 gradient-brand text-white font-semibold rounded-lg text-sm hover:opacity-90 transition">
+        {{ 'Save Changes' if template else 'Create Template' }}
+      </button>
+      <a href="{{ url_for('admin.templates') }}"
+         class="px-6 py-2.5 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50 transition">
+        Cancel
+      </a>
+    </div>
+  </form>
+</div>
+{% endblock %}

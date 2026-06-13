@@ -1,0 +1,66 @@
+{% extends "base_dashboard.html" %}
+{% block title %}ATS Checker{% endblock %}
+{% block page_title %}ATS Score Checker{% endblock %}
+{% block page_subtitle %}See how your CV ranks against any job description{% endblock %}
+
+{% block content %}
+<div class="grid lg:grid-cols-2 gap-6">
+  <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+    <form id="ats-form" hx-post="{{ url_for('ats.check') }}" hx-target="#ats-result"
+          hx-indicator="#ats-loading" class="space-y-5">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1.5">Select CV (optional)</label>
+        <select name="resume_id"
+                class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="">— Paste text only —</option>
+          {% for resume in resumes %}
+          <option value="{{ resume.id }}">{{ resume.title }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1.5">Job Description *</label>
+        <textarea name="job_description" rows="10" required placeholder="Paste the full job description here..."
+                  class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"></textarea>
+      </div>
+      <button type="submit"
+              class="w-full py-3 gradient-brand text-white font-semibold rounded-xl hover:opacity-90 transition text-sm">
+        Analyze Now
+      </button>
+      <div id="ats-loading" class="htmx-indicator text-center text-sm text-gray-400 py-2">
+        Analyzing… this takes a few seconds
+      </div>
+    </form>
+  </div>
+
+  <div id="ats-result">
+    {% if recent_reports %}
+    <div class="bg-gray-50 rounded-xl border border-dashed border-gray-200 p-6">
+      <h3 class="font-medium text-gray-700 text-sm mb-3">Recent Reports</h3>
+      <div class="space-y-3">
+        {% for r in recent_reports %}
+        <a href="{{ url_for('ats.report', report_id=r.id) }}"
+           class="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-100 hover:border-blue-200 transition">
+          <div>
+            <p class="text-sm font-medium text-gray-900">Score: {{ r.score }}%</p>
+            <p class="text-xs text-gray-400">{{ r.created_at.strftime('%d %b %Y %H:%M') }}</p>
+          </div>
+          <span class="text-sm font-bold
+            {% if r.score >= 80 %}text-green-600{% elif r.score >= 60 %}text-yellow-600{% else %}text-red-500{% endif %}">
+            {{ r.grade }}
+          </span>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+    {% else %}
+    <div class="bg-gray-50 rounded-xl border border-dashed border-gray-200 p-8 text-center">
+      <p class="text-4xl mb-3">📊</p>
+      <p class="font-medium text-gray-700">Your ATS report will appear here</p>
+      <p class="text-sm text-gray-400 mt-1">Paste a job description and click Analyze</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

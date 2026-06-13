@@ -1,0 +1,21 @@
+{% extends "base_dashboard.html" %}
+{% block title %}New CV{% endblock %}
+{% block page_title %}Create New CV{% endblock %}
+{% block page_subtitle %}Choose how you want to start{% endblock %}
+
+{% block content %}
+<div class="grid md:grid-cols-2 gap-6 max-w-2xl">
+  <a href="{{ url_for('cv.builder') }}"
+     class="block bg-white rounded-2xl border border-gray-100 shadow-sm card-hover p-8 text-center">
+    <div class="text-4xl mb-4">✍️</div>
+    <h3 class="font-bold text-gray-900 mb-2">Build from Scratch</h3>
+    <p class="text-sm text-gray-500">Step-by-step CV builder with AI assistance at every section</p>
+  </a>
+  <a href="{{ url_for('cv.upload') }}"
+     class="block bg-white rounded-2xl border border-gray-100 shadow-sm card-hover p-8 text-center">
+    <div class="text-4xl mb-4">⬆️</div>
+    <h3 class="font-bold text-gray-900 mb-2">Upload & Revamp</h3>
+    <p class="text-sm text-gray-500">Upload your existing CV and let AI make it more impactful</p>
+  </a>
+</div>
+{% endblock %}
