@@ -46,7 +46,24 @@
 
     <!-- Plan badge + user -->
     <div class="px-4 py-4 border-t border-gray-700">
-      {% if not current_user.is_premium %}
+      {% if current_user.is_premium %}
+      <div class="mb-3 px-3 py-2 rounded-lg flex items-center justify-between
+        {% if current_user.plan == 'premium' %}bg-indigo-900/50{% else %}bg-blue-900/50{% endif %}">
+        <div>
+          <p class="text-xs font-bold capitalize
+            {% if current_user.plan == 'premium' %}text-indigo-300{% else %}text-blue-300{% endif %}">
+            {{ current_user.plan }} Plan ✓
+          </p>
+          {% if current_user.plan_expires_at %}
+          <p class="text-xs text-gray-500 mt-0.5">
+            Expires {{ current_user.plan_expires_at.strftime('%d %b %Y') }}
+          </p>
+          {% endif %}
+        </div>
+        <a href="{{ url_for('billing.index') }}"
+           class="text-xs text-gray-400 hover:text-white transition">Manage</a>
+      </div>
+      {% else %}
       <a href="{{ url_for('billing.plans') }}"
          class="block w-full text-center text-xs font-semibold py-2 px-3 mb-3 rounded-lg bg-gradient-to-r from-yellow-500 to-orange-500 text-white hover:opacity-90 transition">
         ⚡ Upgrade to Pro
@@ -81,7 +98,16 @@
         </svg>
       </button>
       <span class="font-bold text-gray-900">CVForge AI</span>
+      {% if current_user.is_premium %}
+      <a href="{{ url_for('billing.index') }}"
+         class="text-xs font-semibold px-2.5 py-1 rounded-full capitalize
+         {% if current_user.plan == 'premium' %}bg-indigo-100 text-indigo-700
+         {% else %}bg-blue-100 text-blue-700{% endif %}">
+        {{ current_user.plan }} ✓
+      </a>
+      {% else %}
       <a href="{{ url_for('billing.plans') }}" class="text-xs font-semibold text-blue-600">Upgrade</a>
+      {% endif %}
     </header>
 
     <!-- Mobile sidebar overlay -->
@@ -127,3 +153,4 @@
   </div>
 </div>
 {% endblock %}
+

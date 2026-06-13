@@ -152,7 +152,15 @@ def upload():
         filename = secure_filename(file.filename)
         ext = filename.rsplit(".", 1)[1].lower()
         safe_name = f"{secrets.token_hex(8)}_{filename}"
-        upload_path = os.path.join(current_app.config["UPLOAD_FOLDER"], safe_name)
+
+        # Resolve upload folder to absolute path so it works on PythonAnywhere
+        upload_folder = current_app.config["UPLOAD_FOLDER"]
+        if not os.path.isabs(upload_folder):
+            upload_folder = os.path.join(current_app.root_path, "..", upload_folder)
+        upload_folder = os.path.abspath(upload_folder)
+        os.makedirs(upload_folder, exist_ok=True)
+
+        upload_path = os.path.join(upload_folder, safe_name)
         file.save(upload_path)
 
         try:
@@ -336,3 +344,4 @@ def toggle_public(resume_id):
         "public_url": url_for("main.public_resume", token=resume.public_token, _external=True)
         if resume.is_public else None,
     })
+
