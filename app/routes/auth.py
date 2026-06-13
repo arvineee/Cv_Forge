@@ -101,7 +101,13 @@ def login():
 
         user = User.query.filter_by(email=email).first()
 
-        if not user or not user.check_password(password):
+        if not user:
+            current_app.logger.warning(f"Login failed: no user found for email={email}")
+            flash("Invalid email or password.", "error")
+            return render_template("auth/login.html", email=email)
+
+        if not user.check_password(password):
+            current_app.logger.warning(f"Login failed: wrong password for email={email}")
             flash("Invalid email or password.", "error")
             return render_template("auth/login.html", email=email)
 
@@ -292,3 +298,4 @@ def google_callback():
     login_user(user, remember=True)
     flash(f"Welcome, {user.first_name or user.email}!", "success")
     return redirect(url_for("dashboard.index"))
+

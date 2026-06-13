@@ -26,6 +26,12 @@ def create_app(config_object=None):
         from config import Config
         app.config.from_object(Config)
 
+    # ── Proxy fix for PythonAnywhere ──────────────────────────────
+    # PA sits behind nginx — trust X-Forwarded-For and X-Forwarded-Proto
+    # so sessions, CSRF, and url_for() all behave correctly
+    from werkzeug.middleware.proxy_fix import ProxyFix
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+
     # ── Extensions ────────────────────────────────────────────────
     db.init_app(app)
     migrate.init_app(app, db)
@@ -339,3 +345,4 @@ def _register_cli(app: Flask):
         click.echo(f"  Cover Letters: {CoverLetter.query.count()}")
         click.echo(f"  AI calls today:{AIUsage.get_total_daily_count()}")
         click.echo("────────────────────────────────────────────\n")
+

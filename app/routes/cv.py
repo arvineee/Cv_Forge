@@ -170,18 +170,41 @@ def upload():
             current_app.logger.error(f"CV parse error: {e}")
             parsed = {}
 
+        personal = parsed.get("personal_info") or {}
+        # Use name from parsed personal_info as resume title if available
+        parsed_name = (
+            personal.get("full_name")
+            or f"{personal.get('first_name','')} {personal.get('last_name','')}".strip()
+        )
+        resume_title = f"{parsed_name}'s CV" if parsed_name else f"Uploaded: {filename[:100]}"
+
+        # Normalize work experience: ensure each entry has 'job_title' key
+        # so both the builder UI and PDF service can read it
+        raw_work = parsed.get("work_experience") or []
+        normalized_work = []
+        for job in raw_work:
+            if isinstance(job, dict):
+                normalized_work.append({
+                    "job_title":  job.get("title") or job.get("job_title") or "",
+                    "company":    job.get("company") or "",
+                    "start_date": job.get("start_date") or "",
+                    "end_date":   job.get("end_date") or "Present",
+                    "description":job.get("description") or "",
+                    "achievements": [],
+                })
+
         resume = Resume(
             user_id=current_user.id,
-            title=f"Uploaded: {filename[:100]}",
+            title=resume_title[:255],
             status="draft", source="upload",
             original_filename=filename,
-            # Store relative path only
             original_file_path=safe_name,
-            personal_info=parsed.get("personal_info"),
+            personal_info=personal,
             professional_summary=parsed.get("professional_summary"),
-            work_experience=parsed.get("work_experience") or [],
+            work_experience=normalized_work,
             education=parsed.get("education") or [],
             skills=parsed.get("skills") or [],
+            certifications=parsed.get("extra_sections", {}).get("certifications", []),
             custom_sections=parsed.get("extra_sections") or {},
         )
         db.session.add(resume)

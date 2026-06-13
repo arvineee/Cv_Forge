@@ -112,6 +112,20 @@ def _normalize_resume(resume: Any) -> Dict[str, Any]:
         or "Resume"
     )
 
+    # Normalize work experience — parser returns 'title', builder uses 'job_title' 
+    # Support both so upload → PDF and builder → PDF both work
+    raw_work = data.get("work_experience") or []
+    normalized_work = []
+    for job in raw_work:
+        if isinstance(job, dict):
+            normalized_work.append({
+                "title":      job.get("title") or job.get("job_title") or "",
+                "company":    job.get("company") or "",
+                "start_date": job.get("start_date") or "",
+                "end_date":   job.get("end_date") or "Present",
+                "description":job.get("description") or "",
+            })
+
     return {
         "name":          name,
         "job_title":     personal.get("job_title") or "",
@@ -121,7 +135,7 @@ def _normalize_resume(resume: Any) -> Dict[str, Any]:
         "linkedin":      personal.get("linkedin") or "",
         "portfolio":     personal.get("portfolio") or "",
         "summary":       data.get("professional_summary") or "",
-        "work":          data.get("work_experience") or [],
+        "work":          normalized_work,
         "education":     data.get("education") or [],
         "skills":        data.get("skills") or [],
     }
@@ -153,7 +167,7 @@ def _build_skills_table(skills: List[str], theme: Dict, style: ParagraphStyle) -
     Renders skills as a flowing grid of styled chip cells.
     Chips are grouped into rows of ~4 per row.
     """
-    CHIPS_PER_ROW = 4
+    CHIPS_PER_ROW = 3
     chip_style = ParagraphStyle(
         "Chip",
         parent=style,
@@ -174,7 +188,7 @@ def _build_skills_table(skills: List[str], theme: Dict, style: ParagraphStyle) -
 
     rows = [cells[i:i + CHIPS_PER_ROW] for i in range(0, len(cells), CHIPS_PER_ROW)]
 
-    col_width = (6.5 * inch) / CHIPS_PER_ROW
+    col_width = (6.5 * inch) / CHIPS_PER_ROW  # 3 chips per row
     tbl = Table(rows, colWidths=[col_width] * CHIPS_PER_ROW, hAlign="LEFT")
     tbl.setStyle(TableStyle([
         ("BACKGROUND",  (0, 0), (-1, -1), theme["chip_bg"]),
@@ -405,7 +419,8 @@ class PDFService:
         """
         block = []
 
-        title = _esc(job.get("title") or "")
+        # Support both 'title' (parser output) and 'job_title' (builder/model output)
+        title = _esc(job.get("title") or job.get("job_title") or "")
         company = _esc(job.get("company") or "")
         start = _esc(job.get("start_date") or "")
         end = _esc(job.get("end_date") or "Present")
@@ -489,7 +504,7 @@ class PDFService:
         - Other lines are rendered as body paragraphs.
         """
         items = []
-        BULLET_RE = r"^[\•\-\*\–\u2022]\s*|^\d+\.\s+"
+        BULLET_RE = r"^[\•\-\*\–\u2022\u00b7·]\s*|^\d+\.\s+"
 
         for line in text.split("\n"):
             stripped = line.strip()
@@ -501,6 +516,7 @@ class PDFService:
             else:
                 items.append(Paragraph(_esc(stripped), self.styles["body"]))
         return items
+
 
 
 
