@@ -1,839 +1,1236 @@
 """
-Production-Grade CV Parser Engine — Enhanced Edition
+CVForge AI - CV Parser Engine v3
+Fully flexible section detection — handles any CV structure, any heading,
+any ordering. Captures subtitled skill groups, achievements, languages,
+interests, references, awards, volunteer work, publications, and any
+unknown section rather than silently dropping it.
 
-Improvements over v1:
-- Section-aware text chunking (headings drive extraction context).
-- Multi-format date normalization: handles "Jan '21", "2021–22", "Present", etc.
-- Confidence-scored name extraction (positional + casing + length heuristics).
-- Location pattern extraction (City, Country / City, State formats).
-- Full heuristic work-experience and education block parsers (title/company/dates/description).
-- Skills alias normalization — "node.js" / "nodejs" / "Node JS" collapse to one canonical form.
-- Post-heuristic Pydantic validation with field-level sanitization.
-- AI response partial recovery — rescues valid fields from malformed Gemini JSON.
-- Thread-safe lazy-loaded AI service.
+Key upgrades over v2:
+- Dynamic section registry — no hardcoded heading whitelist
+- Skill group subtitles preserved (Clinical Skills, Digital Health, etc.)
+- Pipe-separated skill lists parsed correctly
+- Company | Date same-line splitting
+- All known CV sections captured: achievements, languages, interests,
+  references, volunteer, publications, awards, hobbies, objective
+- Unknown sections stored in extra_sections by their actual heading name
+- Heuristic confidence scoring for name extraction
+- Date range line correctly split into company + start/end
+- Certifications parsed as list items not a blob
+- Pydantic v2 schemas with graceful validation
 """
 
-import os
 import re
 import json
 import logging
 from typing import Dict, Any, List, Optional, Tuple
-from pydantic import BaseModel, Field, EmailStr, field_validator, model_validator
 
 logger = logging.getLogger(__name__)
 
 
 # ─────────────────────────────────────────────────────────────
-# 1. Enhanced Pydantic Schemas (V2) with Validators
+# Pydantic Schemas
 # ─────────────────────────────────────────────────────────────
 
-class PersonalInfoSchema(BaseModel):
-    full_name: Optional[str] = Field(None, description="Full name of the candidate.")
-    email: Optional[str] = Field(None, description="Valid email address.")
-    phone: Optional[str] = Field(None, description="Contact phone, with international prefix if available.")
-    location: Optional[str] = Field(None, description="City, region, and/or country of residence.")
-    job_title: Optional[str] = Field(None, description="Current or target professional job title.")
-    linkedin: Optional[str] = Field(None, description="Cleaned LinkedIn URL or handle.")
-    portfolio: Optional[str] = Field(None, description="Personal portfolio, website, or GitHub link.")
-
-    @field_validator("email", mode="before")
-    @classmethod
-    def validate_email_format(cls, v: Any) -> Optional[str]:
-        if not v:
-            return None
-        v = str(v).strip().lower()
-        return v if re.fullmatch(r"[\w.\-+]+@[\w\-]+\.\w{2,}", v) else None
-
-    @field_validator("phone", mode="before")
-    @classmethod
-    def normalize_phone(cls, v: Any) -> Optional[str]:
-        if not v:
-            return None
-        digits = re.sub(r"[^\d+]", "", str(v))
-        return digits if 7 <= len(digits) <= 16 else None
-
-    @field_validator("linkedin", "portfolio", mode="before")
-    @classmethod
-    def clean_url(cls, v: Any) -> Optional[str]:
-        if not v:
-            return None
-        v = str(v).strip().strip(".,()[]\"'")
-        if not v.startswith(("http://", "https://", "www.")):
-            v = "https://" + v
-        return v
+try:
+    from pydantic import BaseModel, Field, field_validator, model_validator
+    PYDANTIC_AVAILABLE = True
+except ImportError:
+    PYDANTIC_AVAILABLE = False
+    BaseModel = object
 
 
-class WorkExperienceSchema(BaseModel):
-    title: Optional[str] = Field(None, description="Job title held.")
-    company: Optional[str] = Field(None, description="Company or organization name.")
-    start_date: Optional[str] = Field(None, description="Start date: Month Year or Year.")
-    end_date: Optional[str] = Field(None, description="End date: Month Year, Year, or 'Present'.")
-    description: Optional[str] = Field(None, description="Key duties and achievements.")
+if PYDANTIC_AVAILABLE:
+    class PersonalInfoSchema(BaseModel):
+        full_name: Optional[str] = None
+        email: Optional[str] = None
+        phone: Optional[str] = None
+        location: Optional[str] = None
+        job_title: Optional[str] = None
+        linkedin: Optional[str] = None
+        portfolio: Optional[str] = None
+        github: Optional[str] = None
+        website: Optional[str] = None
 
-    @field_validator("start_date", "end_date", mode="before")
-    @classmethod
-    def normalize_date(cls, v: Any) -> Optional[str]:
-        return DateNormalizer.normalize(v) if v else None
+        @field_validator("email", mode="before")
+        @classmethod
+        def validate_email(cls, v):
+            if not v: return None
+            v = str(v).strip().lower()
+            return v if re.fullmatch(r"[\w.\-+]+@[\w\-]+\.\w{2,}", v) else None
 
-    @field_validator("description", mode="before")
-    @classmethod
-    def handle_list_description(cls, v: Any) -> Optional[str]:
-        """
-        Rescues data when Gemini returns descriptions as a JSON array of strings
-        instead of a single plaintext string block.
-        """
-        if isinstance(v, list):
-            return "\n".join(str(item).strip() for item in v if item)
-        if v:
-            return str(v).strip()
-        return None
+        @field_validator("phone", mode="before")
+        @classmethod
+        def normalize_phone(cls, v):
+            if not v: return None
+            digits = re.sub(r"[^\d+]", "", str(v))
+            return str(v).strip() if 7 <= len(digits) <= 16 else None
 
+    class WorkExperienceSchema(BaseModel):
+        job_title: Optional[str] = None
+        company: Optional[str] = None
+        location: Optional[str] = None
+        start_date: Optional[str] = None
+        end_date: Optional[str] = None
+        description: Optional[str] = None
+        achievements: List[str] = Field(default_factory=list)
 
-class EducationSchema(BaseModel):
-    degree: Optional[str] = Field(None, description="Degree or certificate name.")
-    institution: Optional[str] = Field(None, description="University or educational institution.")
-    year: Optional[str] = Field(None, description="Graduation year or date range.")
-    grade: Optional[str] = Field(None, description="GPA, classification, or honors.")
+        @field_validator("description", mode="before")
+        @classmethod
+        def handle_list(cls, v):
+            if isinstance(v, list):
+                return "\n".join(str(i).strip() for i in v if i)
+            return str(v).strip() if v else None
 
+    class EducationSchema(BaseModel):
+        degree: Optional[str] = None
+        institution: Optional[str] = None
+        location: Optional[str] = None
+        year: Optional[str] = None
+        grade: Optional[str] = None
 
-class CVParserOutputSchema(BaseModel):
-    personal_info: PersonalInfoSchema = Field(default_factory=PersonalInfoSchema)
-    professional_summary: Optional[str] = Field(None, description="Concise professional identity, max 200 words.")
-    work_experience: List[WorkExperienceSchema] = Field(default_factory=list)
-    education: List[EducationSchema] = Field(default_factory=list)
-    skills: List[str] = Field(default_factory=list, description="Deduplicated canonical skill names.")
-    extra_sections: Dict[str, str] = Field(
-        default_factory=dict,
-        description="Any CV sections not matching standard headings, keyed by their original heading name.",
-    )
+    class SkillGroupSchema(BaseModel):
+        """Skills with optional subtitle grouping."""
+        group: Optional[str] = None   # e.g. "Clinical Skills", None = ungrouped
+        skills: List[str] = Field(default_factory=list)
 
-    @field_validator("professional_summary", mode="before")
-    @classmethod
-    def cap_summary(cls, v: Any) -> Optional[str]:
-        if not v:
-            return None
-        words = str(v).split()
-        return " ".join(words[:200])
+    class CVOutputSchema(BaseModel):
+        personal_info: PersonalInfoSchema = Field(default_factory=PersonalInfoSchema)
+        professional_summary: Optional[str] = None
+        objective: Optional[str] = None
+        work_experience: List[WorkExperienceSchema] = Field(default_factory=list)
+        education: List[EducationSchema] = Field(default_factory=list)
+        skills: List[str] = Field(default_factory=list)          # flat deduplicated
+        skill_groups: List[SkillGroupSchema] = Field(default_factory=list)  # with subtitles
+        certifications: List[str] = Field(default_factory=list)
+        achievements: List[str] = Field(default_factory=list)
+        languages: List[str] = Field(default_factory=list)
+        interests: List[str] = Field(default_factory=list)
+        references: Optional[str] = None
+        volunteer: Optional[str] = None
+        publications: List[str] = Field(default_factory=list)
+        awards: List[str] = Field(default_factory=list)
+        extra_sections: Dict[str, str] = Field(default_factory=dict)
 
-    @field_validator("skills", mode="before")
-    @classmethod
-    def deduplicate_skills(cls, v: Any) -> List[str]:
-        if not v:
-            return []
-        return list(dict.fromkeys(s.strip() for s in v if s and s.strip()))
+        @field_validator("professional_summary", "objective", "volunteer", mode="before")
+        @classmethod
+        def cap_text(cls, v):
+            if not v: return None
+            return " ".join(str(v).split()[:300])
+
+        @field_validator("skills", mode="before")
+        @classmethod
+        def dedup_skills(cls, v):
+            if not v: return []
+            seen, out = set(), []
+            for s in v:
+                k = str(s).strip().lower()
+                if k and k not in seen:
+                    seen.add(k)
+                    out.append(str(s).strip())
+            return out
+
+        def model_dump_flat(self) -> Dict[str, Any]:
+            """Returns dict compatible with Resume model fields."""
+            d = self.model_dump()
+            d["work_experience"] = [
+                {
+                    "job_title": j.get("job_title") or j.get("title") or "",
+                    "company":   j.get("company") or "",
+                    "location":  j.get("location") or "",
+                    "start_date":j.get("start_date") or "",
+                    "end_date":  j.get("end_date") or "Present",
+                    "description":j.get("description") or "",
+                    "achievements": j.get("achievements") or [],
+                }
+                for j in (d.get("work_experience") or [])
+            ]
+            return d
+else:
+    # Fallback plain dict when pydantic unavailable
+    class CVOutputSchema:
+        def __init__(self, **kwargs):
+            self.__dict__.update(kwargs)
+        def model_dump(self): return self.__dict__
+        def model_dump_flat(self): return self.__dict__
 
 
 # ─────────────────────────────────────────────────────────────
-# 2. Date Normalization Utility
+# Date Normalizer
 # ─────────────────────────────────────────────────────────────
 
 class DateNormalizer:
     MONTH_MAP = {
-        "jan": "January", "feb": "February", "mar": "March", "apr": "April",
-        "may": "May", "jun": "June", "jul": "July", "aug": "August",
-        "sep": "September", "oct": "October", "nov": "November", "dec": "December",
+        "jan":"January","feb":"February","mar":"March","apr":"April",
+        "may":"May","jun":"June","jul":"July","aug":"August",
+        "sep":"September","oct":"October","nov":"November","dec":"December",
     }
-    PRESENT_TOKENS = {"present", "current", "now", "ongoing", "till date", "to date"}
+    PRESENT = {"present","current","now","ongoing","till date","to date","date"}
 
     @classmethod
     def normalize(cls, raw: str) -> Optional[str]:
+        if not raw: return None
         raw = str(raw).strip()
-        if not raw:
-            return None
-        if raw.lower() in cls.PRESENT_TOKENS:
-            return "Present"
-
-        # e.g. "Jan '21" → "January 2021"
-        m = re.match(r"([A-Za-z]{3,9})[\s.'\-]+['']?(\d{2,4})", raw)
+        if raw.lower() in cls.PRESENT: return "Present"
+        m = re.match(r"([A-Za-z]{3,9})[\s.''\-]+[''']?(\d{2,4})", raw)
         if m:
-            month_key = m.group(1).lower()[:3]
-            year = m.group(2)
-            year = ("20" + year) if len(year) == 2 else year
-            month_full = cls.MONTH_MAP.get(month_key, m.group(1).capitalize())
-            return f"{month_full} {year}"
-
-        # e.g. "2021–2023" or "2021-Present"
+            key = m.group(1).lower()[:3]
+            yr = m.group(2)
+            yr = ("20" + yr) if len(yr) == 2 else yr
+            return f"{cls.MONTH_MAP.get(key, m.group(1).capitalize())} {yr}"
         m = re.match(r"(\d{4})\s*[–\-–]\s*(\d{4}|present|current)", raw, re.I)
         if m:
-            end = "Present" if m.group(2).lower() in cls.PRESENT_TOKENS else m.group(2)
+            end = "Present" if m.group(2).lower() in cls.PRESENT else m.group(2)
             return f"{m.group(1)} – {end}"
-
-        # Bare year
-        if re.fullmatch(r"\d{4}", raw):
-            return raw
-
-        return raw  # Return as-is if unrecognized
+        if re.fullmatch(r"\d{4}", raw): return raw
+        return raw
 
 
 # ─────────────────────────────────────────────────────────────
-# 3. Skills Alias Normalization Registry
+# Dynamic Section Detector
 # ─────────────────────────────────────────────────────────────
 
-SKILLS_ALIAS_MAP: Dict[str, str] = {
-    # JavaScript ecosystem
-    "nodejs": "Node.js", "node js": "Node.js", "node.js": "Node.js",
-    "reactjs": "React", "react.js": "React", "react js": "React",
-    "vuejs": "Vue.js", "vue js": "Vue.js", "vue": "Vue.js",
-    "angularjs": "Angular", "angular js": "Angular",
-    "nextjs": "Next.js", "next js": "Next.js", "next.js": "Next.js",
-    "typescript": "TypeScript", "ts": "TypeScript",
-    "javascript": "JavaScript", "js": "JavaScript",
-    # Python ecosystem
-    "py": "Python", "python3": "Python", "python 3": "Python",
-    "django rest framework": "DRF", "drf": "DRF",
-    "fastapi": "FastAPI", "fast api": "FastAPI",
-    # Cloud / DevOps
-    "amazon web services": "AWS", "aws": "AWS",
-    "google cloud platform": "GCP", "google cloud": "GCP", "gcp": "GCP",
-    "microsoft azure": "Azure", "azure": "Azure",
-    "kubernetes": "Kubernetes", "k8s": "Kubernetes",
-    "ci/cd": "CI/CD", "cicd": "CI/CD", "ci cd": "CI/CD",
-    # Databases
-    "postgresql": "PostgreSQL", "postgres": "PostgreSQL",
-    "mongodb": "MongoDB", "mongo": "MongoDB",
-    "mysql": "MySQL", "my sql": "MySQL",
-    "mssql": "SQL Server", "sql server": "SQL Server",
-    "redis": "Redis",
-    # ML/AI
-    "machine learning": "Machine Learning", "ml": "Machine Learning",
-    "deep learning": "Deep Learning", "dl": "Deep Learning",
-    "natural language processing": "NLP", "nlp": "NLP",
-    "tensorflow": "TensorFlow", "tf": "TensorFlow",
-    "pytorch": "PyTorch", "torch": "PyTorch",
-    # General
-    "rest api": "REST API", "restful api": "REST API", "restful": "REST API",
-    "graphql": "GraphQL", "graph ql": "GraphQL",
-    "html5": "HTML5", "html": "HTML5",
-    "css3": "CSS3", "css": "CSS3",
-    "git": "Git", "github": "GitHub", "gitlab": "GitLab",
-    "docker": "Docker",
-    "terraform": "Terraform",
-    "linux": "Linux",
-    "agile": "Agile", "scrum": "Scrum",
-    "microservices": "Microservices",
+# Canonical section names mapped to their common aliases
+SECTION_ALIASES: Dict[str, List[str]] = {
+    "summary": [
+        "summary","professional summary","profile","about me","about",
+        "career profile","personal statement","executive summary",
+        "career summary","overview",
+    ],
+    "objective": [
+        "objective","career objective","professional objective",
+        "job objective","career goal","goals",
+    ],
+    "experience": [
+        "experience","work experience","professional experience","employment",
+        "work history","career history","employment history",
+        "professional background","positions held","relevant experience",
+        "professional experience","job history",
+    ],
+    "education": [
+        "education","academic background","qualifications",
+        "academic qualifications","educational background",
+        "academic history","schooling","training",
+    ],
+    "skills": [
+        "skills","technical skills","core competencies","competencies",
+        "key skills","skill set","technologies","tools","expertise",
+        "areas of expertise","specialization","capabilities",
+    ],
+    "certifications": [
+        "certifications","certificates","licenses","accreditations",
+        "professional certifications","credentials","licensure",
+        "professional licenses","training & certifications",
+    ],
+    "achievements": [
+        "achievements","key achievements","accomplishments",
+        "key accomplishments","notable achievements","highlights",
+        "career highlights","professional achievements","awards & achievements",
+    ],
+    "awards": [
+        "awards","honors","honours","awards & honors","recognition",
+        "awards & recognition","prizes",
+    ],
+    "languages": [
+        "languages","language skills","linguistic skills","spoken languages",
+    ],
+    "interests": [
+        "interests","hobbies","hobbies & interests","personal interests",
+        "extracurricular","activities","passions",
+    ],
+    "references": [
+        "references","referees","professional references",
+    ],
+    "volunteer": [
+        "volunteer","volunteering","volunteer experience","community service",
+        "voluntary work","community involvement","social work",
+    ],
+    "publications": [
+        "publications","research","papers","articles","research publications",
+        "journal articles","conference papers",
+    ],
+    "projects": [
+        "projects","key projects","notable projects","personal projects",
+        "academic projects","portfolio",
+    ],
 }
 
-# Canonical skill patterns — what to search for in text
-SKILL_PATTERNS: List[str] = sorted(set(list(SKILLS_ALIAS_MAP.keys()) + [
-    "python", "java", "c++", "c#", "go", "rust", "ruby", "php", "swift", "kotlin",
-    "r", "scala", "matlab", "bash", "shell scripting", "powershell",
-    "pandas", "numpy", "scikit-learn", "keras", "spark", "hadoop",
-    "elasticsearch", "cassandra", "dynamodb", "firebase",
-    "aws lambda", "ec2", "s3", "gke", "gcs", "azure devops",
-    "jenkins", "github actions", "gitlab ci", "ansible", "nginx", "apache",
-    "oauth", "jwt", "websockets", "grpc",
-    "figma", "sketch", "adobe xd", "photoshop", "illustrator",
-    "excel", "powerpoint", "tableau", "power bi",
-    "project management", "leadership", "communication", "problem solving",
-    "data analysis", "data visualization",
-]))
+# Build reverse alias → canonical map
+ALIAS_TO_CANONICAL: Dict[str, str] = {}
+for canonical, aliases in SECTION_ALIASES.items():
+    for alias in aliases:
+        ALIAS_TO_CANONICAL[alias.lower()] = canonical
 
 
-def normalize_skill(raw: str) -> str:
-    key = raw.strip().lower()
-    return SKILLS_ALIAS_MAP.get(key, raw.strip().title())
+def detect_section_heading(line: str) -> Optional[str]:
+    """
+    Returns canonical section name if the line is a KNOWN CV section heading,
+    or the cleaned heading for unknown-but-heading-shaped lines.
+    Returns None if the line is not a section heading.
+
+    Conservative: only promotes a line to a heading if it matches known aliases
+    OR passes strict heuristics. This prevents names, job titles, and locations
+    from being misclassified as section headings.
+    """
+    stripped = line.strip().rstrip(":").strip()
+    if not stripped or len(stripped) > 80:
+        return None
+
+    # Step 1: Check known aliases first (exact match after lowercase)
+    lower = stripped.lower()
+    if lower in ALIAS_TO_CANONICAL:
+        return ALIAS_TO_CANONICAL[lower]
+
+    # Step 2: Strict heuristics for unknown section headings
+    # Must NOT look like contact info or a name
+    if re.search(r"[@/\\|✉📞📧]|https?://|www\.", stripped):
+        return None
+    if not re.search(r"[A-Za-z]", stripped):
+        return None
+
+    words = stripped.split()
+
+    # Reject if too many words (headings are typically 1-4 words)
+    if len(words) > 5:
+        return None
+
+    # Reject if contains comma (names like "Narok County, Kenya" or sentences)
+    if "," in stripped:
+        return None
+
+    # Reject if contains digits (years, phone numbers)
+    if re.search(r"\d", stripped):
+        return None
+
+    # Reject if looks like a job title / name (has known non-heading words)
+    NAME_LIKE = {
+        "county","kenya","nairobi","mombasa","kisumu","nakuru","eldoret",
+        "ltd","limited","inc","llc","corp","company",
+    }
+    if any(w.lower() in NAME_LIKE for w in words):
+        return None
+
+    # For ALL CAPS headings (common in PDFs): accept if ≥ 2 chars
+    if stripped.isupper() and len(stripped) >= 4:
+        return lower
+
+    # For title-case headings: require at least one known heading keyword
+    HEADING_SIGNALS = {
+        "experience","education","skills","summary","profile","work",
+        "employment","qualifications","competencies","certifications",
+        "achievements","accomplishments","languages","interests","references",
+        "awards","publications","volunteer","projects","objective","overview",
+        "history","background","training","highlights","career","personal",
+        "expertise","about",
+    }
+    is_title = all(w[0].isupper() for w in words if w and w[0].isalpha())
+    has_signal = any(w.lower() in HEADING_SIGNALS for w in words)
+
+    if is_title and has_signal:
+        return lower
+
+    return None
+
+
+def chunk_cv(text: str) -> Dict[str, List[str]]:
+    """
+    Splits CV text into sections. Returns dict of canonical_name → [lines].
+    Unknown headings are preserved verbatim as keys.
+    """
+    sections: Dict[str, List[str]] = {"_header": []}
+    current = "_header"
+
+    for line in text.split("\n"):
+        stripped = line.strip()
+        heading = detect_section_heading(stripped) if stripped else None
+
+        if heading is not None and heading != current:
+            current = heading
+            sections.setdefault(current, [])
+        else:
+            sections.setdefault(current, []).append(line)
+
+    return {k: v for k, v in sections.items() if any(l.strip() for l in v)}
 
 
 # ─────────────────────────────────────────────────────────────
-# 4. Section-Aware Text Chunker
+# Skill Group Parser
 # ─────────────────────────────────────────────────────────────
 
-SECTION_HEADINGS = {
-    "summary": ["summary", "profile", "professional summary", "about me", "objective", "career objective"],
-    "experience": ["experience", "work experience", "employment", "work history", "professional experience", "career history"],
-    "education": ["education", "academic background", "qualifications", "academic qualifications"],
-    "skills": ["skills", "technical skills", "core competencies", "competencies", "technologies", "tools"],
-    "projects": ["projects", "key projects", "notable projects"],
-    "certifications": ["certifications", "certificates", "licenses", "accreditations"],
-}
+def parse_skill_groups(section_lines: List[str]) -> Tuple[List[Dict], List[str]]:
+    """
+    Parse skills section that may contain subtitled groups like:
+        Clinical Skills
+        Skill A | Skill B | Skill C
 
-def build_heading_pattern() -> re.Pattern:
-    all_headings = [h for group in SECTION_HEADINGS.values() for h in group]
-    escaped = [re.escape(h) for h in sorted(all_headings, key=len, reverse=True)]
-    return re.compile(
-        r"^(?P<heading>" + "|".join(escaped) + r")\s*:?\s*$",
-        re.IGNORECASE | re.MULTILINE,
+        Digital Health & Technology
+        DHIS2 | EMR | Health Data
+
+    Returns (skill_groups, flat_skills_list).
+    """
+    groups: List[SkillGroupSchema] = []
+    flat: List[str] = []
+    seen = set()
+
+    current_group: Optional[str] = None
+    current_skills: List[str] = []
+
+    def flush():
+        nonlocal current_group, current_skills
+        if current_skills:
+            groups.append({"group": current_group, "skills": current_skills})
+            for s in current_skills:
+                k = s.lower()
+                if k not in seen:
+                    seen.add(k)
+                    flat.append(s)
+        current_group = None
+        current_skills = []
+
+    for line in section_lines:
+        stripped = line.strip()
+        if not stripped:
+            continue
+
+        # Split pipe-separated items → skill list line
+        if "|" in stripped or "," in stripped:
+            sep = "|" if "|" in stripped else ","
+            items = [i.strip().strip("·•-") for i in stripped.split(sep)]
+            items = [i for i in items if i and len(i) > 1]
+            if items:
+                current_skills.extend(items)
+            continue
+
+        # Bullet-prefixed single skill
+        bullet_m = re.match(r"^[·•\-\*–]\s*(.+)", stripped)
+        if bullet_m:
+            skill = bullet_m.group(1).strip()
+            if skill:
+                current_skills.append(skill)
+            continue
+
+        # Check if this looks like a skill group subtitle
+        # (short, title-cased, no digits, no punctuation mid-line)
+        words = stripped.split()
+        if (
+            1 <= len(words) <= 6
+            and not re.search(r"[@\d/\\|,]", stripped)
+            and all(w[0].isupper() for w in words if w and w[0].isalpha())
+            and len(stripped) < 60
+        ):
+            flush()
+            current_group = stripped
+            continue
+
+        # Otherwise treat as a plain skill
+        if 2 <= len(stripped) <= 60:
+            current_skills.append(stripped)
+
+    flush()
+
+    # If no groups were detected, just return flat list
+    if not groups or (len(groups) == 1 and groups[0].group is None):
+        return [], flat
+
+    return groups, flat
+
+
+# ─────────────────────────────────────────────────────────────
+# Work Experience Parser
+# ─────────────────────────────────────────────────────────────
+
+DATE_RANGE_RE = re.compile(
+    r"(?:"
+    r"(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|"
+    r"Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)"
+    r"[\s.''\-]+[''']?\d{2,4}"
+    r"|\d{4}"
+    r")"
+    r"\s*[–\-–to]+\s*"
+    r"(?:"
+    r"(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|"
+    r"Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)"
+    r"[\s.''\-]+[''']?\d{2,4}"
+    r"|\d{4}"
+    r"|[Pp]resent|[Cc]urrent|[Nn]ow|[Dd]ate"
+    r")",
+    re.IGNORECASE,
+)
+
+# Pattern for "Company Name | Apr 2025 – Present" or "Company | 2020-2022"
+COMPANY_DATE_LINE_RE = re.compile(
+    r"^(.+?)\s*\|\s*(" + DATE_RANGE_RE.pattern + r")\s*$",
+    re.IGNORECASE,
+)
+
+
+
+def parse_work_experience(section_lines: List[str]) -> List[Dict]:
+    """
+    Flexible work experience parser. Handles all common CV formats:
+    - Title / Company | Date / bullets  (each on own line, separated by blanks)
+    - Title on one line, then company+date on next line
+    - Company | Date on same line
+    - Title, Company, Date all separated by blank lines
+    """
+    BULLET_RE = re.compile(r"^[·•\-\*–\u2022\u00b7]\s*")
+
+    # Step 1: Split raw text into non-empty lines, keep blank as separators
+    lines = [l.rstrip() for l in section_lines]
+
+    # Step 2: Group lines into "paragraphs" separated by blank lines
+    paragraphs: List[List[str]] = []
+    cur: List[str] = []
+    for line in lines:
+        if line.strip():
+            cur.append(line.strip())
+        else:
+            if cur:
+                paragraphs.append(cur)
+                cur = []
+    if cur:
+        paragraphs.append(cur)
+
+    # Step 3: Classify each paragraph as:
+    #   "title"   — single short non-bullet line with no date
+    #   "meta"    — company/date line (has date or pipe)
+    #   "bullets" — starts with bullet chars
+    #   "mixed"   — title + company|date on consecutive lines
+
+    def has_date(line: str) -> bool:
+        return bool(DATE_RANGE_RE.search(line))
+
+    def is_bullet_block(para: List[str]) -> bool:
+        return bool(para) and bool(BULLET_RE.match(para[0]))
+
+    def is_meta_line(line: str) -> bool:
+        return "|" in line or has_date(line)
+
+    # Step 4: Build job entries by walking paragraphs sequentially
+    entries: List[Dict] = []
+    job_title: Optional[str] = None
+    company:   Optional[str] = None
+    location:  Optional[str] = None
+    start_date: Optional[str] = None
+    end_date:   Optional[str] = None
+    desc_lines: List[str] = []
+
+    def flush_entry():
+        nonlocal job_title, company, location, start_date, end_date, desc_lines
+        if job_title or company:
+            clean_desc = "\n".join(
+                re.sub(r"^[·•\-\*–\u2022\u00b7]\s*", "• ", l)
+                for l in desc_lines
+            ).strip()
+            entries.append({
+                "job_title":   job_title or "",
+                "company":     company or "",
+                "location":    location or "",
+                "start_date":  start_date or "",
+                "end_date":    end_date or "Present",
+                "description": clean_desc or "",
+                "achievements": [],
+            })
+        job_title = company = location = start_date = end_date = None
+        desc_lines = []
+
+    for para in paragraphs:
+        if not para:
+            continue
+
+        if is_bullet_block(para):
+            # These are description bullets for the current job
+            desc_lines.extend(para)
+            continue
+
+        # Check if this paragraph looks like a new job header
+        # (non-bullet, not all bullets)
+        all_meta = all(is_meta_line(l) for l in para)
+        any_meta = any(is_meta_line(l) for l in para)
+
+        if all_meta:
+            # Pure company/date paragraph — attach to current job
+            for line in para:
+                date_m = DATE_RANGE_RE.search(line)
+                company_date_m = COMPANY_DATE_LINE_RE.match(line)
+                if company_date_m and not company:
+                    raw_company = company_date_m.group(1).strip()
+                    loc_split = re.split(r"\s*,\s*|\s*\|\s*", raw_company, maxsplit=1)
+                    company = loc_split[0].strip()
+                    if len(loc_split) > 1:
+                        location = loc_split[1].strip()
+                if date_m:
+                    date_str = date_m.group(0)
+                    parts = re.split(r"\s*[–\-–]\s*|\s+to\s+", date_str, maxsplit=1, flags=re.I)
+                    start_date = DateNormalizer.normalize(parts[0].strip()) if parts else None
+                    end_date   = DateNormalizer.normalize(parts[1].strip()) if len(parts) > 1 else "Present"
+            continue
+
+        # Mixed or pure title paragraph
+        # If we already have a job title, this is a new entry
+        if job_title and not company:
+            # Previous title with no company — flush and start fresh
+            flush_entry()
+        elif job_title and company:
+            flush_entry()
+
+        # Parse lines in this paragraph
+        for line in para:
+            if BULLET_RE.match(line):
+                desc_lines.append(line)
+                continue
+
+            date_m = DATE_RANGE_RE.search(line)
+            company_date_m = COMPANY_DATE_LINE_RE.match(line)
+
+            if company_date_m and not company:
+                raw_company = company_date_m.group(1).strip()
+                loc_split = re.split(r"\s*,\s*|\s*\|\s*", raw_company, maxsplit=1)
+                company = loc_split[0].strip()
+                if len(loc_split) > 1 and not location:
+                    location = loc_split[1].strip()
+                if date_m:
+                    date_str = date_m.group(0)
+                    parts = re.split(r"\s*[–\-–]\s*|\s+to\s+", date_str, maxsplit=1, flags=re.I)
+                    start_date = DateNormalizer.normalize(parts[0].strip()) if parts else None
+                    end_date   = DateNormalizer.normalize(parts[1].strip()) if len(parts) > 1 else "Present"
+                continue
+
+            if date_m and not start_date:
+                date_str = date_m.group(0)
+                parts = re.split(r"\s*[–\-–]\s*|\s+to\s+", date_str, maxsplit=1, flags=re.I)
+                start_date = DateNormalizer.normalize(parts[0].strip()) if parts else None
+                end_date   = DateNormalizer.normalize(parts[1].strip()) if len(parts) > 1 else "Present"
+                remainder = line.replace(date_str, "").strip(" |–-,·")
+                if remainder and not company:
+                    company = remainder
+                continue
+
+            # Plain text line
+            if not job_title:
+                job_title = line
+            elif not company:
+                company = line
+            else:
+                desc_lines.append(line)
+
+    flush_entry()
+    return entries
+
+
+
+def parse_education(section_lines: List[str]) -> List[Dict]:
+    DEGREE_RE = re.compile(
+        r"\b(B\.?Sc|B\.?A|B\.?Eng|B\.?Tech|M\.?Sc|M\.?A|M\.?Eng|MBA|Ph\.?D|"
+        r"Bachelor[''\s]?s?|Master[''\s]?s?|Doctorate|Diploma|Certificate|"
+        r"HND|OND|Associate|KCSE|KCPE|A\s*Level|O\s*Level)\b",
+        re.IGNORECASE,
+    )
+    YEAR_RE = re.compile(r"\b(19|20)\d{2}\b")
+    GRADE_RE = re.compile(
+        r"\b(First Class|Second Class|2:1|2:2|Third Class|Pass|Distinction|"
+        r"Merit|GPA\s*:?\s*[\d.]+|[\d.]+\s*/\s*[\d.]+|Cum Laude|"
+        r"Magna Cum Laude|Summa Cum Laude|Credit|Fail|Upper|Lower)\b",
+        re.IGNORECASE,
     )
 
-HEADING_RE = build_heading_pattern()
-
-
-def _is_section_heading(line: str) -> bool:
-    """
-    Detects whether a line looks like a CV section heading even if not in SECTION_HEADINGS.
-    Criteria: short (≤60 chars), no sentence-ending punctuation mid-line, no email/URL,
-    title-cased or ALL-CAPS, and optionally ends with ':'.
-    """
-    stripped = line.strip().rstrip(":")
-    if not stripped or len(stripped) > 60:
-        return False
-    if re.search(r"[@/\\]|https?://|www\.", stripped):
-        return False
-    # Must contain at least one letter
-    if not re.search(r"[A-Za-z]", stripped):
-        return False
-    # Skip lines that are clearly sentences (contain common sentence mid-punctuation)
-    if re.search(r"[,;]\s+[a-z]", stripped):
-        return False
-    # Title case (each word starts with upper) or ALL CAPS — typical heading styles
-    words = stripped.split()
-    if len(words) > 6:
-        return False
-    is_title = all(w[0].isupper() for w in words if w and w[0].isalpha())
-    is_allcaps = stripped.isupper() and len(stripped) > 2
-    return is_title or is_allcaps
-
-
-def chunk_sections(text: str) -> Dict[str, str]:
-    """
-    Splits raw CV text into named sections based on heading detection.
-    Known headings are canonicalized; unknown headings are preserved verbatim
-    under their original (lowercased) name so no CV content is silently dropped.
-    Returns a dict mapping canonical section name → section body text.
-    """
-    lines = text.split("\n")
-    sections: Dict[str, List[str]] = {"_header": []}
-    current_section = "_header"
-
-    for line in lines:
+    # Pre-process: insert blank lines before degree-starting lines so entries
+    # that run together without blank lines still get split into separate blocks.
+    # Check first 2 words (handles "Kenya Certificate...", "Diploma...", "KCSE", etc.)
+    processed = []
+    for line in section_lines:
         stripped = line.strip()
-        m = HEADING_RE.match(stripped)
-        if m:
-            # Known heading — map to canonical key
-            matched_heading = m.group("heading").lower()
-            canonical = next(
-                (k for k, aliases in SECTION_HEADINGS.items() if matched_heading in aliases),
-                matched_heading,
-            )
-            current_section = canonical
-            sections.setdefault(current_section, [])
-        elif stripped and _is_section_heading(stripped):
-            # Unknown heading — keep verbatim (lowercased) so it isn't lost
-            current_section = stripped.rstrip(":").strip().lower()
-            sections.setdefault(current_section, [])
+        if stripped and DEGREE_RE.search(stripped):
+            words = stripped.split()
+            # Match if first OR second word is a degree keyword
+            first_two = " ".join(words[:2]) if len(words) >= 2 else (words[0] if words else "")
+            if DEGREE_RE.match(words[0]) or (len(words) > 1 and DEGREE_RE.match(words[1])):
+                processed.append("")  # force new block
+        processed.append(line)
+
+    entries: List[Dict] = []
+    blocks: List[List[str]] = []
+    cur: List[str] = []
+
+    for line in processed:
+        if line.strip():
+            cur.append(line.strip())
         else:
-            sections.setdefault(current_section, []).append(line)
+            if cur:
+                blocks.append(cur)
+                cur = []
+    if cur:
+        blocks.append(cur)
 
-    return {k: "\n".join(v).strip() for k, v in sections.items() if "\n".join(v).strip()}
+    for block in blocks:
+        if not block:
+            continue
+        degree = institution = year = grade = location = None
+
+        for line in block:
+            # "Institution | Year" or "Institution | Month Year"
+            pipe_m = re.match(r"^(.+?)\s*\|\s*(.+)$", line)
+            if pipe_m:
+                left = pipe_m.group(1).strip()
+                right = pipe_m.group(2).strip()
+                year_m = YEAR_RE.search(right)
+                if year_m:
+                    if not institution:
+                        institution = left
+                    year = year_m.group(0)
+                    continue
+
+            year_m = YEAR_RE.search(line)
+            grade_m = GRADE_RE.search(line)
+            degree_m = DEGREE_RE.search(line)
+
+            if grade_m and not grade:
+                grade = grade_m.group(0)
+            if year_m and not year:
+                year = year_m.group(0)
+            if degree_m and not degree:
+                degree = line
+            elif not institution and not degree_m and len(line) < 120:
+                institution = line
+
+        if degree or institution:
+            entries.append({
+                "degree": degree,
+                "institution": institution,
+                "location": location,
+                "year": year,
+                "grade": grade,
+            })
+
+    return entries
 
 
 # ─────────────────────────────────────────────────────────────
-# 5. Library Dependency Resolution
+# List Section Parser (bullets/pipes/commas → list of strings)
 # ─────────────────────────────────────────────────────────────
 
-try:
-    import pypdf
-except ImportError:
-    try:
-        import PyPDF2 as pypdf
-    except ImportError:
-        pypdf = None
-        logger.critical("No PDF library found (pypdf/PyPDF2). PDF ingestion disabled.")
+def parse_list_section(section_lines: List[str]) -> List[str]:
+    """
+    Parse any section that should be a list of items.
+    Handles: bullet points, numbered lists, pipe-separated, comma-separated,
+    or plain line-by-line items. Also handles ". " (period-space) bullet variant
+    and embedded newlines within a single line.
+    """
+    items: List[str] = []
+    # Matches: bullets (·•-*–), numbered (1.), period-space (". "), leading dot+space
+    BULLET_RE = re.compile(
+        r"^[\d]+\.\s+|^[·•\-\*–\u2022\u00b7]\s*|^\.\.?\s+|^-\s*\.\s*",
+        re.UNICODE
+    )
 
-try:
-    from docx import Document as DocxDocument
-except ImportError:
-    DocxDocument = None
-    logger.critical("python-docx not installed. DOCX ingestion disabled.")
+    # First split any embedded newlines so multi-bullet paragraphs become separate lines
+    expanded = []
+    for line in section_lines:
+        for sub in line.split("\n"):
+            expanded.append(sub)
+
+    for line in expanded:
+        stripped = line.strip()
+        if not stripped:
+            continue
+
+        # Pipe-separated — but only if no date range (avoid splitting company|date)
+        if "|" in stripped and not re.search(r"\d{4}", stripped):
+            for part in stripped.split("|"):
+                part = BULLET_RE.sub("", part).strip()
+                if part and len(part) > 1:
+                    items.append(part)
+            continue
+
+        # Strip bullet prefix
+        cleaned = BULLET_RE.sub("", stripped).strip()
+        # Also strip a lone leading period that survived
+        cleaned = re.sub(r"^\.\.?\s*", "", cleaned).strip()
+        if cleaned and len(cleaned) > 1:
+            items.append(cleaned)
+
+    return [i for i in items if i]
 
 
 # ─────────────────────────────────────────────────────────────
-# 6. Core Engine
+# Header Parser (name, contact, job title)
 # ─────────────────────────────────────────────────────────────
+
+
+def parse_header(lines: List[str]) -> Dict:
+    """Extract name, email, phone, location, job title from CV header lines."""
+    personal: Dict[str, Any] = {
+        "full_name": None, "email": None, "phone": None, "location": None,
+        "job_title": None, "linkedin": None, "portfolio": None,
+        "github": None, "website": None,
+    }
+
+    full_text = "\n".join(lines)
+
+    # Email
+    m = re.search(r"[\w.\-+]+@[\w.\-]+\.\w{2,}", full_text)
+    if m:
+        personal["email"] = m.group(0).lower()
+
+    # Phone
+    phone_text = re.sub(r"[\w.\-+]+@[\w.\-]+\.\w{2,}", "", full_text)
+    m = re.search(
+        r"(?:\+?\d{1,3}[\s.\-]?)?(?:\(?\d{2,4}\)?[\s.\-]?)?\d{3,4}[\s.\-]?\d{3,4}[\s.\-]?\d{3,4}",
+        phone_text,
+    )
+    if m:
+        candidate = re.sub(r"[^\d+]", "", m.group(0))
+        if 7 <= len(candidate) <= 16:
+            personal["phone"] = m.group(0).strip()
+
+    # URLs
+    for url in re.findall(r"https?://[^\s<>\"\')]+|www\.[^\s<>\"\')]+", full_text):
+        url = url.strip(".,;)\'\"")
+        if "linkedin.com" in url and not personal["linkedin"]:
+            personal["linkedin"] = url
+        elif "github.com" in url and not personal["github"]:
+            personal["github"] = url
+        elif not personal["website"]:
+            personal["website"] = url
+
+    # Name heuristic — confident title-cased 2-4 word phrase near top
+    NOISE = {"resume","cv","curriculum","vitae","email","phone","mobile","address",
+             "contact","profile","summary","linkedin","github","portfolio","tel","fax"}
+    TITLE_WORDS = {"engineer","developer","designer","manager","analyst","consultant",
+                   "director","officer","specialist","coordinator","architect","lead",
+                   "scientist","researcher","executive","associate","intern","registered",
+                   "nurse","accountant","teacher","lecturer","administrator","technician",
+                   "clinical","registered"}
+
+    candidates: List[tuple] = []
+    for idx, line in enumerate(lines[:12]):
+        line = re.sub(r"^[^\w\s]+\s*", "", line.strip()).strip()  # strip emoji
+        line = re.sub(r"[✉📞📧📱🏠🌍\U0001F300-\U0001FFFF]+", "", line).strip()
+        if not line:
+            continue
+        words = line.split()
+        if not (2 <= len(words) <= 5):
+            continue
+        if not (4 <= len(line) <= 55):
+            continue
+        if re.search(r"[@\d/\\|]", line):
+            continue
+        if any(n in line.lower() for n in NOISE):
+            continue
+        score = 0
+        if all(w[0].isupper() for w in words if w and w[0].isalpha()):
+            score += 3
+        score += max(0, 8 - idx)
+        if any(t in line.lower() for t in TITLE_WORDS):
+            score -= 2
+        if line.isupper():
+            score -= 1
+        candidates.append((score, line))
+
+    if candidates:
+        personal["full_name"] = max(candidates, key=lambda x: x[0])[1]
+
+    # Job title — line containing professional keywords
+    TITLE_KW = ["engineer","developer","designer","manager","analyst","consultant",
+                "director","officer","specialist","coordinator","architect","lead",
+                "scientist","executive","associate","intern","registered","nurse",
+                "accountant","teacher","lecturer","administrator","technician","clinical"]
+    for line in lines[:8]:
+        stripped = re.sub(r"^[^\w\s]+\s*", "", line.strip()).strip()
+        stripped = re.sub(r"[✉📞📧📱\U0001F300-\U0001FFFF]+", "", stripped).strip()
+        if 5 < len(stripped) < 100:
+            lower = stripped.lower()
+            if any(kw in lower for kw in TITLE_KW):
+                if not re.search(r"[@\d|]", stripped):
+                    # Not the name
+                    if stripped != personal["full_name"]:
+                        personal["job_title"] = stripped
+                        break
+
+    # Location — look for "City, Country", "City County, Country" patterns
+    # Use line-by-line scan to avoid grabbing the name or title
+    for line in lines[:10]:
+        stripped = re.sub(r"^[^\w\s]+\s*", "", line.strip()).strip()
+        stripped = re.sub(r"[✉📞📧📱\U0001F300-\U0001FFFF|]+", "", stripped).strip()
+        if not stripped or stripped == personal.get("full_name") or stripped == personal.get("job_title"):
+            continue
+        # Match "City, Country", "City County" or "City, Country"
+        m = re.match(
+            r"^([A-Z][a-zA-Z\s]{1,25}(?:County)?),?\s*([A-Z][a-zA-Z]{2,20})?$",
+            stripped
+        )
+        if m and not re.search(r"[@\d/\\|]", stripped):
+            candidate = stripped.strip()
+            # Avoid short false positives that are just one word
+            if len(candidate) > 4 and candidate != personal.get("full_name"):
+                # Make sure it doesn't look like a name (2+ words both title-cased is OK for location too)
+                words = candidate.split()
+                # If it contains "County" or "Kenya" or known location words, it's a location
+                LOC_SIGNALS = {"county","kenya","nairobi","mombasa","uganda","tanzania",
+                               "ghana","nigeria","africa","city","district","province"}
+                if any(w.lower() in LOC_SIGNALS for w in words):
+                    personal["location"] = candidate
+                    break
+                # Otherwise only accept if it contains a comma (City, Country format)
+                if "," in candidate:
+                    personal["location"] = candidate
+                    break
+
+    return personal
+
+
 
 class CVParser:
     """
-    Enterprise-grade CV parser. Primary path: Gemini structured JSON schema.
-    Secondary path: Section-aware heuristic engine with date normalization,
-    confidence-scored name extraction, alias-normalized skills, and
-    full Pydantic validation before returning.
+    Flexible CV parser. Primary path: Gemini AI structured extraction.
+    Fallback: dynamic section-aware heuristic engine that handles any
+    CV structure, any section ordering, grouped skills with subtitles,
+    and unknown sections.
     """
 
-    def __init__(self) -> None:
-        self._ai_service = None
+    def __init__(self):
+        self._ai = None
 
-    def _get_ai_service(self) -> Any:
-        """Thread-safe lazy loader — prevents circular imports at module load."""
-        if self._ai_service is None:
+    def _get_ai(self):
+        if self._ai is None:
             from app.ai_service import AIService
-            self._ai_service = AIService()
-        return self._ai_service
+            self._ai = AIService()
+        return self._ai
 
-    # ─────────────────────────────────────────────────────────
-    # Public Entry Point
-    # ─────────────────────────────────────────────────────────
+    # ── Public entry point ──────────────────────────────────
 
     def parse(self, file_path: str, file_ext: str) -> Dict[str, Any]:
-        normalized_ext = file_ext.lower().strip(".")
-        if normalized_ext == "pdf":
-            raw_text = self._extract_pdf_text(file_path)
-        elif normalized_ext == "docx":
-            raw_text = self._extract_docx_text(file_path)
+        ext = file_ext.lower().strip(".")
+        if ext == "pdf":
+            raw_text = self._read_pdf(file_path)
+        elif ext == "docx":
+            raw_text = self._read_docx(file_path)
         else:
-            raise ValueError(f"Unsupported file extension: '{normalized_ext}'. Accepted: pdf, docx.")
+            raise ValueError(f"Unsupported format: {ext}")
 
-        if not raw_text or len(raw_text.strip()) < 50:
-            logger.warning(f"Extracted text from '{file_path}' is empty or critically short.")
-            return CVParserOutputSchema().model_dump()
+        if not raw_text or len(raw_text.strip()) < 40:
+            logger.warning("Extracted text too short, returning empty result")
+            return self._empty()
 
-        # Primary: Gemini structured extraction
+        # Try AI first, fall back to heuristics
         try:
-            result = self._parse_with_ai(raw_text)
+            result = self._parse_ai(raw_text)
             if result:
                 return result
         except Exception as e:
-            logger.error(f"AI parsing failed: {e}", exc_info=True)
+            logger.warning(f"AI parse failed, using heuristics: {e}")
 
-        # Fallback: section-aware heuristic engine
-        logger.warning("Falling back to heuristic parser.")
-        return self._parse_with_heuristics(raw_text)
+        return self._parse_heuristic(raw_text)
 
-    # ─────────────────────────────────────────────────────────
-    # Text Extractors
-    # ─────────────────────────────────────────────────────────
+    # ── Text Extractors ─────────────────────────────────────
 
-    def _extract_pdf_text(self, path: str) -> str:
-        if pypdf is None:
-            raise ImportError("pypdf or PyPDF2 is required for PDF parsing.")
+    def _read_pdf(self, path: str) -> str:
+        if not pypdf:
+            raise ImportError("pypdf required for PDF parsing")
         chunks = []
         try:
             with open(path, "rb") as f:
                 reader = pypdf.PdfReader(f)
                 for page in reader.pages:
-                    text = page.extract_text()
-                    if text:
-                        chunks.append(text)
-            combined = "\n".join(chunks)
-            return re.sub(r"\n{3,}", "\n\n", combined).strip()
+                    t = page.extract_text()
+                    if t:
+                        chunks.append(t)
+            return re.sub(r"\n{3,}", "\n\n", "\n".join(chunks)).strip()
         except Exception as e:
-            logger.error(f"PDF extraction failed for '{path}': {e}")
+            logger.error(f"PDF read error: {e}")
             return ""
 
-    def _extract_docx_text(self, path: str) -> str:
-        if DocxDocument is None:
-            raise ImportError("python-docx is required for DOCX parsing.")
+    def _read_docx(self, path: str) -> str:
+        """
+        Style-aware DOCX reader. Uses paragraph styles (Heading 1/2, Title)
+        to preserve document structure rather than treating everything as plain text.
+        Multi-bullet paragraphs (newlines within one para) are split into separate lines.
+        """
+        if not DocxDocument:
+            raise ImportError("python-docx required for DOCX parsing")
         try:
             doc = DocxDocument(path)
-            elements = []
+            parts = []
+
             for para in doc.paragraphs:
-                if para.text.strip():
-                    elements.append(para.text.strip())
+                text = para.text.strip()
+                if not text:
+                    parts.append("")  # preserve blank line as separator
+                    continue
+
+                style = para.style.name if para.style else "Normal"
+
+                # Title style → name, always first
+                if style == "Title":
+                    parts.append("")
+                    parts.append(text)
+                    parts.append("")
+
+                # Heading 1 → major section heading (blank lines around it)
+                elif style.startswith("Heading 1") or style == "heading 1":
+                    parts.append("")
+                    parts.append(text)
+                    parts.append("")
+
+                # Heading 2 → sub-heading (job title, skill group name)
+                elif style.startswith("Heading 2") or style == "heading 2":
+                    parts.append("")
+                    parts.append(text)
+
+                # Heading 3+ → treat like sub-heading
+                elif style.startswith("Heading"):
+                    parts.append(text)
+
+                # Normal text — may contain embedded newlines (multiple bullets in one para)
+                else:
+                    # Split on newlines within the paragraph
+                    for line in text.split("\n"):
+                        line = line.strip()
+                        if line:
+                            parts.append(line)
+
+            # Tables
             for table in doc.tables:
                 for row in table.rows:
-                    row_cells = list(dict.fromkeys(
-                        cell.text.strip() for cell in row.cells if cell.text.strip()
+                    cells = list(dict.fromkeys(
+                        c.text.strip() for c in row.cells if c.text.strip()
                     ))
-                    if row_cells:
-                        elements.append(" | ".join(row_cells))
-            return "\n".join(elements).strip()
+                    if cells:
+                        parts.append(" | ".join(cells))
+
+            # Collapse 3+ consecutive blank lines to 2
+            result = re.sub(r"\n{3,}", "\n\n", "\n".join(parts))
+            return result.strip()
         except Exception as e:
-            logger.error(f"DOCX extraction failed for '{path}': {e}")
+            logger.error(f"DOCX read error: {e}")
             return ""
 
-    # ─────────────────────────────────────────────────────────
-    # AI Path: Gemini Native JSON Schema
-    # ─────────────────────────────────────────────────────────
+    # ── AI Path ─────────────────────────────────────────────
 
-    def _parse_with_ai(self, text: str) -> Optional[Dict[str, Any]]:
-        ai = self._get_ai_service()
-
-        # Context-window guard
+    def _parse_ai(self, text: str) -> Optional[Dict[str, Any]]:
+        ai = self._get_ai()
         if len(text) > 40_000:
-            text = text[:40_000] + "\n...[Truncated by CVParser]"
+            text = text[:40_000]
 
-        prompt = (
-            "Analyze the following resume and accurately extract all fields "
-            "into the JSON schema structure you have been configured with.\n"
-            "CRITICAL: If a section has bullet points (like work experience descriptions), "
-            "you may output them as a JSON list of strings, or join them with newlines.\n\n"
-            f"{text}"
-        )
+        prompt = f"""Extract ALL information from this CV into structured JSON.
 
-        raw_schema = CVParserOutputSchema.model_json_schema()
+CRITICAL INSTRUCTIONS:
+1. Extract EVERY section present — skills with subtitles/groups, achievements,
+   languages, interests, certifications, references, awards, volunteer work,
+   publications, and any other sections
+2. For skills with subtitles (like "Clinical Skills", "Digital Health"), preserve
+   the group name in skill_groups
+3. Work experience: capture job_title, company, location, start_date, end_date,
+   and full description with bullet points
+4. Return ONLY valid JSON, no markdown fences
 
-        generation_config = {
-            "response_mime_type": "application/json",
-            "response_schema": raw_schema,
-        }
-        generation_config_simple = {
-            "response_mime_type": "application/json",
-        }
+JSON structure:
+{{
+  "personal_info": {{
+    "full_name": "", "email": "", "phone": "", "location": "",
+    "job_title": "", "linkedin": "", "portfolio": "", "github": "", "website": ""
+  }},
+  "professional_summary": "",
+  "objective": "",
+  "work_experience": [{{
+    "job_title": "", "company": "", "location": "",
+    "start_date": "", "end_date": "", "description": ""
+  }}],
+  "education": [{{
+    "degree": "", "institution": "", "location": "", "year": "", "grade": ""
+  }}],
+  "skills": ["flat", "deduplicated", "list"],
+  "skill_groups": [{{
+    "group": "Group Name or null",
+    "skills": ["skill1", "skill2"]
+  }}],
+  "certifications": ["cert1", "cert2"],
+  "achievements": ["achievement1"],
+  "languages": ["English (Fluent)", "Kiswahili"],
+  "interests": ["interest1"],
+  "references": "Available upon request or actual references",
+  "volunteer": "",
+  "publications": [],
+  "awards": [],
+  "extra_sections": {{}}
+}}
+
+CV TEXT:
+{text}"""
 
         try:
-            try:
-                raw = ai._call(
-                    prompt,
-                    system_instruction=(
-                        "You are a strict ATS data processor. Extract resume fields with high semantic "
-                        "fidelity. Normalize dates to 'Month YYYY' format. Return 'Present' for ongoing roles."
-                    ),
-                    config=generation_config,
-                    context_tag="cv_parse",
-                )
-            except Exception as schema_err:
-                # response_schema may be rejected due to $defs limitations — retry without schema constraints
-                logger.warning(
-                    f"Schema-constrained Gemini call failed ({schema_err}), retrying without schema constraints."
-                )
-                raw = ai._call(
-                    prompt,
-                    system_instruction=(
-                        "You are a strict ATS data processor. Extract resume fields with high semantic "
-                        "fidelity. Normalize dates to 'Month YYYY' format. Return 'Present' for ongoing roles. "
-                        "Return ONLY a valid JSON object matching the CVParserOutputSchema structure exactly."
-                    ),
-                    config=generation_config_simple,
-                    context_tag="cv_parse",
-                )
-
+            raw = ai._call(prompt, "cv_parse")
             if not raw:
                 return None
-
-            # Attempt clean parse first
-            try:
-                data = json.loads(raw.strip())
-                return CVParserOutputSchema(**data).model_dump()
-            except (json.JSONDecodeError, Exception):
-                # Partial recovery: strip markdown fences and retry
-                cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw.strip(), flags=re.MULTILINE)
-                try:
-                    data = json.loads(cleaned)
-                    return CVParserOutputSchema(**data).model_dump()
-                except Exception as recovery_err:
-                    logger.error(f"AI response partial recovery failed: {recovery_err}")
-                    return None
-
+            # Strip markdown fences if present
+            clean = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw.strip(), flags=re.MULTILINE)
+            data = json.loads(clean)
+            if PYDANTIC_AVAILABLE:
+                schema = CVOutputSchema(**data)
+                return schema.model_dump_flat()
+            return data
         except Exception as e:
-            logger.error(f"Gemini API call error: {e}")
+            logger.error(f"AI parse JSON error: {e}")
             return None
 
-    # ─────────────────────────────────────────────────────────
-    # Heuristic Path: Section-Aware Engine
-    # ─────────────────────────────────────────────────────────
+    # ── Heuristic Path ──────────────────────────────────────
 
-    def _parse_with_heuristics(self, text: str) -> Dict[str, Any]:
-        sections = chunk_sections(text)
-        header_text = sections.get("_header", text[:800])
-        full_text = text
+    def _parse_heuristic(self, text: str) -> Dict[str, Any]:
+        sections = chunk_cv(text)
+        header_lines = sections.get("_header", [])
 
-        personal = PersonalInfoSchema()
+        personal = parse_header(header_lines)
 
-        # — Email
-        m = re.search(r"[\w.\-+]+@[\w.\-]+\.\w{2,}", full_text)
-        if m:
-            personal.email = m.group(0)
+        # Summary / Objective
+        summary = self._section_text(sections, "summary")
+        objective = self._section_text(sections, "objective")
 
-        # — Phone (international + local formats)
-        m = re.search(
-            r"(?:\+?\d{1,3}[\s.\-]?)?(?:\(?\d{2,4}\)?[\s.\-]?)?\d{3,4}[\s.\-]?\d{3,4}[\s.\-]?\d{3,4}",
-            full_text,
-        )
-        if m:
-            candidate = re.sub(r"[^\d+]", "", m.group(0))
-            if 7 <= len(candidate) <= 16:
-                personal.phone = m.group(0).strip()
+        # Work experience
+        work = parse_work_experience(sections.get("experience", []))
 
-        # — URLs
-        urls = re.findall(r"https?://[^\s<>\"')\]]+|www\.[^\s<>\"')\]]+", full_text)
-        for url in urls:
-            url = url.strip(".,;)]\\'\"")
-            if "linkedin.com" in url and not personal.linkedin:
-                personal.linkedin = url
-            elif (
-                any(d in url for d in ["github.com", "gitlab.com", "behance.net", "dribbble.com", "portfolio"])
-                and not personal.portfolio
-            ):
-                personal.portfolio = url
+        # Education
+        education = parse_education(sections.get("education", []))
 
-        # — Name (confidence-scored)
-        personal.full_name = self._extract_name(header_text, full_text)
-
-        # — Job title (from header region)
-        personal.job_title = self._extract_job_title(header_text)
-
-        # — Location
-        personal.location = self._extract_location(header_text + "\n" + full_text[:500])
-
-        # — Summary
-        summary = ""
-        if "summary" in sections:
-            summary = sections["summary"][:1000].strip()
-        else:
-            m = re.search(
-                r"(?i)\b(?:summary|profile|objective|about me)\b\s*:?\s*(.*?)(?=\n\s*\n)",
-                full_text, re.DOTALL,
-            )
-            if m:
-                summary = m.group(1).strip()[:1000]
-
-        # — Work experience
-        work_exp = self._extract_work_experience(sections.get("experience", ""))
-
-        # — Education
-        education = self._extract_education(sections.get("education", ""))
-
-        # — Skills
-        skills_text = sections.get("skills", full_text)
-        skills = self._extract_skills(skills_text)
-
-        # — Extra / non-standard sections
-        KNOWN_KEYS = {"_header", "summary", "experience", "education", "skills",
-                      "projects", "certifications"}
-        extra_sections: Dict[str, str] = {
-            k: v for k, v in sections.items()
-            if k not in KNOWN_KEYS and v.strip()
+        # Skills with groups
+        # Skill group subtitles (e.g. "Clinical Skills", "Professional Skills")
+        # may have been extracted as separate sections by chunk_cv.
+        # Merge them back into the skills section.
+        SKILL_GROUP_SIGNALS = {
+            "clinical skills", "technical skills", "soft skills", "hard skills",
+            "professional skills", "core skills", "digital skills", "key skills",
+            "public health", "public health & outreach", "digital health",
+            "digital health & technology", "management skills", "personal skills",
+            "leadership skills", "language skills", "computer skills", "it skills",
+            "interpersonal skills", "communication skills", "analytical skills",
         }
+        skill_lines = list(sections.get("skills", []))
+        for sec_key, sec_lines in list(sections.items()):
+            if sec_key in SKILL_GROUP_SIGNALS:
+                # Re-insert the heading + its lines into skill_lines
+                skill_lines.append("")
+                skill_lines.append(sec_key.title())
+                skill_lines.extend(sec_lines)
 
-        result = CVParserOutputSchema(
-            personal_info=personal,
-            professional_summary=summary or None,
-            work_experience=work_exp,
-            education=education,
-            skills=skills,
-            extra_sections=extra_sections,
-        )
-        return result.model_dump()
+        skill_groups, flat_skills = parse_skill_groups(skill_lines)
 
-    # ─────────────────────────────────────────────────────────
-    # Sub-Extractors
-    # ─────────────────────────────────────────────────────────
+        # List sections
+        certifications = parse_list_section(sections.get("certifications", []))
+        achievements = parse_list_section(sections.get("achievements", []))
+        languages = parse_list_section(sections.get("languages", []))
+        interests = parse_list_section(sections.get("interests", []))
+        awards = parse_list_section(sections.get("awards", []))
+        publications = parse_list_section(sections.get("publications", []))
+        volunteer_text = self._section_text(sections, "volunteer")
 
-    def _extract_name(self, header_text: str, full_text: str) -> Optional[str]:
-        """
-        Confidence-scored name extraction:
-        - Prefers lines that are Title Cased with 2-4 words
-        - Avoids lines containing common CV keywords
-        - Skips lines that look like job titles or addresses
-        """
-        NOISE_WORDS = {
-            "resume", "cv", "curriculum", "vitae", "email", "phone", "mobile",
-            "address", "contact", "profile", "summary", "linkedin", "github",
-            "portfolio", "website", "tel", "fax", "objective",
+        # References
+        ref_lines = sections.get("references", [])
+        references = " ".join(l.strip() for l in ref_lines if l.strip()) or None
+
+        # Projects
+        projects_lines = sections.get("projects", [])
+        projects = self._parse_projects(projects_lines)
+
+        # Extra/unknown sections — everything not in known canonical names
+        known = {
+            "_header","summary","objective","experience","education","skills",
+            "certifications","achievements","languages","interests","references",
+            "volunteer","publications","awards","projects",
         }
-        TITLE_WORDS = {
-            "engineer", "developer", "designer", "manager", "analyst", "consultant",
-            "director", "officer", "specialist", "coordinator", "architect", "lead",
+        extra_sections: Dict[str, str] = {}
+        for key, lines in sections.items():
+            if key not in known and lines:
+                text_val = "\n".join(l for l in lines if l.strip()).strip()
+                if text_val:
+                    extra_sections[key] = text_val
+
+        # Build output
+        result = {
+            "personal_info": personal if isinstance(personal, dict) else (personal.__dict__ if not PYDANTIC_AVAILABLE else personal.model_dump()),
+            "professional_summary": summary,
+            "objective": objective,
+            "work_experience": [
+                {
+                    "job_title":  j.get("job_title","") if isinstance(j,dict) else (j.job_title or ""),
+                    "company":    j.get("company","") if isinstance(j,dict) else (j.company or ""),
+                    "location":   j.get("location","") if isinstance(j,dict) else (j.location or ""),
+                    "start_date": j.get("start_date","") if isinstance(j,dict) else (j.start_date or ""),
+                    "end_date":   j.get("end_date","Present") if isinstance(j,dict) else (j.end_date or "Present"),
+                    "description":j.get("description","") if isinstance(j,dict) else (j.description or ""),
+                    "achievements": j.get("achievements",[]) if isinstance(j,dict) else (j.achievements or []),
+                }
+                for j in work
+            ],
+            "education": [
+                {
+                    "degree":      e.get("degree","") if isinstance(e,dict) else (e.degree or ""),
+                    "institution": e.get("institution","") if isinstance(e,dict) else (e.institution or ""),
+                    "location":    e.get("location","") if isinstance(e,dict) else (e.location or ""),
+                    "year":        e.get("year","") if isinstance(e,dict) else (e.year or ""),
+                    "grade":       e.get("grade","") if isinstance(e,dict) else (e.grade or ""),
+                }
+                for e in education
+            ],
+            "skills": flat_skills,
+            "skill_groups": [
+                {"group": g.get("group") if isinstance(g,dict) else g.group,
+                 "skills": g.get("skills",[]) if isinstance(g,dict) else g.skills}
+                for g in skill_groups
+            ],
+            "certifications": certifications,
+            "achievements": achievements,
+            "languages": languages,
+            "interests": interests,
+            "awards": awards,
+            "publications": publications,
+            "volunteer": volunteer_text,
+            "references": references,
+            "projects": projects,
+            "extra_sections": extra_sections,
         }
+        return result
 
-        candidates: List[Tuple[int, str]] = []
-        lines = [l.strip() for l in header_text.split("\n") if l.strip()]
+    def _section_text(self, sections: Dict, key: str) -> Optional[str]:
+        lines = sections.get(key, [])
+        text = "\n".join(l for l in lines if l.strip()).strip()
+        return text or None
 
-        for idx, line in enumerate(lines[:10]):
-            lower = line.lower()
-            words = line.split()
-            score = 0
+    def _parse_projects(self, lines: List[str]) -> List[Dict]:
+        """Parse projects section into list of {name, description, url}."""
+        if not lines:
+            return []
+        projects = []
+        cur_name = None
+        cur_desc = []
+        cur_url = None
 
-            # Must be 2–5 words
-            if not (2 <= len(words) <= 5):
-                continue
-            # Must not be too long or too short
-            if not (5 <= len(line) <= 50):
-                continue
-            # No noise keywords
-            if any(nw in lower for nw in NOISE_WORDS):
-                continue
-            # No email/phone/url
-            if re.search(r"[@\d/\\|]", line):
-                continue
-            # Prefer title case
-            if line.istitle() or all(w[0].isupper() for w in words if w):
-                score += 3
-            # Prefer early lines
-            score += max(0, 5 - idx)
-            # Penalize if it looks like a job title
-            if any(tw in lower for tw in TITLE_WORDS):
-                score -= 2
-            # Penalize ALL CAPS
-            if line.isupper():
-                score -= 1
-
-            candidates.append((score, line))
-
-        if candidates:
-            return max(candidates, key=lambda x: x[0])[1]
-        return None
-
-    def _extract_job_title(self, header_text: str) -> Optional[str]:
-        """Extracts job title from the header region using common title keywords."""
-        TITLE_KEYWORDS = [
-            "engineer", "developer", "designer", "manager", "analyst", "consultant",
-            "director", "officer", "specialist", "coordinator", "architect", "lead",
-            "scientist", "researcher", "executive", "associate", "intern", "head of",
-        ]
-        for line in header_text.split("\n"):
+        for line in lines:
             stripped = line.strip()
-            if 5 < len(stripped) < 80:
-                lower = stripped.lower()
-                if any(kw in lower for kw in TITLE_KEYWORDS):
-                    if not re.search(r"[@\d]", stripped):
-                        return stripped
-        return None
-
-    def _extract_location(self, text: str) -> Optional[str]:
-        """Matches City, Country / City, State / City, State, Country patterns."""
-        m = re.search(
-            r"\b([A-Z][a-zA-Z\s]{2,20}),\s*([A-Z][a-zA-Z\s]{2,20})(?:,\s*[A-Z][a-zA-Z\s]{2,20})?\b",
-            text,
-        )
-        if m:
-            candidate = m.group(0).strip()
-            # Filter out false positives like "January 2020, March 2021"
-            if not re.search(r"\d", candidate):
-                return candidate
-        return None
-
-    def _extract_work_experience(self, section_text: str) -> List[WorkExperienceSchema]:
-        """
-        Parses work experience blocks. Each job entry typically contains:
-        - A line with title and/or company name
-        - A date range line (Month YYYY – Month YYYY / Present)
-        - Followed by description bullet points or paragraphs
-        """
-        if not section_text.strip():
-            return []
-
-        DATE_RANGE_RE = re.compile(
-            r"(?:"
-            r"(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|"
-            r"Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)"
-            r"[\s.'\-]+['']?\d{2,4}"
-            r"|(?:\d{4})"
-            r")"
-            r"\s*[–\-–to]+\s*"
-            r"(?:"
-            r"(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|"
-            r"Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)"
-            r"[\s.'\-]+['']?\d{2,4}"
-            r"|\d{4}"
-            r"|[Pp]resent|[Cc]urrent|[Nn]ow"
-            r")",
-            re.IGNORECASE,
-        )
-
-        entries: List[WorkExperienceSchema] = []
-        blocks = re.split(r"\n{2,}", section_text.strip())
-
-        for block in blocks:
-            lines = [l.strip() for l in block.split("\n") if l.strip()]
-            if not lines:
+            if not stripped:
+                if cur_name:
+                    projects.append({"name": cur_name, "description": "\n".join(cur_desc).strip(), "url": cur_url})
+                    cur_name = cur_desc = None; cur_desc = []; cur_url = None
                 continue
-
-            title: Optional[str] = None
-            company: Optional[str] = None
-            start_date: Optional[str] = None
-            end_date: Optional[str] = None
-            desc_lines: List[str] = []
-
-            for line in lines:
-                date_m = DATE_RANGE_RE.search(line)
-                if date_m:
-                    date_str = date_m.group(0)
-                    parts = re.split(r"\s*[–\-–to]+\s*", date_str, maxsplit=1)
-                    start_date = DateNormalizer.normalize(parts[0].strip()) if parts else None
-                    end_date = DateNormalizer.normalize(parts[1].strip()) if len(parts) > 1 else None
-                    remainder = line.replace(date_str, "").strip(" |–-,")
-                    if remainder and not company:
-                        company = remainder
-                elif not title and len(line) < 80:
-                    title = line
-                elif not company and len(line) < 80 and title:
-                    if not DATE_RANGE_RE.search(line):
-                        company = line
-                else:
-                    desc_lines.append(line)
-
-            if title or company:
-                entries.append(WorkExperienceSchema(
-                    title=title,
-                    company=company,
-                    start_date=start_date,
-                    end_date=end_date,
-                    description="\n".join(desc_lines).strip() or None,
-                ))
-
-        return entries
-
-    def _extract_education(self, section_text: str) -> List[EducationSchema]:
-        """
-        Parses education blocks: degree, institution, year, grade.
-        """
-        if not section_text.strip():
-            return []
-
-        DEGREE_RE = re.compile(
-            r"\b(B\.?Sc|B\.?A|B\.?Eng|B\.?Tech|M\.?Sc|M\.?A|M\.?Eng|MBA|Ph\.?D|"
-            r"Bachelor['\s]?s?|Master['\s]?s?|Doctorate|Diploma|Certificate|HND|OND|Associate)\b",
-            re.IGNORECASE,
-        )
-        GRADE_RE = re.compile(
-            r"\b(First Class|Second Class|2:1|2:2|Third Class|Pass|Distinction|"
-            r"Merit|GPA\s*:?\s*[\d.]+|[\d.]+\s*/\s*[\d.]+|Cum Laude|Magna Cum Laude|"
-            r"Summa Cum Laude)\b",
-            re.IGNORECASE,
-        )
-        YEAR_RE = re.compile(r"\b(19|20)\d{2}\b(?:\s*[–\-]\s*(?:(19|20)\d{2}|[Pp]resent))?")
-
-        entries: List[EducationSchema] = []
-        blocks = re.split(r"\n{2,}", section_text.strip())
-
-        for block in blocks:
-            lines = [l.strip() for l in block.split("\n") if l.strip()]
-            if not lines:
+            url_m = re.search(r"https?://[^\s]+", stripped)
+            if url_m:
+                cur_url = url_m.group(0)
                 continue
+            bullet_m = re.match(r"^[·•\-\*–\u2022\u00b7]\s*(.+)", stripped)
+            if bullet_m:
+                cur_desc.append(bullet_m.group(1))
+            elif not cur_name:
+                cur_name = stripped
+            else:
+                cur_desc.append(stripped)
 
-            degree: Optional[str] = None
-            institution: Optional[str] = None
-            year: Optional[str] = None
-            grade: Optional[str] = None
+        if cur_name:
+            projects.append({"name": cur_name, "description": "\n".join(cur_desc).strip(), "url": cur_url})
 
-            for line in lines:
-                year_m = YEAR_RE.search(line)
-                grade_m = GRADE_RE.search(line)
-                degree_m = DEGREE_RE.search(line)
+        return projects
 
-                if grade_m and not grade:
-                    grade = grade_m.group(0)
-                if year_m and not year:
-                    year = year_m.group(0)
-                if degree_m and not degree:
-                    degree = line  # full line often has degree + subject
-                elif not institution and not degree_m and len(line) < 100:
-                    if not year_m or len(line) > 10:
-                        institution = line
-
-            if degree or institution:
-                entries.append(EducationSchema(
-                    degree=degree,
-                    institution=institution,
-                    year=year,
-                    grade=grade,
-                ))
-
-        return entries
-
-    def _extract_skills(self, text: str) -> List[str]:
-        """
-        Extracts skills using alias-aware pattern matching with canonical normalization.
-        Also parses comma/bullet-separated skill lists when present in the skills section.
-        """
-        found: Dict[str, str] = {}  # canonical → display
-        lower_text = text.lower()
-
-        # Pattern match against known skills registry
-        for pattern in SKILL_PATTERNS:
-            if re.search(rf"(?<![a-z]){re.escape(pattern)}(?![a-z])", lower_text):
-                canonical = normalize_skill(pattern)
-                found[canonical.lower()] = canonical
-
-        # Also parse explicit skill lists (CSV or bullet lines within skills section)
-        list_items = re.split(r"[,•\|\n]+", text)
-        for item in list_items:
-            item = item.strip(" .-\t")
-            if 2 <= len(item) <= 40 and not re.search(r"\d{4}", item):
-                canonical = normalize_skill(item)
-                key = canonical.lower()
-                if key not in found:
-                    found[key] = canonical
-
-        return sorted(found.values(), key=str.lower)
-
+    def _empty(self) -> Dict[str, Any]:
+        return {
+            "personal_info": {}, "professional_summary": None, "objective": None,
+            "work_experience": [], "education": [], "skills": [], "skill_groups": [],
+            "certifications": [], "achievements": [], "languages": [], "interests": [],
+            "awards": [], "publications": [], "volunteer": None, "references": None,
+            "projects": [], "extra_sections": {},
+        }
