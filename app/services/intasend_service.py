@@ -110,6 +110,17 @@ class IntaSendService:
             test=self.test_mode,
         )
 
+        # Sandbox and live are separate IntaSend accounts/domains
+        # (sandbox.intasend.com vs payment.intasend.com), not a toggle —
+        # mismatched keys here produce a confusing "Invalid token for
+        # sandbox environment" error rather than a clear "wrong account"
+        # message. Logging the resolved mode on every init makes that
+        # mismatch obvious immediately instead of after a failed payment.
+        logger.info(f"IntaSendService initialized: mode={'SANDBOX' if self.test_mode else 'LIVE'} "
+                    f"(INTASEND_ENV={current_app.config.get('INTASEND_ENV', 'sandbox')})")
+        if not self.secret_key or not self.publishable_key:
+            logger.warning("IntaSendService initialized with missing key(s) — payments will fail")
+
     def initiate_payment(self, phone: str, amount: float, reference: str,
                           description: str = "", email: str = "") -> Dict[str, Any]:
         """
