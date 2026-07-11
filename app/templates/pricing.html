@@ -23,7 +23,7 @@
       <p class="text-gray-500 text-lg">Pay with M-Pesa. Cancel anytime. No hidden fees.</p>
     </div>
 
-    <!-- Plans grid — rendered directly from DB, not via {% include %} -->
+    <!-- Plans grid — rendered directly from DB, not via an include partial -->
     <div class="grid md:grid-cols-{{ plans|length }} gap-6 mb-16">
       {% for plan in plans %}
       <div class="bg-white rounded-2xl border
@@ -118,8 +118,12 @@
               <td class="px-6 py-3 text-gray-700">{{ label }}</td>
               {% for plan in plans %}
               <td class="px-4 py-3 text-center">
-                {% set val = plan[attr] if plan is mapping else plan.__dict__.get(attr, getattr(plan, attr, None)) %}
-                {% set v = getattr(plan, attr) %}
+                {# Jinja's subscript syntax (plan[attr]) already falls back to
+                   attribute access for non-dict objects like ORM models —
+                   getattr() isn't a Jinja global and plan.__dict__ can trip
+                   a SecurityError under a sandboxed environment, so neither
+                   was needed here. #}
+                {% set v = plan[attr] %}
                 {% if v is sameas True or v is sameas False %}
                   {% if v %}
                   <span class="text-green-500 font-bold">✓</span>
@@ -176,3 +180,4 @@
   <a href="{{ url_for('main.about') }}" class="hover:text-white transition">About</a>
 </footer>
 {% endblock %}
+
