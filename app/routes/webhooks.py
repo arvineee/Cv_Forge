@@ -52,13 +52,25 @@ def _handle_payment_success(data: dict):
     reference = data.get("reference") or data.get("checkout_request_id")
     transaction_id = data.get("transaction_id") or data.get("mpesa_receipt_number")
 
-    subscription = Subscription.query.filter_by(payment_reference=reference).first()
+    # FIX: Lipana (like most webhook providers) delivers "at least once" —
+    # the same event can arrive twice (retry after a slow 200, network
+    # blip, etc). The old code did read-then-write
+    # (`if status == "active": skip`), which has a race: two near-
+    # simultaneous deliveries can both read "pending" before either
+    # commits, and both proceed to activate/charge logic. with_for_update()
+    # takes a row lock so the second delivery blocks until the first
+    # commits, then re-reads the now-"active" status and skips cleanly.
+    subscription = (Subscription.query
+                     .filter_by(payment_reference=reference)
+                     .with_for_update()
+                     .first())
     if not subscription:
         current_app.logger.warning(f"No subscription found for reference={reference}")
         return
 
     if subscription.status == "active":
-        current_app.logger.info(f"Subscription {subscription.id} already active, skipping")
+        current_app.logger.info(f"Subscription {subscription.id} already active, skipping duplicate webhook")
+        db.session.rollback()  # release the row lock, nothing to write
         return
 
     subscription.activate(transaction_id=transaction_id)
@@ -97,4 +109,56 @@ def _handle_payment_failed(data: dict):
         payment.raw_webhook = data
     db.session.commit()
     current_app.logger.info(f"Payment failed: ref={reference}")
+
+
+# ─────────────────────────────────────────────────────────────
+# IntaSend webhook — separate route because IntaSend's payload shape and
+# auth mechanism are both different from Lipana's:
+# - Auth: a static "challenge" string configured in the IntaSend
+#   dashboard, echoed back in every payload (not HMAC).
+# - Payload: invoice_id, state (PENDING/PROCESSING/COMPLETE/FAILED),
+#   api_ref (your reference), net_amount, failed_reason.
+# ─────────────────────────────────────────────────────────────
+
+@webhooks_bp.route("/intasend", methods=["POST"])
+def intasend_webhook():
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"error": "Invalid JSON"}), 400
+
+    from app.services.intasend_service import IntaSendService
+    try:
+        service = IntaSendService()
+    except ImportError:
+        current_app.logger.error("intasend-python not installed — cannot verify webhook")
+        return jsonify({"error": "Service unavailable"}), 503
+
+    if not service.verify_webhook_challenge(data.get("challenge", "")):
+        current_app.logger.warning("IntaSend webhook: invalid challenge")
+        return jsonify({"error": "Invalid challenge"}), 401
+
+    reference = data.get("api_ref")
+    invoice_id = data.get("invoice_id")
+    state = data.get("state")
+
+    current_app.logger.info(f"IntaSend webhook state={state} ref={reference} invoice={invoice_id}")
+
+    if state == "COMPLETE":
+        _handle_payment_success({
+            "reference": reference,
+            "checkout_request_id": reference,
+            "transaction_id": invoice_id,
+        })
+    elif state == "FAILED":
+        _handle_payment_failed({
+            "reference": reference,
+            "checkout_request_id": reference,
+            "failed_reason": data.get("failed_reason"),
+        })
+    else:
+        # PENDING / PROCESSING — no action, just log. The final COMPLETE
+        # or FAILED delivery is what matters.
+        current_app.logger.info(f"IntaSend webhook state={state} for ref={reference} — no action taken")
+
+    return jsonify({"received": True}), 200
 

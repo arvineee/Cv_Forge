@@ -72,13 +72,17 @@ def subscribe(plan_slug):
     db.session.commit()
 
     try:
-        from app.services.lipana_service import LipanaService
-        lipana = LipanaService()
-        resp = lipana.initiate_payment(
+        # Switched from LipanaService to IntaSendService — same interface,
+        # no other changes needed here. Requires INTASEND_SECRET_KEY /
+        # INTASEND_PUBLISHABLE_KEY in your .env and `pip install intasend-python`.
+        from app.services.intasend_service import IntaSendService
+        intasend = IntaSendService()
+        resp = intasend.initiate_payment(
             phone=phone,
             amount=plan.price_kes,
             reference=reference,
             description=f"CVForge {plan.name} Plan",
+            email=current_user.email,
         )
         if resp.get("success"):
             flash("M-Pesa payment request sent! Check your phone.", "success")
@@ -86,7 +90,7 @@ def subscribe(plan_slug):
         else:
             flash(f"Payment initiation failed: {resp.get('message', 'Unknown error')}", "error")
     except Exception as e:
-        current_app.logger.error(f"Lipana error: {e}")
+        current_app.logger.error(f"IntaSend error: {e}")
         flash("Payment service unavailable. Please try again.", "error")
 
     return redirect(url_for("billing.plans"))
