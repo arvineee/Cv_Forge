@@ -38,7 +38,12 @@ class Config:
 
     # Gemini AI
     GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-    GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.1-flash-lite")
+    # FIX: this default ("gemini-3.1-flash-lite") didn't match ai_service.py's
+    # own hardcoded fallback ("gemini-1.5-flash"), so the two could silently
+    # disagree depending on which one actually got used. Aligned to the same
+    # value here — but verify against Google's current model list for your
+    # google-generativeai SDK version before deploying; model names change.
+    GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-1.5-flash")
     GEMINI_DAILY_LIMIT = int(os.environ.get("GEMINI_DAILY_LIMIT", 1400))
     GEMINI_FREE_USER_DAILY_LIMIT = int(os.environ.get("GEMINI_FREE_USER_DAILY_LIMIT", 3))
 
@@ -63,4 +68,5 @@ class Config:
     MAIL_USERNAME = os.environ.get("MAIL_USERNAME", "")
     MAIL_PASSWORD = os.environ.get("MAIL_PASSWORD", "")
     MAIL_DEFAULT_SENDER = os.environ.get("MAIL_DEFAULT_SENDER", "noreply@cvforge.app")
+
 

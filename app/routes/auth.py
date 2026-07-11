@@ -38,12 +38,46 @@ def _safe_next(next_url):
     return None
 
 
+# FIX: this file's docstring has claimed "rate limiting" for a while, but no
+# such code actually existed anywhere in it — login/register/forgot-password
+# were fully unthrottled. This is a minimal IP-based limiter built on the
+# ActivityLog table that already exists, so it needs no new dependency
+# (e.g. Flask-Limiter) and no extra infrastructure (e.g. Redis).
+def _rate_limited(action: str, limit: int = 5, window_minutes: int = 15) -> bool:
+    """Return True if this IP has hit `action` >= limit times in the window."""
+    ip = request.remote_addr
+    if not ip:
+        return False
+    cutoff = datetime.now(timezone.utc) - timedelta(minutes=window_minutes)
+    count = ActivityLog.query.filter(
+        ActivityLog.action == action,
+        ActivityLog.ip_address == ip,
+        ActivityLog.created_at >= cutoff,
+    ).count()
+    return count >= limit
+
+
+def _record_attempt(action: str, user_id=None, details=None):
+    db.session.add(ActivityLog(
+        user_id=user_id, action=action,
+        ip_address=request.remote_addr,
+        user_agent=request.user_agent.string[:500] if request.user_agent else None,
+        details=details,
+    ))
+    db.session.commit()
+
+
 @auth_bp.route("/register", methods=["GET", "POST"])
 def register():
     if current_user.is_authenticated:
         return redirect(url_for("dashboard.index"))
 
     if request.method == "POST":
+        if _rate_limited("register_attempt", limit=5, window_minutes=15):
+            flash("Too many signup attempts. Please try again in a few minutes.", "error")
+            return render_template("auth/register.html")
+        _record_attempt("register_attempt")
+
         email = request.form.get("email", "").strip().lower()
         password = request.form.get("password", "")
         confirm = request.form.get("confirm_password", "")
@@ -68,7 +102,9 @@ def register():
 
         token = secrets.token_urlsafe(32)
         user = User(email=email, first_name=first_name, last_name=last_name,
-                    verification_token=token, is_verified=False)
+                    verification_token=token,
+                    verification_token_expires=datetime.now(timezone.utc) + timedelta(hours=24),
+                    is_verified=False)
         user.set_password(password)
         db.session.add(user)
         db.session.flush()
@@ -95,6 +131,10 @@ def login():
         return redirect(url_for("dashboard.index"))
 
     if request.method == "POST":
+        if _rate_limited("login_failed", limit=10, window_minutes=15):
+            flash("Too many failed login attempts. Please try again in a few minutes.", "error")
+            return render_template("auth/login.html")
+
         email = request.form.get("email", "").strip().lower()
         password = request.form.get("password", "")
         remember = bool(request.form.get("remember"))
@@ -103,11 +143,13 @@ def login():
 
         if not user:
             current_app.logger.warning(f"Login failed: no user found for email={email}")
+            _record_attempt("login_failed")
             flash("Invalid email or password.", "error")
             return render_template("auth/login.html", email=email)
 
         if not user.check_password(password):
             current_app.logger.warning(f"Login failed: wrong password for email={email}")
+            _record_attempt("login_failed", user_id=user.id)
             flash("Invalid email or password.", "error")
             return render_template("auth/login.html", email=email)
 
@@ -142,8 +184,20 @@ def verify_email(token):
     if not user:
         flash("Invalid or expired verification link.", "error")
         return redirect(url_for("auth.login"))
+
+    # FIX: the email says this link expires in 24 hours, but nothing ever
+    # checked that before. Now it actually does.
+    expires = user.verification_token_expires
+    if expires and expires.tzinfo is None:
+        expires = expires.replace(tzinfo=timezone.utc)
+    if expires and expires < datetime.now(timezone.utc):
+        flash("That verification link has expired. Please request a new one.", "error")
+        return redirect(url_for("auth.resend_verification") if current_user.is_authenticated
+                         else url_for("auth.login"))
+
     user.is_verified = True
     user.verification_token = None
+    user.verification_token_expires = None
     db.session.commit()
     flash("Email verified! Your account is now active.", "success")
     if current_user.is_authenticated:
@@ -157,7 +211,14 @@ def resend_verification():
     if current_user.is_verified:
         flash("Your email is already verified.", "info")
         return redirect(url_for("dashboard.index"))
+
+    if _rate_limited("resend_verification", limit=3, window_minutes=15):
+        flash("Too many requests. Please wait a few minutes before trying again.", "warning")
+        return redirect(url_for("dashboard.index"))
+    _record_attempt("resend_verification", user_id=current_user.id)
+
     current_user.verification_token = secrets.token_urlsafe(32)
+    current_user.verification_token_expires = datetime.now(timezone.utc) + timedelta(hours=24)
     db.session.commit()
     try:
         from app.services.email_service import send_verification_email
@@ -171,6 +232,11 @@ def resend_verification():
 @auth_bp.route("/forgot-password", methods=["GET", "POST"])
 def forgot_password():
     if request.method == "POST":
+        if _rate_limited("forgot_password_attempt", limit=5, window_minutes=15):
+            flash("Too many requests. Please try again in a few minutes.", "error")
+            return render_template("auth/forgot_password.html")
+        _record_attempt("forgot_password_attempt")
+
         email = request.form.get("email", "").strip().lower()
         user = User.query.filter_by(email=email).first()
         if user:
@@ -298,4 +364,5 @@ def google_callback():
     login_user(user, remember=True)
     flash(f"Welcome, {user.first_name or user.email}!", "success")
     return redirect(url_for("dashboard.index"))
+
 

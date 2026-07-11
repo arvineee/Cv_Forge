@@ -69,6 +69,16 @@ def impersonate(user_id):
     user = db.session.get(User, user_id)
     if not user:
         abort(404)
+    # FIX: impersonation previously left no audit trail at all — no record
+    # of which admin did it, or who they became. Log it before switching
+    # sessions, while current_user is still the admin.
+    db.session.add(ActivityLog(
+        user_id=current_user.id, action="admin_impersonate_start",
+        resource_type="user", resource_id=user.id,
+        ip_address=request.remote_addr,
+        details={"admin_email": current_user.email, "target_email": user.email},
+    ))
+    db.session.commit()
     login_user(user)
     flash(f"Impersonating {user.email}.", "warning")
     return redirect(url_for("dashboard.index"))
@@ -251,3 +261,4 @@ def template_toggle(template_id):
     db.session.commit()
     flash(f"Template {'activated' if t.is_active else 'deactivated'}.", "success")
     return redirect(url_for("admin.templates"))
+

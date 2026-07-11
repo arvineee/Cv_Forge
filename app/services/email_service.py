@@ -67,3 +67,4 @@ def send_password_reset_email(user):
     except Exception as e:
         current_app.logger.warning(f"Password reset email failed: {e}")
 
+

@@ -1,19 +1,45 @@
 """
 CVForge AI - CV Blueprint
-Fixed: unified import path, added restore_version route,
-certifications/projects/references save as lists, BytesIO cover letter download
+
+Fixes applied in this pass:
+- upload() now runs _check_ai_limit() before calling CVParser().parse().
+  Parsing calls Gemini internally, so previously a free user could upload
+  unlimited CVs and burn unlimited AI calls with zero rate limiting.
+- download("docx") now checks the user's plan (PricingPlan.allow_docx)
+  before generating a DOCX. Previously any user, free or paid, could
+  download DOCX regardless of plan.
+- download() now deletes the generated temp file after send_file() via
+  after_this_request, instead of leaking a new PDF/DOCX into /tmp on every
+  single download forever.
+- revamp()'s merge step no longer does a blind
+  `for key, val in revamped.items(): setattr(resume, key, val)`. That
+  would happily overwrite ANY attribute the AI's JSON happened to name
+  (including ones that were never meant to be touched) as long as
+  hasattr() was true. It's now a fixed whitelist of fields the AI is
+  actually allowed to change, and skill_groups (if returned) are merged
+  into custom_sections rather than dropped.
+- ai_assist() and revamp() now pass user_id=current_user.id into the AI
+  service calls so the AIUsage cache (previously always-dead) actually
+  activates for repeat requests.
 """
 import os
 import secrets
+from datetime import datetime, timezone
 from flask import (Blueprint, render_template, redirect, url_for, flash,
-                   request, jsonify, current_app, send_file, abort)
+                   request, jsonify, current_app, send_file, abort, after_this_request)
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 
-from app.models import db, Resume, ResumeVersion, Template, ActivityLog, AIUsage
+from app.models import db, Resume, ResumeVersion, Template, ActivityLog, AIUsage, PricingPlan
 from app.ai_service import get_ai_service
 
 cv_bp = Blueprint("cv", __name__)
+
+# Fields the AI Revamp response is allowed to write back onto a Resume.
+# Anything else in the AI's JSON is ignored, even if it happens to match
+# an existing model attribute name (id, user_id, is_public, etc. must
+# never be settable from AI output).
+REVAMP_ALLOWED_FIELDS = {"professional_summary", "work_experience", "skills"}
 
 
 def _allowed_file(filename: str) -> bool:
@@ -39,6 +65,37 @@ def _check_ai_limit(feature: str) -> tuple:
     if AIUsage.get_total_daily_count() >= current_app.config["GEMINI_DAILY_LIMIT"]:
         return False, "AI service is temporarily busy. Please try again later."
     return True, ""
+
+
+def _current_plan() -> "PricingPlan | None":
+    """Look up the PricingPlan row matching the user's current plan slug."""
+    return PricingPlan.query.filter_by(slug=current_user.plan, is_active=True).first()
+
+
+def _plan_allows_docx() -> bool:
+    if current_user.is_premium:
+        plan = _current_plan()
+        if plan:
+            return bool(plan.allow_docx)
+        # Premium but no matching plan row configured — default to allowing it
+        return True
+    # Free-tier: only allow if explicitly configured on the "free" plan row
+    plan = _current_plan()
+    return bool(plan and plan.allow_docx)
+
+
+def _cleanup_after_send(file_path: str):
+    """Register a cleanup callback so generated PDF/DOCX temp files don't
+    pile up in /tmp — pdf_service/docx_service both create files with
+    delete=False / mkstemp and never remove them themselves."""
+    @after_this_request
+    def _remove(response):
+        try:
+            if file_path and os.path.exists(file_path):
+                os.remove(file_path)
+        except Exception as e:
+            current_app.logger.warning(f"Temp file cleanup failed: {e}")
+        return response
 
 
 @cv_bp.route("/")
@@ -125,7 +182,8 @@ def ai_assist(resume_id):
 
     try:
         ai = get_ai_service()
-        result = ai.assist_section(section=section, context=context, resume=resume)
+        result = ai.assist_section(section=section, context=context, resume=resume,
+                                    user_id=current_user.id)
         AIUsage.log_usage(user_id=current_user.id, feature="cv_generate", prompt=context)
         db.session.commit()
         return jsonify({"success": True, "result": result})
@@ -149,6 +207,14 @@ def upload():
             flash("Only PDF and DOCX files are supported.", "error")
             return redirect(request.url)
 
+        # Parsing calls Gemini internally (AI-assisted extraction), so it
+        # needs to be rate-limited the same as any other AI feature —
+        # previously this was uncapped for every plan.
+        can_use, err = _check_ai_limit("cv_parse")
+        if not can_use:
+            flash(err, "warning")
+            return redirect(request.url)
+
         filename = secure_filename(file.filename)
         ext = filename.rsplit(".", 1)[1].lower()
         safe_name = f"{secrets.token_hex(8)}_{filename}"
@@ -166,6 +232,7 @@ def upload():
         try:
             from app.services.cv_parser import CVParser
             parsed = CVParser().parse(upload_path, ext)
+            AIUsage.log_usage(user_id=current_user.id, feature="cv_parse", prompt=filename)
         except Exception as e:
             current_app.logger.error(f"CV parse error: {e}")
             parsed = {}
@@ -232,7 +299,12 @@ def upload():
         db.session.flush()
         _log("cv_upload", resume.id, {"filename": filename})
         db.session.commit()
-        flash("CV uploaded successfully! You can now revamp it with AI.", "success")
+
+        if not parsed_name and not normalized_work and not parsed.get("education"):
+            flash("CV uploaded, but we couldn't automatically extract its content. "
+                  "You may need to fill in details manually before revamping.", "warning")
+        else:
+            flash("CV uploaded successfully! You can now revamp it with AI.", "success")
         return redirect(url_for("cv.revamp", resume_id=resume.id))
 
     return render_template("cv/upload.html")
@@ -262,10 +334,38 @@ def revamp(resume_id):
             )
             db.session.add(version)
 
-            revamped = ai.revamp_resume(resume)
-            for key, val in revamped.items():
-                if hasattr(resume, key) and val:
-                    setattr(resume, key, val)
+            revamped = ai.revamp_resume(resume, user_id=current_user.id)
+
+            # Whitelisted merge — only fields the AI is actually allowed to
+            # touch get written back. Never blindly setattr() on arbitrary
+            # keys the model's JSON happened to include.
+            if revamped.get("professional_summary"):
+                resume.professional_summary = revamped["professional_summary"]
+
+            if revamped.get("work_experience"):
+                normalized = []
+                for job in revamped["work_experience"]:
+                    if not isinstance(job, dict):
+                        continue
+                    normalized.append({
+                        "job_title":    job.get("job_title") or job.get("title") or "",
+                        "company":      job.get("company") or "",
+                        "location":     job.get("location") or "",
+                        "start_date":   job.get("start_date") or "",
+                        "end_date":     job.get("end_date") or "Present",
+                        "description":  job.get("description") or "",
+                        "achievements": job.get("achievements") or [],
+                    })
+                if normalized:
+                    resume.work_experience = normalized
+
+            if revamped.get("skill_groups"):
+                custom = dict(resume.custom_sections or {})
+                custom["skill_groups"] = revamped["skill_groups"]
+                resume.custom_sections = custom
+            elif revamped.get("skills"):
+                resume.skills = revamped["skills"]
+
             resume.source = "revamp"
 
             after_version = ResumeVersion(
@@ -336,6 +436,10 @@ def download(resume_id, fmt):
     if fmt not in ("pdf", "docx"):
         abort(400)
 
+    if fmt == "docx" and not _plan_allows_docx():
+        flash("DOCX download is a Pro feature. Upgrade your plan to download as Word.", "warning")
+        return redirect(url_for("billing.plans"))
+
     try:
         if fmt == "pdf":
             from app.services.pdf_service import PDFService
@@ -348,11 +452,12 @@ def download(resume_id, fmt):
             mimetype = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             dl_name = f"{resume.title.replace(' ', '_')}.docx"
 
-        from datetime import datetime, timezone
         resume.download_count = (resume.download_count or 0) + 1
         resume.last_downloaded_at = datetime.now(timezone.utc)
         _log("cv_download", resume.id, {"format": fmt})
         db.session.commit()
+
+        _cleanup_after_send(file_path)
         return send_file(file_path, as_attachment=True, download_name=dl_name, mimetype=mimetype)
     except Exception as e:
         current_app.logger.error(f"Download error: {e}")

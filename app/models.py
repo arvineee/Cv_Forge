@@ -45,6 +45,10 @@ class User(db.Model, UserMixin):
     is_admin = db.Column(db.Boolean, default=False, nullable=False)
     is_verified = db.Column(db.Boolean, default=False, nullable=False)
     verification_token = db.Column(db.String(255), nullable=True)
+    # FIX: the verification email says "expires in 24 hours" but nothing
+    # ever enforced that — verify_email() never checked an expiry. This
+    # column + the check in auth.verify_email() make that claim true.
+    verification_token_expires = db.Column(db.DateTime(timezone=True), nullable=True)
     reset_token = db.Column(db.String(255), nullable=True)
     reset_token_expires = db.Column(db.DateTime(timezone=True), nullable=True)
 
@@ -464,4 +468,5 @@ class UserSettings(db.Model):
     default_template_id = db.Column(db.Integer, nullable=True)
     created_at = db.Column(db.DateTime(timezone=True), default=utcnow)
     updated_at = db.Column(db.DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
 

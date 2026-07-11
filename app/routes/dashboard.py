@@ -1,7 +1,7 @@
 """CVForge AI - Dashboard Blueprint"""
-from flask import Blueprint, render_template
+from flask import Blueprint, render_template, request, flash, redirect, url_for
 from flask_login import login_required, current_user
-from app.models import Resume, CoverLetter, ATSReport, AIUsage
+from app.models import db, Resume, CoverLetter, ATSReport, AIUsage, Profile
 
 dashboard_bp = Blueprint("dashboard", __name__)
 
@@ -21,11 +21,6 @@ def index():
                            cover_letters=cover_letters,
                            recent_report=recent_report,
                            daily_ai_used=daily_ai_used)
-
-
-from flask import request, flash, redirect, url_for
-from flask_login import current_user
-from app.models import db, Profile
 
 
 @dashboard_bp.route("/dashboard/profile")
@@ -76,3 +71,4 @@ def change_password():
         flash("Password updated successfully.", "success")
 
     return redirect(url_for("dashboard.profile"))
+

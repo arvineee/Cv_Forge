@@ -38,6 +38,20 @@ except ImportError:
     PYDANTIC_AVAILABLE = False
     BaseModel = object
 
+# FIX: pypdf / python-docx were referenced below (pypdf.PdfReader, DocxDocument)
+# but never imported anywhere in this file, so every upload crashed with
+# NameError and silently fell back to an empty parsed result. Import them
+# here, guarded the same way pydantic is above.
+try:
+    import pypdf
+except ImportError:
+    pypdf = None
+
+try:
+    from docx import Document as DocxDocument
+except ImportError:
+    DocxDocument = None
+
 
 if PYDANTIC_AVAILABLE:
     class PersonalInfoSchema(BaseModel):
@@ -898,6 +912,20 @@ class CVParser:
 
     # ── Public entry point ──────────────────────────────────
 
+    def extract_text(self, file_path: str, file_ext: str) -> str:
+        """
+        Lightweight raw-text extraction only — no AI structured parse.
+        Used by flows (e.g. ATS check-on-upload) that just need the CV's
+        text content and don't need it broken into resume fields, so they
+        don't burn a second Gemini call on top of whatever uses the text.
+        """
+        ext = file_ext.lower().strip(".")
+        if ext == "pdf":
+            return self._read_pdf(file_path)
+        elif ext == "docx":
+            return self._read_docx(file_path)
+        raise ValueError(f"Unsupported format: {ext}")
+
     def parse(self, file_path: str, file_ext: str) -> Dict[str, Any]:
         ext = file_ext.lower().strip(".")
         if ext == "pdf":
@@ -1234,3 +1262,4 @@ CV TEXT:
             "awards": [], "publications": [], "volunteer": None, "references": None,
             "projects": [], "extra_sections": {},
         }
+

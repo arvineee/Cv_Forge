@@ -71,6 +71,7 @@ def new_letter():
                 job_description=job_description,
                 tone=tone,
                 resume=resume,
+                user_id=current_user.id,
             )
         except Exception as e:
             current_app.logger.error(f"Cover letter generation failed: {e}")
@@ -180,3 +181,4 @@ def delete_letter(letter_id):
     db.session.commit()
     flash("Cover letter deleted.", "info")
     return redirect(url_for("cover_letter.list_letters"))
+

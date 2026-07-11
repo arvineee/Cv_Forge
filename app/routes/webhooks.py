@@ -5,6 +5,7 @@ Fixed: HMAC signature verification, db.session.get() instead of User.query.get()
 import hashlib
 import hmac
 import json
+from datetime import datetime
 from flask import Blueprint, request, jsonify, current_app
 from app.models import db, User, Payment, Subscription
 
@@ -66,9 +67,12 @@ def _handle_payment_success(data: dict):
     user = db.session.get(User, subscription.user_id)
     if user:
         user.plan = subscription.plan
-        from app.models import utcnow
-        from datetime import timedelta
-        user.plan_expires_at = utcnow() + timedelta(days=30)
+        # FIX: plan_expires_at is DateTime(timezone=True); the old code wrote
+        # utcnow() (a naive datetime, by design for other columns) into it,
+        # which is inconsistent with how reset_token_expires etc. are set
+        # elsewhere with datetime.now(timezone.utc). Standardize on aware here.
+        from datetime import timedelta, timezone as _tz
+        user.plan_expires_at = datetime.now(_tz.utc) + timedelta(days=30)
 
     payment = Payment.query.filter_by(
         lipana_checkout_request_id=reference
@@ -93,3 +97,4 @@ def _handle_payment_failed(data: dict):
         payment.raw_webhook = data
     db.session.commit()
     current_app.logger.info(f"Payment failed: ref={reference}")
+

@@ -30,3 +30,4 @@ def me():
         "plan": current_user.plan,
         "is_premium": current_user.is_premium,
     })
+

@@ -64,6 +64,14 @@ def create_app(config_object=None):
     app.register_blueprint(billing_bp, url_prefix="/billing")
     app.register_blueprint(admin_bp, url_prefix="/admin")
     app.register_blueprint(webhooks_bp, url_prefix="/webhooks")
+    # FIX: CSRFProtect (initialized above) protects ALL POST routes by
+    # default, including this one. But /webhooks/lipana receives POSTs from
+    # Lipana's servers, not from a browser session — it will never carry a
+    # CSRF token. Without this exemption, real payment webhooks were very
+    # likely being rejected with 400 Bad Request, and subscriptions would
+    # never activate. HMAC signature verification (already implemented in
+    # webhooks.py) is the correct auth mechanism for this endpoint instead.
+    csrf.exempt(webhooks_bp)
     app.register_blueprint(templates_gallery_bp, url_prefix="/templates")
     app.register_blueprint(api_bp, url_prefix="/api/v1")
 
@@ -345,4 +353,5 @@ def _register_cli(app: Flask):
         click.echo(f"  Cover Letters: {CoverLetter.query.count()}")
         click.echo(f"  AI calls today:{AIUsage.get_total_daily_count()}")
         click.echo("────────────────────────────────────────────\n")
+
 

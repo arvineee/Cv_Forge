@@ -120,3 +120,4 @@ def payment_status(reference):
         "plan": subscription.plan,
         "redirect": url_for("billing.success") if subscription.status == "active" else None,
     })
+

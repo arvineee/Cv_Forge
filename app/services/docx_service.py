@@ -1,13 +1,29 @@
 """
-DOCX Generation Service — Enhanced Edition
+DOCX Generation Service — Fixed Edition
 
-Improvements over v1:
+Fixes applied in this pass:
+- _normalize() now carries EVERY resume field (certifications, achievements,
+  languages, interests, awards, publications, volunteer, references, projects,
+  skill_groups, github). Previously only 6 fields were read, so every DOCX
+  download silently dropped those sections regardless of what was in the DB.
+- _add_job() now reads job_title (matching the schema used everywhere else in
+  the app) instead of the nonexistent "title" key, and renders the
+  achievements[] bullet list, not just a free-text description.
+- generate() now pulls custom_sections / certifications / languages / awards /
+  references / projects the same way PDFService.generate() already did, so
+  DOCX and PDF exports are at parity.
+- Skill groups (with subtitles) are rendered when present, falling back to a
+  flat comma list otherwise.
+- github is read from personal_info.github separately instead of being
+  guessed out of the portfolio URL.
+
+Improvements kept from v1:
 - generate_from_dict() works with plain dicts (no ORM model needed).
 - Style setup is document-scoped — never mutates shared global style objects.
 - Section headings use paragraph bottom-border dividers (not heading style mutation).
 - Title / date on job entries use tab stops for true left+right alignment.
 - Bullet points use List Bullet numbering style (no manual unicode bullet chars).
-- LinkedIn / portfolio rendered as live hyperlinks via oxml relationship injection.
+- LinkedIn / portfolio / GitHub rendered as live hyperlinks via oxml relationship injection.
 - Accent color is a single constant — change one value to retheme the whole doc.
 - Page number injected into the footer section.
 - All fields fail gracefully — None values are skipped, never rendered as "None".
@@ -34,13 +50,11 @@ logger = logging.getLogger(__name__)
 # Theme / Constants
 # ─────────────────────────────────────────────────────────────
 
-# Change these two values to retheme the entire document
 ACCENT_RGB    = RGBColor(0x25, 0x63, 0xEB)   # Blue-600
 HEADING_RGB   = RGBColor(0x0F, 0x17, 0x2A)   # Slate-900
 MUTED_RGB     = RGBColor(0x47, 0x55, 0x69)   # Slate-600
 DIVIDER_HEX   = "CBD5E1"                      # Slate-300 (no #)
 
-# Page dimensions (US Letter, 1-inch margins → 6.5 inch content width)
 CONTENT_WIDTH_INCHES = 6.5
 RIGHT_TAB_TWIPS      = int(CONTENT_WIDTH_INCHES * 1440)  # twips
 
@@ -50,38 +64,108 @@ RIGHT_TAB_TWIPS      = int(CONTENT_WIDTH_INCHES * 1440)  # twips
 # ─────────────────────────────────────────────────────────────
 
 def _normalize(resume: Any) -> Dict[str, Any]:
-    """Accept ORM model or plain dict; return a clean, safe dict."""
+    """
+    Accept ORM model or plain dict; return a clean, safe dict with EVERY
+    section the app supports. Mirrors pdf_service._normalize_data() so
+    DOCX and PDF exports never drift apart again.
+    """
     if isinstance(resume, dict):
-        data = resume
+        data = dict(resume)
     else:
+        custom = getattr(resume, "custom_sections", None) or {}
         data = {
             "personal_info":        getattr(resume, "personal_info", {}) or {},
             "professional_summary": getattr(resume, "professional_summary", None),
             "work_experience":      getattr(resume, "work_experience", []) or [],
             "education":            getattr(resume, "education", []) or [],
             "skills":               getattr(resume, "skills", []) or [],
+            "skill_groups":         custom.get("skill_groups", []),
+            "certifications":       getattr(resume, "certifications", []) or [],
+            "achievements":         custom.get("achievements", []),
+            "languages":            getattr(resume, "languages", []) or [],
+            "interests":            custom.get("interests", []),
+            "awards":               getattr(resume, "awards", []) or [],
+            "publications":         custom.get("publications", []),
+            "volunteer":            custom.get("volunteer", ""),
+            "references":           getattr(resume, "references", None),
+            "projects":             getattr(resume, "projects", []) or [],
             "title":                getattr(resume, "title", None),
         }
 
     personal = data.get("personal_info") or {}
+    if not isinstance(personal, dict):
+        personal = {}
+
     name = (
         personal.get("full_name")
         or f"{personal.get('first_name', '')} {personal.get('last_name', '')}".strip()
         or data.get("title")
         or "Resume"
     )
+
+    raw_work = data.get("work_experience") or []
+    work = []
+    for job in raw_work:
+        if not isinstance(job, dict):
+            continue
+        work.append({
+            "job_title":    job.get("job_title") or job.get("title") or "",
+            "company":      job.get("company") or "",
+            "location":     job.get("location") or "",
+            "start_date":   job.get("start_date") or "",
+            "end_date":     job.get("end_date") or "Present",
+            "description":  job.get("description") or "",
+            "achievements": job.get("achievements") or [],
+        })
+
+    raw_edu = data.get("education") or []
+    education = []
+    for e in raw_edu:
+        if not isinstance(e, dict):
+            continue
+        education.append({
+            "degree":      e.get("degree") or "",
+            "institution": e.get("institution") or "",
+            "location":    e.get("location") or "",
+            "year":        e.get("year") or "",
+            "grade":       e.get("grade") or "",
+        })
+
+    raw_projects = data.get("projects") or []
+    projects = []
+    for p in raw_projects:
+        if isinstance(p, dict):
+            projects.append({
+                "name": p.get("name") or "",
+                "description": p.get("description") or "",
+                "url": p.get("url") or "",
+            })
+        elif isinstance(p, str) and p.strip():
+            projects.append({"name": p.strip(), "description": "", "url": ""})
+
     return {
-        "name":      name,
-        "job_title": personal.get("job_title") or "",
-        "email":     personal.get("email") or "",
-        "phone":     personal.get("phone") or "",
-        "location":  personal.get("location") or "",
-        "linkedin":  personal.get("linkedin") or "",
-        "portfolio": personal.get("portfolio") or "",
-        "summary":   data.get("professional_summary") or "",
-        "work":      data.get("work_experience") or [],
-        "education": data.get("education") or [],
-        "skills":    data.get("skills") or [],
+        "name":           name,
+        "job_title":      personal.get("job_title") or "",
+        "email":          personal.get("email") or "",
+        "phone":          personal.get("phone") or "",
+        "location":       personal.get("location") or "",
+        "linkedin":       personal.get("linkedin") or "",
+        "portfolio":      personal.get("portfolio") or personal.get("website") or "",
+        "github":         personal.get("github") or "",
+        "summary":        data.get("professional_summary") or data.get("objective") or "",
+        "work":           work,
+        "education":      education,
+        "skills":         data.get("skills") or [],
+        "skill_groups":   data.get("skill_groups") or [],
+        "certifications": data.get("certifications") or [],
+        "achievements":   data.get("achievements") or [],
+        "languages":      data.get("languages") or [],
+        "interests":      data.get("interests") or [],
+        "awards":         data.get("awards") or [],
+        "publications":   data.get("publications") or [],
+        "volunteer":      data.get("volunteer") or "",
+        "references":     data.get("references") or "",
+        "projects":       projects,
     }
 
 
@@ -90,10 +174,6 @@ def _normalize(resume: Any) -> Dict[str, Any]:
 # ─────────────────────────────────────────────────────────────
 
 def _set_paragraph_bottom_border(para, color_hex: str = DIVIDER_HEX, size: int = 6):
-    """
-    Add a bottom border to a paragraph (used as section dividers).
-    Safer than using HRFlowable-style table rows, which have minimum heights.
-    """
     pPr = para._p.get_or_add_pPr()
     pBdr = OxmlElement("w:pBdr")
     bottom = OxmlElement("w:bottom")
@@ -106,10 +186,6 @@ def _set_paragraph_bottom_border(para, color_hex: str = DIVIDER_HEX, size: int =
 
 
 def _add_hyperlink(para, text: str, url: str, rgb: RGBColor = ACCENT_RGB):
-    """
-    Insert a clickable hyperlink run into an existing paragraph.
-    Injects the relationship directly into the document part.
-    """
     part = para.part
     r_id = part.relate_to(url, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink", is_external=True)
 
@@ -119,12 +195,10 @@ def _add_hyperlink(para, text: str, url: str, rgb: RGBColor = ACCENT_RGB):
     run_elem = OxmlElement("w:r")
     rPr = OxmlElement("w:rPr")
 
-    # Underline
     u = OxmlElement("w:u")
     u.set(qn("w:val"), "single")
     rPr.append(u)
 
-    # Color
     color_elem = OxmlElement("w:color")
     color_elem.set(qn("w:val"), f"{rgb[0]:02X}{rgb[1]:02X}{rgb[2]:02X}")
     rPr.append(color_elem)
@@ -138,7 +212,6 @@ def _add_hyperlink(para, text: str, url: str, rgb: RGBColor = ACCENT_RGB):
 
 
 def _add_tab_stop(para, position_twips: int, alignment=WD_TAB_ALIGNMENT.RIGHT):
-    """Add a tab stop to a paragraph for right-aligned date columns."""
     pPr = para._p.get_or_add_pPr()
     tabs = OxmlElement("w:tabs")
     tab = OxmlElement("w:tab")
@@ -149,7 +222,6 @@ def _add_tab_stop(para, position_twips: int, alignment=WD_TAB_ALIGNMENT.RIGHT):
 
 
 def _add_page_number_field(para):
-    """Insert a PAGE field into a paragraph for automatic page numbering."""
     run = para.add_run()
     fldChar_begin = OxmlElement("w:fldChar")
     fldChar_begin.set(qn("w:fldCharType"), "begin")
@@ -173,22 +245,15 @@ class DOCXService:
     Generate a polished DOCX resume.
 
     Usage:
-        # From ORM model
         path = DOCXService().generate(resume_obj)
-
-        # From plain dict
         path = DOCXService().generate_from_dict(data_dict)
     """
-
-    # ── Public API ────────────────────────────────────────────
 
     def generate(self, resume) -> str:
         return self._build_docx(_normalize(resume))
 
     def generate_from_dict(self, data: Dict[str, Any]) -> str:
         return self._build_docx(_normalize(data))
-
-    # ── Document Assembly ─────────────────────────────────────
 
     def _build_docx(self, d: Dict[str, Any]) -> str:
         fd, path = tempfile.mkstemp(suffix=".docx")
@@ -198,7 +263,6 @@ class DOCXService:
         self._setup_styles(doc)
         self._setup_page(doc)
 
-        # ── Header ───────────────────────────────────────────
         self._add_name(doc, d["name"])
 
         if d["job_title"]:
@@ -208,13 +272,13 @@ class DOCXService:
         if contact_parts:
             self._add_centered_run(doc, "  |  ".join(contact_parts), size=9, rgb=MUTED_RGB)
 
-        # Links line
         link_items = []
         if d["linkedin"]:
             link_items.append(("LinkedIn", d["linkedin"]))
+        if d["github"]:
+            link_items.append(("GitHub", d["github"]))
         if d["portfolio"]:
-            label = "GitHub" if "github.com" in d["portfolio"] else "Portfolio"
-            link_items.append((label, d["portfolio"]))
+            link_items.append(("Portfolio", d["portfolio"]))
         if link_items:
             link_para = doc.add_paragraph()
             link_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -224,41 +288,74 @@ class DOCXService:
                 url = url if url.startswith("http") else f"https://{url}"
                 _add_hyperlink(link_para, label, url, ACCENT_RGB)
 
-        doc.add_paragraph()  # breathing room before first section
+        doc.add_paragraph()
 
-        # ── Professional Summary ──────────────────────────────
         if d["summary"]:
             self._section_heading(doc, "PROFESSIONAL SUMMARY")
             doc.add_paragraph(d["summary"])
 
-        # ── Work Experience ───────────────────────────────────
         if d["work"]:
             self._section_heading(doc, "WORK EXPERIENCE")
             for job in d["work"]:
                 self._add_job(doc, job)
 
-        # ── Education ─────────────────────────────────────────
         if d["education"]:
             self._section_heading(doc, "EDUCATION")
             for edu in d["education"]:
                 self._add_education(doc, edu)
 
-        # ── Skills ────────────────────────────────────────────
-        if d["skills"]:
+        if d["skill_groups"] or d["skills"]:
             self._section_heading(doc, "SKILLS")
-            doc.add_paragraph(", ".join(d["skills"]))
+            self._add_skills(doc, d["skill_groups"], d["skills"])
 
-        # ── Footer (page numbers) ─────────────────────────────
+        if d["certifications"]:
+            self._section_heading(doc, "CERTIFICATIONS")
+            self._add_bullet_list(doc, d["certifications"])
+
+        if d["achievements"]:
+            self._section_heading(doc, "KEY ACHIEVEMENTS")
+            self._add_bullet_list(doc, d["achievements"])
+
+        if d["awards"]:
+            self._section_heading(doc, "AWARDS")
+            self._add_bullet_list(doc, d["awards"])
+
+        if d["projects"]:
+            self._section_heading(doc, "PROJECTS")
+            for proj in d["projects"]:
+                self._add_project(doc, proj)
+
+        if d["publications"]:
+            self._section_heading(doc, "PUBLICATIONS")
+            self._add_bullet_list(doc, d["publications"])
+
+        if d["volunteer"]:
+            self._section_heading(doc, "VOLUNTEER EXPERIENCE")
+            doc.add_paragraph(d["volunteer"])
+
+        if d["languages"]:
+            self._section_heading(doc, "LANGUAGES")
+            p = doc.add_paragraph(" · ".join(str(x) for x in d["languages"]))
+            for run in p.runs:
+                run.font.name = "Calibri"
+
+        if d["interests"]:
+            self._section_heading(doc, "INTERESTS")
+            p = doc.add_paragraph(" · ".join(str(x) for x in d["interests"]))
+            for run in p.runs:
+                run.font.name = "Calibri"
+
+        if d["references"]:
+            self._section_heading(doc, "REFERENCES")
+            doc.add_paragraph(d["references"])
+
         self._add_footer(doc, d["name"])
 
         doc.save(path)
         logger.info(f"DOCX generated at: {path}")
         return path
 
-    # ── Page Setup ────────────────────────────────────────────
-
     def _setup_page(self, doc: Document):
-        """US Letter, 0.75-inch margins."""
         section = doc.sections[0]
         section.page_width  = Inches(8.5)
         section.page_height = Inches(11)
@@ -268,13 +365,7 @@ class DOCXService:
         section.left_margin   = margin
         section.right_margin  = margin
 
-    # ── Style Setup ───────────────────────────────────────────
-
     def _setup_styles(self, doc: Document):
-        """
-        Configure styles scoped to this document only.
-        Avoids mutating python-docx's shared default style objects.
-        """
         try:
             normal = doc.styles["Normal"]
             normal.font.name = "Calibri"
@@ -295,8 +386,6 @@ class DOCXService:
         except Exception as e:
             logger.warning(f"Style configuration warning: {e}")
 
-    # ── Component Builders ────────────────────────────────────
-
     def _add_name(self, doc: Document, name: str):
         p = doc.add_paragraph()
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -315,10 +404,6 @@ class DOCXService:
         run.font.name = "Calibri"
 
     def _section_heading(self, doc: Document, title: str):
-        """
-        Section heading with bottom-border divider.
-        Uses paragraph border (not a table row) per DOCX best practice.
-        """
         p = doc.add_paragraph()
         p.paragraph_format.space_before = Pt(12)
         p.paragraph_format.space_after  = Pt(4)
@@ -332,15 +417,18 @@ class DOCXService:
 
     def _add_job(self, doc: Document, job: Dict[str, Any]):
         """
-        Renders one work experience entry.
-        Title is left-aligned; date range is right-aligned via tab stop.
+        Renders one work experience entry. Fixed: reads job_title (not the
+        nonexistent "title" key), and renders the achievements[] bullet
+        list in addition to any free-text description.
         """
-        title     = job.get("title") or ""
+        title     = job.get("job_title") or job.get("title") or ""
         company   = job.get("company") or ""
+        location  = job.get("location") or ""
         start     = job.get("start_date") or ""
         end       = job.get("end_date") or "Present"
         date_str  = f"{start} – {end}" if start else end
         desc      = job.get("description") or ""
+        achievements = job.get("achievements") or []
 
         if title or date_str:
             p = doc.add_paragraph()
@@ -360,16 +448,24 @@ class DOCXService:
                 tab_run.font.color.rgb = MUTED_RGB
                 tab_run.font.name = "Calibri"
 
-        if company:
+        company_loc = ", ".join(v for v in [company, location] if v)
+        if company_loc:
             p = doc.add_paragraph()
             p.paragraph_format.space_after = Pt(2)
-            run = p.add_run(company)
+            run = p.add_run(company_loc)
             run.font.size = Pt(9.5)
             run.font.color.rgb = MUTED_RGB
             run.font.name = "Calibri"
 
         if desc:
             self._render_description(doc, desc)
+
+        for a in achievements:
+            if isinstance(a, str) and a.strip():
+                p = doc.add_paragraph(style="List Bullet")
+                run = p.add_run(a.strip())
+                run.font.name = "Calibri"
+                run.font.size = Pt(10)
 
         doc.add_paragraph().paragraph_format.space_after = Pt(2)
 
@@ -403,12 +499,59 @@ class DOCXService:
             run.font.color.rgb = MUTED_RGB
             run.font.name = "Calibri"
 
+    def _add_skills(self, doc: Document, skill_groups: List[Dict], flat_skills: List[str]):
+        """Render grouped skills with subtitles when available, else a flat comma list."""
+        if skill_groups:
+            for group in skill_groups:
+                group_name = group.get("group") if isinstance(group, dict) else getattr(group, "group", None)
+                skills = group.get("skills") if isinstance(group, dict) else getattr(group, "skills", [])
+                if not skills:
+                    continue
+                if group_name:
+                    p = doc.add_paragraph()
+                    p.paragraph_format.space_before = Pt(4)
+                    p.paragraph_format.space_after = Pt(1)
+                    run = p.add_run(group_name)
+                    run.bold = True
+                    run.font.size = Pt(9.5)
+                    run.font.name = "Calibri"
+                    run.font.color.rgb = MUTED_RGB
+                doc.add_paragraph(", ".join(str(s) for s in skills))
+        elif flat_skills:
+            doc.add_paragraph(", ".join(str(s) for s in flat_skills))
+
+    def _add_bullet_list(self, doc: Document, items: List[str]):
+        """Generic bullet-list renderer used by certifications/achievements/awards/publications."""
+        for item in items:
+            if not item:
+                continue
+            p = doc.add_paragraph(style="List Bullet")
+            run = p.add_run(str(item).strip())
+            run.font.name = "Calibri"
+            run.font.size = Pt(10)
+
+    def _add_project(self, doc: Document, proj: Dict[str, Any]):
+        name = proj.get("name") or ""
+        description = proj.get("description") or ""
+        url = proj.get("url") or ""
+        if not (name or description):
+            return
+        if name:
+            p = doc.add_paragraph()
+            p.paragraph_format.space_after = Pt(1)
+            run = p.add_run(name)
+            run.bold = True
+            run.font.name = "Calibri"
+            run.font.color.rgb = HEADING_RGB
+        if url:
+            link_p = doc.add_paragraph()
+            link_p.paragraph_format.space_after = Pt(1)
+            _add_hyperlink(link_p, url, url if url.startswith("http") else f"https://{url}", ACCENT_RGB)
+        if description:
+            self._render_description(doc, description)
+        doc.add_paragraph().paragraph_format.space_after = Pt(1)
+
     def _render_description(self, doc: Document, text: str):
-        """
-        Renders description text:
-        - Lines with bullet markers → List Bullet style (no manual unicode).
-        - Other lines → Normal paragraph.
-        """
         BULLET_RE = re.compile(r"^[\•\-\*\–\u2022]\s*|^\d+\.\s+")
         for line in text.split("\n"):
             stripped = line.strip()
@@ -427,10 +570,6 @@ class DOCXService:
                     run.font.name = "Calibri"
 
     def _add_footer(self, doc: Document, candidate_name: str):
-        """
-        Adds a centered footer: "Candidate Name · Page N"
-        Page number is injected via a PAGE field (auto-updates in Word).
-        """
         try:
             section = doc.sections[0]
             footer = section.footer

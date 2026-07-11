@@ -19,3 +19,4 @@ def index():
                            templates=templates,
                            categories=categories,
                            active_category=category)
+
