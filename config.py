@@ -4,13 +4,12 @@ from datetime import timedelta
 
 class Config:
     # Core
-    SECRET_KEY = os.environ.get("SECRET_KEY", "change-this-in-production-use-secrets-token-hex-32")
+    SECRET_KEY = os.environ.get("SECRET_KEY")
     DEBUG = os.environ.get("DEBUG", "false").lower() == "true"
 
     # Database
-    SQLALCHEMY_DATABASE_URI = os.environ.get(
-        "DATABASE_URL", "sqlite:///cvforge.db"
-    )
+    DATABASE_URL = os.environ.get("DATABASE_URL")
+    SQLALCHEMY_DATABASE_URI = DATABASE_URL
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {"pool_pre_ping": True}
 
@@ -29,21 +28,21 @@ class Config:
 
     # PythonAnywhere sits behind a reverse proxy — trust its forwarded headers
     # so url_for() generates correct https:// URLs and CSRF origin checks pass
-    PREFERRED_URL_SCHEME = os.environ.get("PREFERRED_URL_SCHEME", "https")
+    PREFERRED_URL_SCHEME = "https"
 
     # Google OAuth
-    GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
-    GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
-    GOOGLE_REDIRECT_URI = os.environ.get("GOOGLE_REDIRECT_URI", "http://localhost:5000/auth/google/callback")
+    GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID")
+    GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET")
+    GOOGLE_REDIRECT_URI = os.environ.get("GOOGLE_REDIRECT_URI", "https://cvforge.pythonanywhere.com/auth/google/callback")
 
     # Gemini AI
-    GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+    GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
     # FIX: this default ("gemini-3.1-flash-lite") didn't match ai_service.py's
     # own hardcoded fallback ("gemini-1.5-flash"), so the two could silently
     # disagree depending on which one actually got used. Aligned to the same
     # value here — but verify against Google's current model list for your
     # google-generativeai SDK version before deploying; model names change.
-    GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-1.5-flash")
+    GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.1-flash-lite")
     GEMINI_DAILY_LIMIT = int(os.environ.get("GEMINI_DAILY_LIMIT", 1400))
     GEMINI_FREE_USER_DAILY_LIMIT = int(os.environ.get("GEMINI_FREE_USER_DAILY_LIMIT", 3))
 
@@ -52,6 +51,16 @@ class Config:
     LIPANA_SECRET = os.environ.get("LIPANA_SECRET", "")
     LIPANA_WEBHOOK_SECRET = os.environ.get("LIPANA_WEBHOOK_SECRET", "")
     LIPANA_ENV = os.environ.get("LIPANA_ENV", "sandbox")
+
+    # IntaSend — alternative to Lipana, doesn't require your own Daraja
+    # production credentials. Get keys from the IntaSend dashboard.
+    INTASEND_SECRET_KEY = os.environ.get("INTASEND_SECRET_KEY")
+    INTASEND_PUBLISHABLE_KEY = os.environ.get("INTASEND_PUBLISHABLE_KEY")
+    INTASEND_ENV = os.environ.get("INTASEND_ENV", "production")
+    # The static "challenge" string you set in the IntaSend dashboard
+    # webhook config — must match exactly, it's how their webhooks are
+    # authenticated (not HMAC).
+    INTASEND_WEBHOOK_CHALLENGE = os.environ.get("INTASEND_WEBHOOK_CHALLENGE", "")
 
     # Uploads — absolute path so PythonAnywhere can find it
     UPLOAD_FOLDER = os.environ.get(
@@ -64,9 +73,8 @@ class Config:
     # Email (optional)
     MAIL_SERVER = os.environ.get("MAIL_SERVER", "smtp.gmail.com")
     MAIL_PORT = int(os.environ.get("MAIL_PORT", 587))
-    MAIL_USE_TLS = True
-    MAIL_USERNAME = os.environ.get("MAIL_USERNAME", "")
-    MAIL_PASSWORD = os.environ.get("MAIL_PASSWORD", "")
+    MAIL_USE_TLS = os.environ.get("MAIL_USE_TLS", "true").lower() == "true"
+    MAIL_USERNAME = os.environ.get("MAIL_USERNAME")
+    MAIL_PASSWORD = os.environ.get("MAIL_PASSWORD")
     MAIL_DEFAULT_SENDER = os.environ.get("MAIL_DEFAULT_SENDER", "noreply@cvforge.app")
-
 
