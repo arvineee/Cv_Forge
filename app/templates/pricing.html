@@ -20,7 +20,7 @@
   <div class="max-w-5xl mx-auto">
     <div class="text-center mb-14">
       <h1 class="text-4xl font-black text-gray-900 mb-4">Simple, transparent pricing</h1>
-      <p class="text-gray-500 text-lg">Pay with M-Pesa. Cancel anytime. No hidden fees.</p>
+      <p class="text-gray-500 text-lg">Pay with M-Pesa or Card. Cancel anytime. No hidden fees.</p>
     </div>
 
     <!-- Plans grid — rendered directly from DB, not via an include partial -->
@@ -167,7 +167,7 @@
       <h2 class="text-2xl font-bold text-gray-900 mb-8 text-center">Frequently Asked Questions</h2>
       <div class="space-y-4 max-w-2xl mx-auto" x-data="{open: null}">
         {% for q, a in [
-          ('How does M-Pesa payment work?', 'After clicking Subscribe, enter your Safaricom number. You\'ll receive an STK push on your phone to confirm payment. Funds are deducted immediately and your plan activates within seconds.'),
+          ('How does payment work?', 'Click Subscribe and choose M-Pesa or Card. With M-Pesa, enter your Safaricom number and confirm the STK push on your phone. With Card, you\'ll be taken to a secure checkout page. Either way, your plan activates within seconds of payment.'),
           ('Can I cancel anytime?', 'Yes. Your plan runs for 30 days from payment date. It won\'t auto-renew — you\'ll need to manually subscribe again if you want to continue.'),
           ('What\'s the difference between Free and Pro?', 'Free gives you 3 AI generations per day and access to 5 templates. Pro removes all daily limits, unlocks all 12+ templates, adds DOCX download, and enables version history.'),
           ('Is my CV data secure?', 'Yes. Your CV data is encrypted at rest and in transit. We never share your personal information with third parties or recruiters.'),
@@ -198,4 +198,5 @@
   <a href="{{ url_for('main.about') }}" class="hover:text-white transition">About</a>
 </footer>
 {% endblock %}
+
 

@@ -42,6 +42,21 @@
 
 {% block body %}{% endblock %}
 
+<!-- Floating support button -->
+{% block floating_support %}
+<a href="{{ url_for('support.index') }}"
+   title="Need help? Chat with support"
+   class="fixed bottom-5 right-5 z-50 w-14 h-14 rounded-full gradient-brand text-white shadow-lg
+          flex items-center justify-center hover:opacity-90 hover:scale-105 transition-all">
+  <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+    <path stroke-linecap="round" stroke-linejoin="round"
+          d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+  </svg>
+  <span class="sr-only">Support</span>
+</a>
+{% endblock %}
+
 {% block extra_scripts %}{% endblock %}
 </body>
 </html>
+
