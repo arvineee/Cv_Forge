@@ -492,7 +492,7 @@ class PageVisit(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
-    path = db.Column(db.String(255), nullable=False, index=True)
+    path = db.Column(db.String(255), nullable=False, index=True,default='/')
     method = db.Column(db.String(10), nullable=False, default="GET")
     ip_truncated = db.Column(db.String(45), nullable=True)
     user_agent = db.Column(db.String(300), nullable=True)
