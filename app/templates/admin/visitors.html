@@ -1,0 +1,101 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Visitors — Admin{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+  <h1 class="text-2xl font-bold text-gray-900">Site Visitors</h1>
+  <div class="flex gap-2">
+    {% for d in [1, 7, 30, 90] %}
+    <a href="{{ url_for('admin.visitors', days=d) }}"
+       class="px-3 py-1.5 rounded-lg text-sm font-medium transition
+              {% if days == d %}bg-blue-600 text-white{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">
+      {{ d }}d
+    </a>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="grid sm:grid-cols-3 gap-4 mb-8">
+  <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+    <p class="text-xs text-gray-400 uppercase font-medium mb-1">Page Views</p>
+    <p class="text-3xl font-black text-gray-900">{{ total_views }}</p>
+  </div>
+  <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+    <p class="text-xs text-gray-400 uppercase font-medium mb-1">Unique Visitors</p>
+    <p class="text-3xl font-black text-gray-900">{{ unique_visitors }}</p>
+  </div>
+  <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+    <p class="text-xs text-gray-400 uppercase font-medium mb-1">Logged-in Visits</p>
+    <p class="text-3xl font-black text-gray-900">{{ logged_in_visits }}</p>
+  </div>
+</div>
+
+<div class="grid lg:grid-cols-2 gap-6 mb-8">
+  <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+    <h2 class="font-bold text-gray-900 mb-4">Top Pages</h2>
+    <div class="space-y-2">
+      {% for path, views in top_pages %}
+      <div class="flex items-center justify-between text-sm py-1.5 border-b border-gray-50 last:border-0">
+        <span class="text-gray-700 font-mono text-xs truncate max-w-[70%]">{{ path }}</span>
+        <span class="font-semibold text-gray-900">{{ views }}</span>
+      </div>
+      {% else %}
+      <p class="text-sm text-gray-400">No data yet for this period.</p>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+    <h2 class="font-bold text-gray-900 mb-4">Views Per Day</h2>
+    <div class="space-y-2">
+      {% for day, views in daily %}
+      <div class="flex items-center justify-between text-sm py-1.5 border-b border-gray-50 last:border-0">
+        <span class="text-gray-600">{{ day }}</span>
+        <div class="flex items-center gap-2">
+          <div class="h-2 bg-blue-500 rounded" style="width: {{ (views / (daily|map(attribute=1)|max) * 100) if daily else 0 }}px"></div>
+          <span class="font-semibold text-gray-900 w-8 text-right">{{ views }}</span>
+        </div>
+      </div>
+      {% else %}
+      <p class="text-sm text-gray-400">No data yet for this period.</p>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<div class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+  <div class="px-6 py-4 bg-gray-50 border-b border-gray-100">
+    <h2 class="font-bold text-gray-900">Recent Visits</h2>
+    <p class="text-xs text-gray-400 mt-0.5">IPs are shown truncated (last octet masked)</p>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="border-b border-gray-100 text-left text-gray-500">
+          <th class="px-6 py-3 font-medium">Time</th>
+          <th class="px-4 py-3 font-medium">Path</th>
+          <th class="px-4 py-3 font-medium">User</th>
+          <th class="px-4 py-3 font-medium">IP (truncated)</th>
+          <th class="px-4 py-3 font-medium">Referrer</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-50">
+        {% for v in recent %}
+        <tr class="hover:bg-gray-50">
+          <td class="px-6 py-2.5 text-gray-500 whitespace-nowrap">{{ v.created_at.strftime('%d %b %H:%M') }}</td>
+          <td class="px-4 py-2.5 font-mono text-xs text-gray-700">{{ v.path }}</td>
+          <td class="px-4 py-2.5 text-gray-600">
+            {% if v.user %}{{ v.user.email }}{% else %}<span class="text-gray-300">Anonymous</span>{% endif %}
+          </td>
+          <td class="px-4 py-2.5 text-gray-400 font-mono text-xs">{{ v.ip_truncated }}</td>
+          <td class="px-4 py-2.5 text-gray-400 text-xs truncate max-w-[200px]">{{ v.referrer or '—' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="px-6 py-8 text-center text-gray-400">No visits recorded yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+

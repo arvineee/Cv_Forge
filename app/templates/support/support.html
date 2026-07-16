@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Support — CVForge AI{% endblock %}
+{% block body %}
+<section class="max-w-2xl mx-auto px-4 py-16">
+  <h1 class="text-3xl font-black text-gray-900 mb-2">How can we help?</h1>
+  <p class="text-gray-500 mb-8">Ask our AI assistant, available 24/7. For account-specific or billing issues, use the contact form below instead.</p>
+
+  <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-6">
+    <div id="chat-log" class="space-y-4 mb-4 max-h-96 overflow-y-auto"></div>
+
+    <form id="ask-form" class="flex gap-2">
+      <input type="hidden" id="csrf-token" value="{{ csrf_token() }}"/>
+      <input id="question-input" type="text" maxlength="500" required
+             placeholder="e.g. How do I download my CV as a Word document?"
+             class="flex-1 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+      <button type="submit" id="ask-btn"
+              class="px-5 py-3 gradient-brand text-white font-semibold rounded-xl text-sm hover:opacity-90 transition">
+        Ask
+      </button>
+    </form>
+    <p id="ask-error" class="text-sm text-red-500 mt-2 hidden"></p>
+  </div>
+
+  <div class="bg-gray-50 rounded-xl border border-dashed border-gray-200 p-6 text-center">
+    <p class="text-sm text-gray-500">Need a human, or something account-specific (billing, refunds, a bug)?</p>
+    <a href="mailto:support@cvforge.app" class="text-blue-600 font-semibold text-sm">Email kiruifelix03@gmail.com</a>
+  </div>
+</section>
+
+<script>
+const form = document.getElementById('ask-form');
+const input = document.getElementById('question-input');
+const log = document.getElementById('chat-log');
+const errorEl = document.getElementById('ask-error');
+const askBtn = document.getElementById('ask-btn');
+
+function addMessage(text, isUser) {
+  const div = document.createElement('div');
+  div.className = isUser
+    ? 'ml-auto max-w-[80%] bg-blue-600 text-white rounded-2xl rounded-br-sm px-4 py-2.5 text-sm'
+    : 'mr-auto max-w-[80%] bg-gray-100 text-gray-800 rounded-2xl rounded-bl-sm px-4 py-2.5 text-sm';
+  div.textContent = text;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+}
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const question = input.value.trim();
+  if (!question) return;
+
+  errorEl.classList.add('hidden');
+  addMessage(question, true);
+  input.value = '';
+  askBtn.disabled = true;
+  askBtn.textContent = '...';
+
+  try {
+    const res = await fetch("{{ url_for('support.ask') }}", {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': document.getElementById('csrf-token').value,
+      },
+      body: JSON.stringify({ question }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      errorEl.textContent = data.error || 'Something went wrong.';
+      errorEl.classList.remove('hidden');
+    } else {
+      addMessage(data.answer, false);
+    }
+  } catch (err) {
+    errorEl.textContent = 'Could not reach the support assistant. Please try again.';
+    errorEl.classList.remove('hidden');
+  } finally {
+    askBtn.disabled = false;
+    askBtn.textContent = 'Ask';
+  }
+});
+</script>
+{% endblock %}
+

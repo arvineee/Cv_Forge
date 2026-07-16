@@ -184,6 +184,59 @@ class IntaSendService:
         logger.error(f"IntaSend STK push failed for reference={reference}: {last_error}")
         return {"success": False, "message": "Payment service is temporarily unavailable. Please try again shortly."}
 
+    def initiate_card_payment(self, email: str, first_name: str, last_name: str,
+                               amount: float, reference: str, currency: str = "KES",
+                               redirect_url: str = "", comment: str = "") -> Dict[str, Any]:
+        """
+        Card payments go through IntaSend's Checkout API — a hosted
+        payment page (not an inline API call like STK push, since card
+        details need to be collected on IntaSend's PCI-compliant page,
+        not yours). This returns a `url` to redirect the user to; the
+        actual COMPLETE/FAILED result arrives via the same
+        /webhooks/intasend handler as M-Pesa payments do (same api_ref /
+        state payload shape), so no separate webhook logic is needed.
+        """
+        if not self._rate_limiter.allow():
+            wait = self._rate_limiter.wait_time()
+            logger.warning(f"IntaSend rate limit hit, retry in {wait:.1f}s")
+            return {"success": False, "message": "Too many payment requests right now. Please wait a moment and try again."}
+
+        if not self._inflight.try_acquire(reference):
+            logger.warning(f"Duplicate card checkout call for reference={reference} suppressed")
+            return {"success": False, "message": "A payment request for this order is already in progress."}
+
+        last_error = None
+        for attempt in range(1, self.MAX_RETRIES + 1):
+            try:
+                resp = self._service.collect.checkout(
+                    email=email,
+                    first_name=first_name or "Customer",
+                    last_name=last_name or "",
+                    amount=amount,
+                    currency=currency,
+                    method="CARD-PAYMENT",
+                    api_ref=reference,
+                    redirect_url=redirect_url,
+                    comment=comment or f"CVForge payment {reference}",
+                )
+                checkout_url = resp.get("url") if isinstance(resp, dict) else None
+                if not checkout_url:
+                    logger.error(f"IntaSend checkout response missing url for reference={reference}: {resp}")
+                    return {"success": False, "message": "Could not start card checkout. Please try again."}
+                return {"success": True, "checkout_url": checkout_url, "raw": resp}
+
+            except Exception as e:
+                last_error = e
+                transient_markers = ("timeout", "connection", "502", "503", "504")
+                if not any(m in str(e).lower() for m in transient_markers) or attempt == self.MAX_RETRIES:
+                    break
+                sleep_for = self.BACKOFF_BASE_SECONDS * (2 ** (attempt - 1))
+                logger.warning(f"IntaSend card checkout attempt {attempt} failed ({e}), retrying in {sleep_for}s")
+                time.sleep(sleep_for)
+
+        logger.error(f"IntaSend card checkout failed for reference={reference}: {last_error}")
+        return {"success": False, "message": "Card payment service is temporarily unavailable. Please try again shortly."}
+
     def check_status(self, invoice_id: str) -> Dict[str, Any]:
         try:
             resp = self._service.collect.status(invoice_id=invoice_id)

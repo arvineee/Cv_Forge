@@ -96,6 +96,71 @@ def subscribe(plan_slug):
     return redirect(url_for("billing.plans"))
 
 
+@billing_bp.route("/subscribe-card/<plan_slug>", methods=["POST"])
+@login_required
+def subscribe_card(plan_slug):
+    """
+    Card payment via IntaSend's hosted Checkout page. Unlike the M-Pesa
+    STK flow, this doesn't need a phone number — it redirects the user to
+    IntaSend's own payment page where they enter card details, then
+    IntaSend redirects back here. The actual COMPLETE/FAILED result still
+    arrives via /webhooks/intasend, same as M-Pesa — the redirect is just
+    UX, not the source of truth for activation.
+    """
+    plan = PricingPlan.query.filter_by(slug=plan_slug, is_active=True).first_or_404()
+
+    if plan.price_kes == 0:
+        flash("You're already on the free plan.", "info")
+        return redirect(url_for("billing.index"))
+
+    reference = f"CVF-{secrets.token_hex(6).upper()}"
+    subscription = Subscription(
+        user_id=current_user.id,
+        plan=plan.slug,
+        amount=plan.price_kes,
+        currency="KES",
+        status="pending",
+        payment_reference=reference,
+    )
+    db.session.add(subscription)
+    db.session.flush()
+
+    payment = Payment(
+        user_id=current_user.id,
+        subscription_id=subscription.id,
+        amount=plan.price_kes,
+        currency="KES",
+        status="pending",
+        payment_method="card",
+        lipana_checkout_request_id=reference,
+    )
+    db.session.add(payment)
+    db.session.commit()
+
+    try:
+        from app.services.intasend_service import IntaSendService
+        intasend = IntaSendService()
+        resp = intasend.initiate_card_payment(
+            email=current_user.email,
+            first_name=current_user.first_name or "",
+            last_name=current_user.last_name or "",
+            amount=plan.price_kes,
+            reference=reference,
+            currency="KES",
+            redirect_url=url_for("billing.payment_pending", reference=reference, _external=True),
+            comment=f"CVForge {plan.name} Plan",
+        )
+        if resp.get("success"):
+            return redirect(resp["checkout_url"])
+        else:
+            flash(f"Card payment could not be started: {resp.get('message', 'Unknown error')}", "error")
+    except Exception as e:
+        current_app.logger.error(f"IntaSend card checkout error: {e}")
+        flash("Card payment service unavailable. Please try again.", "error")
+
+    return redirect(url_for("billing.plans"))
+
+
 @billing_bp.route("/pending/<reference>")
 @login_required
 def payment_pending(reference):

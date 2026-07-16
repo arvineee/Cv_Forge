@@ -60,6 +60,7 @@ class User(db.Model, UserMixin):
     last_login_at = db.Column(db.DateTime(timezone=True), nullable=True)
 
     profile = db.relationship("Profile", backref="user", uselist=False, lazy="joined", cascade="all, delete-orphan")
+    settings = db.relationship("UserSettings", backref="user", uselist=False, lazy="joined", cascade="all, delete-orphan")
     resumes = db.relationship("Resume", backref="user", lazy="dynamic", cascade="all, delete-orphan")
     cover_letters = db.relationship("CoverLetter", backref="user", lazy="dynamic", cascade="all, delete-orphan")
     subscriptions = db.relationship("Subscription", backref="user", lazy="dynamic", cascade="all, delete-orphan")
@@ -466,7 +467,39 @@ class UserSettings(db.Model):
     allow_analytics = db.Column(db.Boolean, default=True)
     theme = db.Column(db.String(20), default="light")
     default_template_id = db.Column(db.Integer, nullable=True)
+    # Pro-upgrade nudge cadence — reuses email_newsletter as the opt-out
+    # flag (a dedicated "marketing emails" toggle would be more precise,
+    # but this already exists and is the closest fit rather than adding
+    # a redundant field).
+    last_nudge_sent_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    nudge_count = db.Column(db.Integer, default=0, nullable=False)
     created_at = db.Column(db.DateTime(timezone=True), default=utcnow)
     updated_at = db.Column(db.DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
+
+class PageVisit(db.Model):
+    """
+    Lightweight visit log for the admin visitor-tracking view.
+    Deliberately minimal — not a full analytics engine. IP is stored
+    truncated (last octet zeroed for IPv4) rather than in full, as a
+    reasonable middle ground between "admin can see traffic patterns"
+    and "don't retain precise personal location data indefinitely" —
+    worth reviewing against Kenya's Data Protection Act 2019 obligations
+    for your actual use case before relying on this as sufficient
+    compliance on its own.
+    """
+    __tablename__ = "page_visits"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
+    path = db.Column(db.String(255), nullable=False, index=True)
+    method = db.Column(db.String(10), nullable=False, default="GET")
+    ip_truncated = db.Column(db.String(45), nullable=True)
+    user_agent = db.Column(db.String(300), nullable=True)
+    referrer = db.Column(db.String(500), nullable=True)
+    session_id = db.Column(db.String(64), nullable=True, index=True)  # for unique-visitor counting
+    created_at = db.Column(db.DateTime(timezone=True), default=utcnow, nullable=False, index=True)
+
+    def __repr__(self):
+        return f"<PageVisit {self.path} user={self.user_id}>"
 

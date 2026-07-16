@@ -50,7 +50,7 @@ class AIService:
     # NOTE: verify this is a real, currently-available model id for your
     # google-generativeai SDK version before deploying — model names change
     # and this fallback should match config.py's GEMINI_MODEL default.
-    MODEL = "gemini-1.5-flash"
+    MODEL = "gemini-3.1-flash-lite"
 
     def __init__(self):
         self.api_key = current_app.config.get("GEMINI_API_KEY", "")
@@ -334,4 +334,56 @@ Tone: {tone}
 Write in third person. Highlight expertise, achievements, and value proposition.
 Return only the bio text."""
         return self._call(prompt, "bio_generate", user_id=user_id)
+
+    # Static knowledge grounding for the support assistant — keeps answers
+    # anchored to what CVForge actually does/costs instead of the model
+    # guessing or inventing features/pricing. Update this when plans,
+    # limits, or features change; it's the single source of truth the AI
+    # is told to defer to.
+    SUPPORT_KNOWLEDGE = """
+CVForge AI — Product Facts (use these, don't invent anything not listed here):
+- CV/resume builder with AI-assisted writing, ATS scoring, and cover letter generation
+- Upload an existing CV (PDF/DOCX) to auto-fill the builder, or start from scratch
+- AI Revamp rewrites your professional summary, work experience bullets, and skills
+- ATS Checker: analyze a saved CV or upload a file directly, with or without a job description
+- Download as PDF (all plans) or DOCX (Pro only)
+- Free plan: limited daily AI generations, limited templates, no DOCX export
+- Pro plan: unlimited AI generations, all templates, DOCX export, version history, AI career coach
+- Payment: M-Pesa (STK Push) or card, via IntaSend
+- Subscriptions run 30 days from payment and do not auto-renew
+- Support contact: use the in-app support page; there is no phone support
+"""
+
+    def support_answer(self, question: str, user=None, user_id: int = None) -> str:
+        """
+        AI support assistant, grounded in SUPPORT_KNOWLEDGE above via
+        system_instruction so it answers from what CVForge actually does
+        rather than making things up about pricing or features. For
+        anything outside that scope (refunds, account-specific issues,
+        bugs), it's instructed to say so plainly and hand off rather than
+        guess — a wrong confident answer here is worse than "I don't
+        know, here's how to reach a human."
+        """
+        user_context = ""
+        if user:
+            plan = getattr(user, "plan", "free")
+            user_context = f"\nThis user is on the '{plan}' plan."
+
+        system_instruction = f"""You are the support assistant for CVForge AI, a CV/resume builder.
+{self.SUPPORT_KNOWLEDGE}
+
+RULES:
+- Only answer using the facts above plus general, obviously-safe advice
+  (e.g. "try clearing your browser cache").
+- If the question is about something not covered above (refunds, a
+  specific bug, account/billing disputes, anything you're not certain
+  about), say clearly that you don't have that information and suggest
+  they contact support directly for a human to help — do not guess or
+  invent an answer.
+- Never invent pricing, limits, or features not listed above.
+- Keep answers short — 2-4 sentences unless genuinely more is needed.
+- Friendly, direct, no corporate filler."""
+
+        prompt = f"{user_context}\n\nUser question: {question}"
+        return self._call(prompt, "support_chat", user_id=user_id, system_instruction=system_instruction)
 

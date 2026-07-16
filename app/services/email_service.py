@@ -68,3 +68,42 @@ def send_password_reset_email(user):
         current_app.logger.warning(f"Password reset email failed: {e}")
 
 
+def send_pro_nudge_email(user):
+    """
+    Occasional reminder to free-tier users about what Pro unlocks.
+    Called from cli.py's `flask send-nudges` command — never called
+    directly from a request, so cadence/opt-out is enforced by the
+    caller, not here.
+    """
+    Mail, Message = _get_mailer()
+    if not Mail or not current_app.config.get("MAIL_USERNAME"):
+        current_app.logger.info(f"[email stub] Pro nudge email skipped for {user.email}")
+        return
+
+    try:
+        from flask_mail import Mail, Message
+        mail = Mail(current_app)
+        billing_url = url_for("billing.plans", _external=True)
+        msg = Message(
+            subject="Get more out of CVForge AI",
+            sender=current_app.config["MAIL_DEFAULT_SENDER"],
+            recipients=[user.email],
+            html=f"""
+            <p>Hi {user.first_name or 'there'},</p>
+            <p>Just a quick note — Pro removes your daily AI generation limits,
+            unlocks every template, adds Word (DOCX) downloads, keeps your
+            version history, and gives you the AI career coach.</p>
+            <p><a href="{billing_url}">See plans and pricing</a></p>
+            <p>No pressure — the free plan still works great. This is just here
+            in case it's useful.</p>
+            <p>— CVForge AI</p>
+            <p style="font-size:12px;color:#888;">
+            Don't want these emails? Turn off "Newsletter" in your account settings.
+            </p>
+            """,
+        )
+        mail.send(msg)
+    except Exception as e:
+        current_app.logger.warning(f"Pro nudge email failed: {e}")
+
+

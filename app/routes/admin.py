@@ -262,3 +262,46 @@ def template_toggle(template_id):
     flash(f"Template {'activated' if t.is_active else 'deactivated'}.", "success")
     return redirect(url_for("admin.templates"))
 
+
+# ── Visitors ──────────────────────────────────────────────────────
+
+@admin_bp.route("/visitors")
+@login_required
+@admin_required
+def visitors():
+    from datetime import timedelta
+    from app.models import PageVisit, utcnow
+    from sqlalchemy import func
+
+    days = request.args.get("days", 7, type=int)
+    cutoff = utcnow() - timedelta(days=days)
+
+    recent = (PageVisit.query.filter(PageVisit.created_at >= cutoff)
+              .order_by(PageVisit.created_at.desc()).limit(200).all())
+
+    total_views = PageVisit.query.filter(PageVisit.created_at >= cutoff).count()
+    unique_visitors = (db.session.query(func.count(func.distinct(PageVisit.session_id)))
+                        .filter(PageVisit.created_at >= cutoff).scalar()) or 0
+    logged_in_visits = (PageVisit.query.filter(PageVisit.created_at >= cutoff,
+                                                PageVisit.user_id.isnot(None)).count())
+
+    top_pages = (db.session.query(PageVisit.path, func.count(PageVisit.id).label("views"))
+                 .filter(PageVisit.created_at >= cutoff)
+                 .group_by(PageVisit.path)
+                 .order_by(func.count(PageVisit.id).desc())
+                 .limit(15).all())
+
+    # Visits per day for a simple sparkline/table
+    daily = (db.session.query(func.date(PageVisit.created_at).label("day"),
+                               func.count(PageVisit.id).label("views"))
+             .filter(PageVisit.created_at >= cutoff)
+             .group_by("day")
+             .order_by("day")
+             .all())
+
+    return render_template("admin/visitors.html",
+                           recent=recent, total_views=total_views,
+                           unique_visitors=unique_visitors,
+                           logged_in_visits=logged_in_visits,
+                           top_pages=top_pages, daily=daily, days=days)
+
