@@ -472,7 +472,13 @@ class UserSettings(db.Model):
     # but this already exists and is the closest fit rather than adding
     # a redundant field).
     last_nudge_sent_at = db.Column(db.DateTime(timezone=True), nullable=True)
-    nudge_count = db.Column(db.Integer, default=0, nullable=False)
+    # FIX: default=0 is Python/ORM-side only — Alembic autogenerate had no
+    # server-level default to backfill existing rows with when this column
+    # was added, so `flask db upgrade` failed on SQLite with "Cannot add a
+    # NOT NULL column with default value NULL". server_default gives it an
+    # actual DB-level default so both fresh installs and future ALTER
+    # TABLEs against existing rows work.
+    nudge_count = db.Column(db.Integer, default=0, server_default="0", nullable=False)
     created_at = db.Column(db.DateTime(timezone=True), default=utcnow)
     updated_at = db.Column(db.DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
@@ -502,4 +508,5 @@ class PageVisit(db.Model):
 
     def __repr__(self):
         return f"<PageVisit {self.path} user={self.user_id}>"
+
 
