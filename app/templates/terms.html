@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block title %}Terms of Service — CVForge AI{% endblock %}
+{% block body %}
+<nav class="sticky top-0 z-50 bg-white/90 backdrop-blur-sm border-b border-gray-100">
+  <div class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+    <a href="{{ url_for('main.index') }}" class="flex items-center gap-2 font-bold text-xl text-gray-900">
+      <div class="w-8 h-8 rounded-lg gradient-brand flex items-center justify-center text-white font-black text-xs">CV</div>
+      CVForge AI
+    </a>
+    <a href="{{ url_for('auth.login') }}" class="text-sm font-medium text-gray-600 hover:text-gray-900 transition">Sign In</a>
+  </div>
+</nav>
+
+<section class="max-w-3xl mx-auto px-4 py-16">
+  <h1 class="text-3xl font-black text-gray-900 mb-2">Terms of Service</h1>
+  <p class="text-gray-400 text-sm mb-10">Last updated: {{ updated_date or "18 July 2026" }}</p>
+
+  <div class="prose prose-sm max-w-none text-gray-700 space-y-8">
+
+    <div>
+      <h2 class="text-lg font-bold text-gray-900 mb-2">1. Agreement</h2>
+      <p>By creating an account or using CVForge AI, you agree to these terms. If you don't agree, please don't
+      use the service.</p>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-bold text-gray-900 mb-2">2. The service</h2>
+      <p>CVForge AI lets you build, improve, and export CVs and cover letters, check them against ATS
+      criteria, and manage job-application content. Some features use AI (Google's Gemini) to generate or
+      improve content — see Section 5 below on AI-generated content.</p>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-bold text-gray-900 mb-2">3. Accounts</h2>
+      <ul class="list-disc pl-5 space-y-1">
+        <li>You must provide accurate information when registering and keep your login credentials secure.</li>
+        <li>You're responsible for all activity under your account.</li>
+        <li>You must be 18 or older to use CVForge AI.</li>
+        <li>We may suspend or terminate accounts that violate these terms, abuse the free tier's fair-use limits, or attempt to circumvent security or rate limits.</li>
+      </ul>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-bold text-gray-900 mb-2">4. Plans, payments, and billing</h2>
+      <ul class="list-disc pl-5 space-y-1">
+        <li>We offer a Free plan with daily usage limits, and paid plans (Pro/Premium) with expanded limits and features.</li>
+        <li>Paid plans are billed via M-Pesa or card through our payment processor, IntaSend.</li>
+        <li>Subscriptions run for a fixed period (currently 30 days) from the date of payment and <strong>do not auto-renew</strong> — you'll need to manually subscribe again to continue on a paid plan.</li>
+        <li>Prices are shown in Kenyan Shillings (KES) and may change; we'll display current pricing before you pay.</li>
+        <li><strong>Refunds:</strong> because plan access is granted immediately on payment, payments are generally non-refundable except where required by law or at our discretion for a genuine service failure on our part. Contact support if something went wrong with a payment.</li>
+      </ul>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-bold text-gray-900 mb-2">5. AI-generated content</h2>
+      <ul class="list-disc pl-5 space-y-1">
+        <li>Content generated or improved by our AI features (summaries, bullet points, cover letters, ATS analysis, support answers) is provided as a drafting aid, not verified professional advice.</li>
+        <li>You are responsible for reviewing and verifying the accuracy of any AI-generated or AI-modified content before using it — including facts, dates, and claims about your own experience. We do not guarantee AI outputs are accurate, complete, or free of errors.</li>
+        <li>Never let AI-generated content state anything about your experience or qualifications that isn't true.</li>
+        <li>ATS scores and suggestions are estimates based on general best practices — they are not a guarantee of how any specific employer's applicant tracking system will actually score your CV.</li>
+      </ul>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-bold text-gray-900 mb-2">6. Your content</h2>
+      <p>You retain ownership of the CV content, personal information, and files you upload or create.
+      By using the service, you grant us a limited license to store, process, and display that content solely
+      to provide the service to you (including sending it to our AI provider to generate improvements you
+      request). We do not claim ownership of your CV content, and we do not use it to train AI models.</p>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-bold text-gray-900 mb-2">7. Acceptable use</h2>
+      <p>You agree not to:</p>
+      <ul class="list-disc pl-5 space-y-1">
+        <li>Use the service to create fraudulent, defamatory, or knowingly false content about yourself or others</li>
+        <li>Attempt to bypass usage limits, rate limits, or payment requirements</li>
+        <li>Use automated tools to scrape, abuse, or overload the service</li>
+        <li>Upload malicious files or attempt to compromise the platform's security</li>
+        <li>Use the AI support chat or other AI features for anything unrelated to CVForge AI's intended purpose</li>
+      </ul>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-bold text-gray-900 mb-2">8. Service availability</h2>
+      <p>We aim to keep CVForge AI available and reliable, but we don't guarantee uninterrupted access.
+      Features that depend on third parties (AI generation via Google Gemini, payments via IntaSend) may be
+      temporarily unavailable if those providers have an outage — we're not liable for issues caused by
+      third-party service disruptions outside our control.</p>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-bold text-gray-900 mb-2">9. Limitation of liability</h2>
+      <p>CVForge AI is provided "as is." To the maximum extent permitted by law, we are not liable for
+      indirect, incidental, or consequential damages arising from your use of the service — including any
+      outcome of a job application, however it was affected by content created using this platform. Your use
+      of AI-generated content in real applications is your own decision and responsibility.</p>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-bold text-gray-900 mb-2">10. Termination</h2>
+      <p>You can delete your account at any time from your account settings. We may suspend or terminate
+      accounts that violate these terms. On termination, your right to use the service ends, though certain
+      data may be retained as described in our <a href="{{ url_for('main.privacy') }}" class="text-blue-600">Privacy Policy</a>.</p>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-bold text-gray-900 mb-2">11. Governing law</h2>
+      <p>These terms are governed by the laws of Kenya.</p>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-bold text-gray-900 mb-2">12. Changes to these terms</h2>
+      <p>We may update these terms as the service evolves. Continued use after changes means you accept the
+      updated terms. We'll update the date at the top of this page when we do.</p>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-bold text-gray-900 mb-2">13. Contact</h2>
+      <p>Questions about these terms — email <a href="mailto:kiruifelix03@gmail.com" class="text-blue-600">support@cvforge.app</a>,
+      or use our <a href="{{ url_for('support.index') }}" class="text-blue-600">support page</a>.</p>
+    </div>
+
+  </div>
+</section>
+
+<footer class="bg-gray-900 text-gray-400 py-8 px-4 text-center text-sm">
+  © 2026 CVForge AI · Built in Kenya 🇰🇪 ·
+  <a href="{{ url_for('main.index') }}" class="hover:text-white transition">Home</a> ·
+  <a href="{{ url_for('main.privacy') }}" class="hover:text-white transition">Privacy</a> ·
+  <a href="{{ url_for('main.terms') }}" class="hover:text-white transition">Terms</a>
+</footer>
+{% endblock %}
+

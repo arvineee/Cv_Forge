@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}Privacy Policy — CVForge AI{% endblock %}
+{% block body %}
+<nav class="sticky top-0 z-50 bg-white/90 backdrop-blur-sm border-b border-gray-100">
+  <div class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+    <a href="{{ url_for('main.index') }}" class="flex items-center gap-2 font-bold text-xl text-gray-900">
+      <div class="w-8 h-8 rounded-lg gradient-brand flex items-center justify-center text-white font-black text-xs">CV</div>
+      CVForge AI
+    </a>
+    <a href="{{ url_for('auth.login') }}" class="text-sm font-medium text-gray-600 hover:text-gray-900 transition">Sign In</a>
+  </div>
+</nav>
+
+<section class="max-w-3xl mx-auto px-4 py-16">
+  <h1 class="text-3xl font-black text-gray-900 mb-2">Privacy Policy</h1>
+  <p class="text-gray-400 text-sm mb-10">Last updated: {{ updated_date or "18 July 2026" }}</p>
+
+  <div class="prose prose-sm max-w-none text-gray-700 space-y-8">
+
+    <div>
+      <h2 class="text-lg font-bold text-gray-900 mb-2">1. Who we are</h2>
+      <p>CVForge AI ("we", "us") is a CV/resume-building service operated in Kenya. This policy explains what
+      personal data we collect when you use CVForge AI, why, and what rights you have over it — including
+      your rights under Kenya's Data Protection Act, 2019.</p>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-bold text-gray-900 mb-2">2. What we collect</h2>
+      <ul class="list-disc pl-5 space-y-1">
+        <li><strong>Account data:</strong> name, email address, password (stored as a salted hash, never in plain text), and if you sign in with Google, your Google account ID and profile info.</li>
+        <li><strong>CV content:</strong> anything you enter or upload into the builder — work history, education, skills, contact details, and any CV/resume file you upload for parsing.</li>
+        <li><strong>Payment data:</strong> your phone number (for M-Pesa) or card details (for card payments) are collected and processed by our payment processor, IntaSend — we do not see or store your full card number ourselves. We do store payment amounts, references, and status.</li>
+        <li><strong>Usage data:</strong> pages you visit, timestamps, browser type, and a truncated IP address (last segment masked) — used to understand site traffic and diagnose problems. You can opt out of this being linked to your account in your account settings.</li>
+        <li><strong>Communications:</strong> emails we send you (verification, password reset, payment confirmations, and occasional product updates you can opt out of).</li>
+      </ul>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-bold text-gray-900 mb-2">3. How we use it</h2>
+      <ul class="list-disc pl-5 space-y-1">
+        <li>To provide the service — building, storing, and exporting your CV and cover letters</li>
+        <li>To process AI features (CV parsing, content improvement, ATS scoring, cover letter generation, and our support chat) — see Section 4 on third parties</li>
+        <li>To process payments and manage your subscription</li>
+        <li>To send essential account emails (verification, password reset, payment receipts)</li>
+        <li>To send occasional, opt-out-able emails about features or plan upgrades — never more than a few times, and never if you've turned this off</li>
+        <li>To maintain security, prevent abuse, and enforce fair-use limits on our free plan</li>
+      </ul>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-bold text-gray-900 mb-2">4. Third parties we share data with</h2>
+      <p>We don't sell your data. We do share limited data with the following service providers, strictly to
+      operate CVForge AI:</p>
+      <ul class="list-disc pl-5 space-y-1">
+        <li><strong>Google (Gemini API):</strong> when you use an AI feature (revamp, ATS check, cover letter, support chat), the relevant CV text or question is sent to Google's Gemini API to generate a response. Google's own privacy terms govern how they process that request.</li>
+        <li><strong>Google (Sign in with Google):</strong> if you use Google login, Google shares your name, email, and profile photo with us to create your account.</li>
+        <li><strong>IntaSend:</strong> our payment processor. Your phone number or card details are sent directly to IntaSend to process M-Pesa or card payments — we don't handle raw card numbers ourselves.</li>
+        <li><strong>Email delivery provider:</strong> used to send account and transactional emails.</li>
+      </ul>
+      <p class="mt-2">We do not use your CV content to train any AI model, ours or a third party's.</p>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-bold text-gray-900 mb-2">5. How long we keep your data</h2>
+      <p>We keep your account and CV data for as long as your account is active. If you delete your account,
+      we delete your CV content and personal data within a reasonable period, except where we're required to
+      keep payment records for accounting/legal purposes. Site-traffic data is automatically deleted after 90 days.</p>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-bold text-gray-900 mb-2">6. Your rights</h2>
+      <p>Under Kenya's Data Protection Act, 2019, you have the right to:</p>
+      <ul class="list-disc pl-5 space-y-1">
+        <li>Access the personal data we hold about you</li>
+        <li>Correct inaccurate data (most of this you can edit directly in your account)</li>
+        <li>Request deletion of your account and data</li>
+        <li>Object to or restrict certain processing (e.g. opt out of marketing emails or usage tracking, both available in account settings)</li>
+        <li>Request a copy of your data in a portable format</li>
+      </ul>
+      <p class="mt-2">To exercise any of these, email us at the address in Section 8.</p>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-bold text-gray-900 mb-2">7. Security</h2>
+      <p>Passwords are hashed, not stored in plain text. Data in transit is encrypted (HTTPS). We limit access
+      to personal data to what's needed to operate the service. No system is 100% secure, and we can't
+      guarantee absolute security, but we take reasonable, industry-standard measures to protect your data.</p>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-bold text-gray-900 mb-2">8. Children's privacy</h2>
+      <p>CVForge AI is not directed at children under 18. We don't knowingly collect data from anyone under 18.</p>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-bold text-gray-900 mb-2">9. Changes to this policy</h2>
+      <p>We may update this policy as the service changes. We'll update the date at the top of this page when we do.</p>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-bold text-gray-900 mb-2">10. Contact</h2>
+      <p>Questions about this policy or your data — email <a href="mailto:kiruifelix03@gmail.com" class="text-blue-600">privacy@cvforge.app</a>,
+      or use our <a href="{{ url_for('support.index') }}" class="text-blue-600">support page</a>.</p>
+    </div>
+
+  </div>
+</section>
+
+<footer class="bg-gray-900 text-gray-400 py-8 px-4 text-center text-sm">
+  © 2026 CVForge AI · Built in Kenya 🇰🇪 ·
+  <a href="{{ url_for('main.index') }}" class="hover:text-white transition">Home</a> ·
+  <a href="{{ url_for('main.privacy') }}" class="hover:text-white transition">Privacy</a> ·
+  <a href="{{ url_for('main.terms') }}" class="hover:text-white transition">Terms</a>
+</footer>
+{% endblock %}
+

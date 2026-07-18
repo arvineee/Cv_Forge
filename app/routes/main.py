@@ -28,3 +28,10 @@ def public_resume(token):
     # Safe access — never crash on missing fields
     personal = resume.personal_info or {}
     return render_template("cv/public.html", resume=resume, personal=personal)
+@main_bp.route("/privacy")
+def privacy():
+    return render_template("privacy.html")
+
+@main_bp.route("/terms")
+def terms():
+    return render_template("terms.html")
