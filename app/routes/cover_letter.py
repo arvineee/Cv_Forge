@@ -94,7 +94,9 @@ def new_letter():
         )
         db.session.add(letter)
         db.session.flush()
-        AIUsage.log_usage(current_user.id, "cover_letter", job_description[:200])
+        # AIUsage.log_usage() removed — ai.generate_cover_letter(..., user_id=...)
+        # already logs the call inside ai_service._call(). Logging it a second
+        # time here double-counted every cover letter against the daily limit.
         _log("cover_letter_create", letter.id)
         db.session.commit()
         flash("Cover letter generated!", "success")
@@ -181,4 +183,5 @@ def delete_letter(letter_id):
     db.session.commit()
     flash("Cover letter deleted.", "info")
     return redirect(url_for("cover_letter.list_letters"))
+
 

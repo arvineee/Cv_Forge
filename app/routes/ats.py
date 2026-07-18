@@ -134,7 +134,9 @@ def check():
         resume.ats_score = report.score
         resume.ats_report = report_data
 
-    AIUsage.log_usage(current_user.id, "ats_check", job_description[:200])
+    # AIUsage.log_usage() removed — ai.ats_check(..., user_id=...) already
+    # logs the call inside ai_service._call(). Logging it again here
+    # double-counted every ATS check against the daily limit.
     db.session.add(ActivityLog(
         user_id=current_user.id, action="ats_check",
         resource_type="resume", resource_id=resume_id,
@@ -232,7 +234,7 @@ def check_upload():
 
     report = _save_report(report_data, resume_id=None)
 
-    AIUsage.log_usage(current_user.id, "ats_check", f"upload:{filename}")
+    # AIUsage.log_usage() removed — same double-counting fix as check() above.
     db.session.add(ActivityLog(
         user_id=current_user.id, action="ats_check_upload",
         resource_type="resume", resource_id=None,
@@ -260,4 +262,5 @@ def report(report_id):
         "format_issues": report.issues or [],
     }
     return render_template("ats/report.html", report=report, report_data=report_data, resume=resume)
+
 

@@ -184,7 +184,15 @@ def ai_assist(resume_id):
         ai = get_ai_service()
         result = ai.assist_section(section=section, context=context, resume=resume,
                                     user_id=current_user.id)
-        AIUsage.log_usage(user_id=current_user.id, feature="cv_generate", prompt=context)
+        # NOTE: do NOT also call AIUsage.log_usage() here — passing
+        # user_id into assist_section() already makes ai._call() insert
+        # an AIUsage row internally (that's what makes the 24h response
+        # cache work at all). Logging it again here double-counted every
+        # single AI call, which silently halved everyone's real daily
+        # limit (GEMINI_FREE_USER_DAILY_LIMIT) and doubled the platform-
+        # wide daily count used for GEMINI_DAILY_LIMIT and the admin
+        # "AI Usage Today" stat. db.session.commit() below is still
+        # needed to persist the row _call() already added to the session.
         db.session.commit()
         return jsonify({"success": True, "result": result})
     except Exception as e:
@@ -376,7 +384,9 @@ def revamp(resume_id):
                 created_by="ai_revamp",
             )
             db.session.add(after_version)
-            AIUsage.log_usage(current_user.id, "cv_revamp", str(resume_id))
+            # AIUsage.log_usage() removed here — ai.revamp_resume(..., user_id=...)
+            # already logs the call inside ai_service._call(). See ai_assist()
+            # above for the full explanation of the double-counting bug.
             _log("cv_revamp", resume.id)
             db.session.commit()
             flash("Resume revamped successfully! Compare versions below.", "success")
@@ -493,4 +503,5 @@ def toggle_public(resume_id):
         "public_url": url_for("main.public_resume", token=resume.public_token, _external=True)
         if resume.is_public else None,
     })
+
 

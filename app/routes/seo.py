@@ -46,7 +46,10 @@ DISALLOWED_PREFIXES = [
     "/api/",
     "/webhooks/",
     "/auth/reset-password",
-    "/auth/verify-email",
+    "/auth/verify",       # actual route is /auth/verify/<token> — was
+                           # "/auth/verify-email", which doesn't exist
+                           # and never matched, leaving tokenized
+                           # verification links crawlable/indexable
     "/auth/forgot-password",
     "/support/ask",
 ]
@@ -95,4 +98,5 @@ def sitemap():
         "\n</urlset>"
     )
     return Response(xml, mimetype="application/xml")
+
 
