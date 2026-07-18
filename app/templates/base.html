@@ -3,11 +3,60 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>{% block title %}CVForge AI{% endblock %} — CVForge</title>
-  <meta name="description" content="{% block meta_description %}AI-powered CV builder for African professionals.{% endblock %}"/>
+
+  <!-- ── Core SEO ─────────────────────────────────────────────── -->
+  <title>{% block title %}CVForge AI — Build a Job-Winning CV in Minutes{% endblock %}</title>
+  <meta name="description" content="{% block meta_description %}Build an ATS-optimized, professional CV with AI in minutes. Free templates, instant PDF & Word download, trusted by African job seekers.{% endblock %}"/>
+  <meta name="robots" content="{% block robots %}index, follow, max-image-preview:large, max-snippet:-1{% endblock %}"/>
+  <meta name="author" content="CVForge AI"/>
+  <link rel="canonical" href="{% block canonical %}{{ request.url_root.rstrip('/') }}{{ request.path }}{% endblock %}"/>
+  <meta name="theme-color" content="#1e40af"/>
+
   <!-- Favicon -->
   <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
   <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='logo.png') }}">
+  <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
+
+  {% set share_title = self.title() %}
+  {% set share_description = self.meta_description() %}
+  {% set share_url = request.url_root.rstrip('/') + request.path %}
+  {% set share_image %}{% block og_image %}{{ url_for('static', filename='og-default.jpg', _external=True) }}{% endblock %}{% endset %}
+
+  <!-- ── Open Graph (Facebook, WhatsApp, LinkedIn, Telegram) ───── -->
+  <meta property="og:type" content="{% block og_type %}website{% endblock %}"/>
+  <meta property="og:site_name" content="CVForge AI"/>
+  <meta property="og:locale" content="en_US"/>
+  <meta property="og:url" content="{{ share_url }}"/>
+  <meta property="og:title" content="{{ share_title|trim }}"/>
+  <meta property="og:description" content="{{ share_description|trim }}"/>
+  <meta property="og:image" content="{{ share_image|trim }}"/>
+  <meta property="og:image:secure_url" content="{{ share_image|trim }}"/>
+  <meta property="og:image:type" content="image/jpeg"/>
+  <meta property="og:image:width" content="1200"/>
+  <meta property="og:image:height" content="630"/>
+  <meta property="og:image:alt" content="{{ share_title|trim }}"/>
+
+  <!-- ── Twitter / X Card (also read by some link-preview bots) ── -->
+  <meta name="twitter:card" content="summary_large_image"/>
+  <meta name="twitter:title" content="{{ share_title|trim }}"/>
+  <meta name="twitter:description" content="{{ share_description|trim }}"/>
+  <meta name="twitter:image" content="{{ share_image|trim }}"/>
+  {% block twitter_site %}<meta name="twitter:site" content="@Arvinefelix"/>
+  <meta name="twitter:creator" content="@Arvinefelix"/>{% endblock %}
+
+  <!-- ── Structured data (Google rich results) ───────────────── -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "CVForge AI",
+    "url": "{{ request.url_root }}",
+    "logo": "{{ url_for('static', filename='logo.png', _external=True) }}",
+    "sameAs": []
+  }
+  </script>
+  {% block structured_data %}{% endblock %}
 
   <script src="https://cdn.tailwindcss.com"></script>
   <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
@@ -59,4 +108,6 @@
 {% block extra_scripts %}{% endblock %}
 </body>
 </html>
+
+
 

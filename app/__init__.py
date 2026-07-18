@@ -55,6 +55,7 @@ def create_app(config_object=None):
     from app.routes.templates_gallery import templates_gallery_bp
     from app.routes.api import api_bp
     from app.routes.support import support_bp
+    from app.routes.seo import seo_bp
 
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp, url_prefix="/auth")
@@ -76,6 +77,7 @@ def create_app(config_object=None):
     app.register_blueprint(templates_gallery_bp, url_prefix="/templates")
     app.register_blueprint(api_bp, url_prefix="/api/v1")
     app.register_blueprint(support_bp)
+    app.register_blueprint(seo_bp)
 
     # ── Visitor tracking ─────────────────────────────────────────
     from app.services.visitor_tracking import register_visitor_tracking
