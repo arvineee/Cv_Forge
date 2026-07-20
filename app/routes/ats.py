@@ -70,6 +70,22 @@ def _get_job_description_from_request() -> str:
             (request.get_json(silent=True) or {}).get("job_description", "") or "")
 
 
+def _render_report(report, report_data, resume):
+    """
+    htmx swaps (the Analyze forms on ats/index.html target #ats-result)
+    must get ONLY the report content, not the full page — the full page
+    extends base_dashboard.html and includes the navbar/sidebar, which
+    were getting swapped into an already-rendered page and duplicating
+    the whole site chrome. A direct browser visit to /ats/report/<id>
+    still gets the full page.
+    """
+    if request.headers.get("HX-Request"):
+        return render_template("ats/_report_partial.html", report=report,
+                                report_data=report_data, resume=resume)
+    return render_template("ats/report.html", report=report,
+                            report_data=report_data, resume=resume)
+
+
 def _save_report(report_data: dict, resume_id: int = None, source_label: str = None):
     report = ATSReport(
         user_id=current_user.id,
@@ -147,7 +163,7 @@ def check():
     if request.is_json:
         return jsonify({"success": True, "report": report_data, "report_id": report.id})
 
-    return render_template("ats/report.html", report=report, report_data=report_data, resume=resume)
+    return _render_report(report, report_data, resume)
 
 
 @ats_bp.route("/check-upload", methods=["POST"])
@@ -245,7 +261,7 @@ def check_upload():
     if request.is_json:
         return jsonify({"success": True, "report": report_data, "report_id": report.id})
 
-    return render_template("ats/report.html", report=report, report_data=report_data, resume=None)
+    return _render_report(report, report_data, None)
 
 
 @ats_bp.route("/report/<int:report_id>")
@@ -262,5 +278,6 @@ def report(report_id):
         "format_issues": report.issues or [],
     }
     return render_template("ats/report.html", report=report, report_data=report_data, resume=resume)
+
 
 
