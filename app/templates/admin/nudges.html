@@ -1,0 +1,61 @@
+{% extends "base_dashboard.html" %}
+{# Your admin/*.html templates weren't in what you shared, so this assumes
+   they extend base_dashboard.html the same way index.html does. If admin
+   actually has its own base template, just swap the extends line. #}
+
+{% block title %}Pro-Upgrade Nudges — Admin{% endblock %}
+{% block page_title %}Pro-Upgrade Reminders{% endblock %}
+{% block page_subtitle %}Free-tier users become eligible again {{ interval_days }} days after their last reminder.{% endblock %}
+
+{% block page_actions %}
+  <form method="POST">
+    <button type="submit"
+            onclick="return confirm('Send an upgrade reminder email to {{ candidates|length }} user(s) now?')"
+            class="inline-flex items-center gap-2 px-4 py-2 rounded-lg gradient-brand text-white text-sm font-semibold hover:opacity-90 transition">
+      ⚡ Send reminders now
+    </button>
+  </form>
+{% endblock %}
+
+{% block content %}
+<p class="text-sm text-gray-500 mb-4">
+  A daily automatic run can be enabled with <code class="bg-gray-100 px-1 rounded">ENABLE_NUDGE_SCHEDULER</code>
+  in config, or trigger this from a PythonAnywhere Scheduled Task with <code class="bg-gray-100 px-1 rounded">flask send-nudges</code>.
+</p>
+
+<div class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+  <table class="w-full text-sm">
+    <thead class="bg-gray-50 text-left text-gray-500">
+      <tr>
+        <th class="px-6 py-3 font-medium">Email</th>
+        <th class="px-6 py-3 font-medium">Name</th>
+        <th class="px-6 py-3 font-medium">Signed up</th>
+        <th class="px-6 py-3 font-medium">Last reminded</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-50">
+      {% for u in candidates %}
+      <tr class="hover:bg-gray-50 transition-colors">
+        <td class="px-6 py-3 text-gray-900">{{ u.email }}</td>
+        <td class="px-6 py-3 text-gray-500">{{ u.full_name }}</td>
+        <td class="px-6 py-3 text-gray-500">{{ u.created_at.strftime('%d %b %Y') }}</td>
+        <td class="px-6 py-3">
+          {% if u.settings and u.settings.last_nudge_sent_at %}
+            <span class="text-gray-500">{{ u.settings.last_nudge_sent_at.strftime('%d %b %Y') }}</span>
+          {% else %}
+            <span class="text-xs font-semibold px-2 py-1 rounded-full bg-yellow-100 text-yellow-700">Never</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="4" class="px-6 py-12 text-center text-gray-400 text-sm">
+          No free-tier users are due for a reminder right now.
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
+

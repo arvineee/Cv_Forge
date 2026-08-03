@@ -263,6 +263,38 @@ def template_toggle(template_id):
     return redirect(url_for("admin.templates"))
 
 
+# ── Pro-upgrade nudges ───────────────────────────────────────────
+# Reminds free-tier users to upgrade. Runs automatically once a day if
+# ENABLE_NUDGE_SCHEDULER is on (see app/__init__.py), and can also be
+# triggered on demand from here — useful for testing, or as the only
+# trigger if you'd rather not run a background scheduler on PA's free
+# tier and just click the button after checking the candidate list.
+
+@admin_bp.route("/nudges", methods=["GET", "POST"])
+@login_required
+@admin_required
+def nudges():
+    from app.services.nudge_service import (
+        get_nudge_candidates, send_pro_upgrade_nudges, NUDGE_INTERVAL_DAYS,
+    )
+
+    if request.method == "POST":
+        sent = send_pro_upgrade_nudges()
+        db.session.add(ActivityLog(
+            user_id=current_user.id, action="admin_send_nudges",
+            resource_type="user", resource_id=None,
+            ip_address=request.remote_addr, details={"sent": sent},
+        ))
+        db.session.commit()
+        flash(f"Sent {sent} upgrade reminder email{'s' if sent != 1 else ''}.", "success")
+        return redirect(url_for("admin.nudges"))
+
+    candidates = get_nudge_candidates()
+    return render_template("admin/nudges.html",
+                           candidates=candidates,
+                           interval_days=NUDGE_INTERVAL_DAYS)
+
+
 # ── Visitors ──────────────────────────────────────────────────────
 
 @admin_bp.route("/visitors")
@@ -304,4 +336,5 @@ def visitors():
                            unique_visitors=unique_visitors,
                            logged_in_visits=logged_in_visits,
                            top_pages=top_pages, daily=daily, days=days)
+
 

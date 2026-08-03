@@ -83,6 +83,36 @@ def create_app(config_object=None):
     from app.services.visitor_tracking import register_visitor_tracking
     register_visitor_tracking(app)
 
+    # ── Pro-upgrade nudge scheduler (optional, in-process) ─────────
+    # Off by default — the admin panel's "Send reminders now" button
+    # (/admin/nudges) and/or a PythonAnywhere Scheduled Task calling
+    # `flask send-nudges` are the safer defaults on the free tier,
+    # since PA can restart/reload the web app process at any time and
+    # an in-process APScheduler job doesn't survive that. Turn this on
+    # only if you're on a tier where the process stays up reliably, or
+    # accept that a missed day just means the next run catches up
+    # (get_nudge_candidates() is cumulative, not "today only").
+    if app.config.get("ENABLE_NUDGE_SCHEDULER"):
+        import os
+        # Guard against the Flask reloader starting this twice in debug.
+        if os.environ.get("WERKZEUG_RUN_MAIN") != "true" or not app.debug:
+            from apscheduler.schedulers.background import BackgroundScheduler
+
+            def _run_nudges():
+                with app.app_context():
+                    from app.services.nudge_service import send_pro_upgrade_nudges
+                    try:
+                        sent = send_pro_upgrade_nudges()
+                        app.logger.info(f"Nudge scheduler: sent {sent} reminder email(s).")
+                    except Exception as e:
+                        app.logger.error(f"Nudge scheduler failed: {e}")
+
+            scheduler = BackgroundScheduler(daemon=True)
+            scheduler.add_job(_run_nudges, "interval",
+                              hours=app.config.get("NUDGE_SCHEDULER_INTERVAL_HOURS", 24),
+                              id="pro_upgrade_nudges", replace_existing=True)
+            scheduler.start()
+
     # ── Error handlers ────────────────────────────────────────────
     @app.errorhandler(403)
     def forbidden(e):
@@ -364,5 +394,6 @@ def _register_cli(app: Flask):
         click.echo(f"  Cover Letters: {CoverLetter.query.count()}")
         click.echo(f"  AI calls today:{AIUsage.get_total_daily_count()}")
         click.echo("────────────────────────────────────────────\n")
+
 
 

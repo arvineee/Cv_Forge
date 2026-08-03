@@ -106,9 +106,29 @@ def list_cvs():
     return render_template("cv/list.html", resumes=resumes)
 
 
+@cv_bp.route("/start")
+@login_required
+def start():
+    """Action hub — the single entry point for the CV flow.
+
+    Users land here first and pick an intent (create from scratch,
+    upload an existing CV, or write a cover letter / run an ATS check)
+    instead of being dropped straight into the builder or the theme
+    picker with no context. Point every "Create / New CV" link in the
+    app (navbar, dashboard, landing page) at this route now, instead
+    of directly at cv.new or cv.builder.
+    """
+    resumes = (Resume.query.filter_by(user_id=current_user.id)
+               .order_by(Resume.updated_at.desc()).limit(3).all())
+    return render_template("cv/start.html", resumes=resumes)
+
+
 @cv_bp.route("/new")
 @login_required
 def new_cv():
+    """Step 2 of the create flow: pick a theme. Reached only after the
+    user chooses 'Create a new CV' on the /cv/start hub — create_cv()
+    below then uses the chosen template_id to start the builder."""
     templates = Template.query.filter_by(is_active=True).order_by(Template.sort_order).all()
     return render_template("cv/new.html", templates=templates)
 
@@ -503,5 +523,6 @@ def toggle_public(resume_id):
         "public_url": url_for("main.public_resume", token=resume.public_token, _external=True)
         if resume.is_public else None,
     })
+
 
 
