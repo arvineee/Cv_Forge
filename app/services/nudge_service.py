@@ -17,12 +17,26 @@ from app.models import db, User, UserSettings, Notification, utcnow
 # Don't nudge the same free user more than once a week.
 NUDGE_INTERVAL_DAYS = 7
 
+# Give brand-new signups a few days to explore before pestering them
+# about Pro. Users who registered more recently than this are excluded
+# from candidacy entirely (separate from the "already nudged" cooldown
+# above).
+REGISTERED_GRACE_DAYS = 3
+
+# Safety cap on how many nudge emails a single run/click can send, so
+# a bug (or an unexpectedly large candidate pool) can't blast the full
+# user base at once.
+MAX_NUDGES = 200
+
 
 def get_nudge_candidates():
     """Free-tier users eligible for a Pro-upgrade reminder right now:
-    active, verified, opted in to email_newsletter, and either never
-    nudged or not nudged within NUDGE_INTERVAL_DAYS."""
-    cutoff = utcnow() - timedelta(days=NUDGE_INTERVAL_DAYS)
+    active, verified, opted in to email_newsletter, registered more
+    than REGISTERED_GRACE_DAYS ago, and either never nudged or not
+    nudged within NUDGE_INTERVAL_DAYS. Capped at MAX_NUDGES."""
+    now = utcnow()
+    nudge_cutoff = now - timedelta(days=NUDGE_INTERVAL_DAYS)
+    registered_cutoff = now - timedelta(days=REGISTERED_GRACE_DAYS)
     return (
         User.query
         .join(UserSettings, UserSettings.user_id == User.id)
@@ -30,30 +44,40 @@ def get_nudge_candidates():
         .filter(User.is_active.is_(True))
         .filter(User.is_verified.is_(True))
         .filter(UserSettings.email_newsletter.is_(True))
+        .filter(User.created_at < registered_cutoff)
         .filter(db.or_(
             UserSettings.last_nudge_sent_at.is_(None),
-            UserSettings.last_nudge_sent_at < cutoff,
+            UserSettings.last_nudge_sent_at < nudge_cutoff,
         ))
         .order_by(User.created_at.desc())
+        .limit(MAX_NUDGES)
         .all()
     )
 
 
-def send_pro_upgrade_nudges() -> int:
+def send_pro_upgrade_nudges() -> dict:
     """Email every eligible free-tier user a Pro-upgrade reminder, log an
     in-app Notification, and stamp last_nudge_sent_at so they aren't
-    nudged again for NUDGE_INTERVAL_DAYS. Returns the number processed.
+    nudged again for NUDGE_INTERVAL_DAYS.
 
     Uses the existing app/services/email_service.send_pro_nudge_email(user)
     helper, which already logs-and-skips instead of raising when mail
     isn't configured (dev/staging) — so a "sent" count here means
     "attempted," not "SMTP confirmed delivery."
+
+    Returns {"sent": int, "failed": int} so callers (admin panel, CLI)
+    can report both counts.
     """
     from app.services.email_service import send_pro_nudge_email
 
     sent = 0
+    failed = 0
     for user in get_nudge_candidates():
-        send_pro_nudge_email(user)
+        try:
+            send_pro_nudge_email(user)
+        except Exception:
+            failed += 1
+            continue
 
         db.session.add(Notification(
             user_id=user.id,
@@ -67,5 +91,5 @@ def send_pro_upgrade_nudges() -> int:
         sent += 1
 
     db.session.commit()
-    return sent
+    return {"sent": sent, "failed": failed}
 
