@@ -18,11 +18,23 @@
   {% endfor %}
 </div>
 
-<div class="grid md:grid-cols-2 gap-6">
+<div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
   <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
     <h2 class="font-semibold mb-4">AI Usage Today</h2>
     <p class="text-4xl font-bold text-blue-600">{{ daily_ai_usage }}</p>
     <p class="text-sm text-gray-400 mt-1">API calls made today</p>
+  </div>
+
+  <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="font-semibold">Pro-Upgrade Nudges</h2>
+      {% if nudge_due_count %}
+      <span class="text-xs font-semibold px-2 py-1 rounded-full bg-yellow-100 text-yellow-700">{{ nudge_due_count }} due</span>
+      {% endif %}
+    </div>
+    <p class="text-4xl font-bold {{ 'text-orange-600' if nudge_due_count else 'text-gray-300' }}">{{ nudge_due_count }}</p>
+    <p class="text-sm text-gray-400 mt-1 mb-3">Free users due for a reminder</p>
+    <a href="{{ url_for('admin.nudges') }}" class="text-sm text-blue-600 hover:underline font-medium">Review & send →</a>
   </div>
 
   <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
@@ -34,6 +46,7 @@
         ('CV Templates', 'admin.templates'),
         ('Payments', 'admin.payments'),
         ('Visitors', 'admin.visitors'),
+        ('Pro-Upgrade Nudges', 'admin.nudges'),
       ] %}
       <a href="{{ url_for(endpoint) }}"
          class="block text-sm text-blue-600 hover:underline py-1">{{ label }} →</a>
@@ -42,4 +55,5 @@
   </div>
 </div>
 {% endblock %}
+
 

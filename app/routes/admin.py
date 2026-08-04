@@ -34,12 +34,16 @@ def index():
     ).filter_by(status="success").scalar() or 0
     daily_ai_usage = AIUsage.get_total_daily_count()
 
+    from app.services.nudge_service import get_nudge_candidates
+    nudge_due_count = len(get_nudge_candidates())
+
     return render_template("admin/index.html",
                            total_users=total_users,
                            pro_users=pro_users,
                            premium_users=premium_users,
                            total_revenue=total_revenue,
-                           daily_ai_usage=daily_ai_usage)
+                           daily_ai_usage=daily_ai_usage,
+                           nudge_due_count=nudge_due_count)
 
 
 # ── Users ─────────────────────────────────────────────────────────
@@ -275,24 +279,30 @@ def template_toggle(template_id):
 @admin_required
 def nudges():
     from app.services.nudge_service import (
-        get_nudge_candidates, send_pro_upgrade_nudges, NUDGE_INTERVAL_DAYS,
+        get_nudge_candidates, send_pro_upgrade_nudges,
+        NUDGE_INTERVAL_DAYS, REGISTERED_GRACE_DAYS, MAX_NUDGES,
     )
 
     if request.method == "POST":
-        sent = send_pro_upgrade_nudges()
+        result = send_pro_upgrade_nudges()
         db.session.add(ActivityLog(
             user_id=current_user.id, action="admin_send_nudges",
             resource_type="user", resource_id=None,
-            ip_address=request.remote_addr, details={"sent": sent},
+            ip_address=request.remote_addr, details=result,
         ))
         db.session.commit()
-        flash(f"Sent {sent} upgrade reminder email{'s' if sent != 1 else ''}.", "success")
+        msg = f"Sent {result['sent']} upgrade reminder email{'s' if result['sent'] != 1 else ''}."
+        if result["failed"]:
+            msg += f" {result['failed']} failed — check logs."
+        flash(msg, "success" if not result["failed"] else "warning")
         return redirect(url_for("admin.nudges"))
 
     candidates = get_nudge_candidates()
     return render_template("admin/nudges.html",
                            candidates=candidates,
-                           interval_days=NUDGE_INTERVAL_DAYS)
+                           interval_days=NUDGE_INTERVAL_DAYS,
+                           grace_days=REGISTERED_GRACE_DAYS,
+                           max_nudges=MAX_NUDGES)
 
 
 # ── Visitors ──────────────────────────────────────────────────────

@@ -5,7 +5,7 @@
 
 {% block title %}Pro-Upgrade Nudges — Admin{% endblock %}
 {% block page_title %}Pro-Upgrade Reminders{% endblock %}
-{% block page_subtitle %}Free-tier users become eligible again {{ interval_days }} days after their last reminder.{% endblock %}
+{% block page_subtitle %}Free-tier users, {{ grace_days }}+ days old, eligible again {{ interval_days }} days after their last reminder, capped at {{ max_nudges }} ever.{% endblock %}
 
 {% block page_actions %}
   <form method="POST">
@@ -30,6 +30,7 @@
         <th class="px-6 py-3 font-medium">Email</th>
         <th class="px-6 py-3 font-medium">Name</th>
         <th class="px-6 py-3 font-medium">Signed up</th>
+        <th class="px-6 py-3 font-medium">Nudges sent</th>
         <th class="px-6 py-3 font-medium">Last reminded</th>
       </tr>
     </thead>
@@ -39,6 +40,7 @@
         <td class="px-6 py-3 text-gray-900">{{ u.email }}</td>
         <td class="px-6 py-3 text-gray-500">{{ u.full_name }}</td>
         <td class="px-6 py-3 text-gray-500">{{ u.created_at.strftime('%d %b %Y') }}</td>
+        <td class="px-6 py-3 text-gray-500">{{ (u.settings.nudge_count if u.settings else 0) or 0 }} / {{ max_nudges }}</td>
         <td class="px-6 py-3">
           {% if u.settings and u.settings.last_nudge_sent_at %}
             <span class="text-gray-500">{{ u.settings.last_nudge_sent_at.strftime('%d %b %Y') }}</span>
@@ -49,7 +51,7 @@
       </tr>
       {% else %}
       <tr>
-        <td colspan="4" class="px-6 py-12 text-center text-gray-400 text-sm">
+        <td colspan="5" class="px-6 py-12 text-center text-gray-400 text-sm">
           No free-tier users are due for a reminder right now.
         </td>
       </tr>

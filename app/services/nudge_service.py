@@ -42,28 +42,18 @@ def get_nudge_candidates():
 def send_pro_upgrade_nudges() -> int:
     """Email every eligible free-tier user a Pro-upgrade reminder, log an
     in-app Notification, and stamp last_nudge_sent_at so they aren't
-    nudged again for NUDGE_INTERVAL_DAYS. Returns the number sent.
+    nudged again for NUDGE_INTERVAL_DAYS. Returns the number processed.
 
-    NOTE: assumes an existing app/services/email_service.send_email()
-    helper (matching the pdf_service/docx_service pattern already in
-    this codebase). Adjust the import/call below to match your actual
-    email service's signature.
+    Uses the existing app/services/email_service.send_pro_nudge_email(user)
+    helper, which already logs-and-skips instead of raising when mail
+    isn't configured (dev/staging) — so a "sent" count here means
+    "attempted," not "SMTP confirmed delivery."
     """
-    from app.services.email_service import send_email
+    from app.services.email_service import send_pro_nudge_email
 
     sent = 0
     for user in get_nudge_candidates():
-        try:
-            send_email(
-                to=user.email,
-                subject="Get more out of CVForge AI \u2014 upgrade to Pro",
-                template="emails/pro_nudge.html",
-                first_name=user.first_name or "there",
-            )
-        except Exception:
-            # One bad address / SMTP hiccup shouldn't stop the rest of
-            # the batch — skip and keep going.
-            continue
+        send_pro_nudge_email(user)
 
         db.session.add(Notification(
             user_id=user.id,
