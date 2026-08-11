@@ -37,6 +37,14 @@
         </button>
       </form>
 
+      {% if show_resend %}
+      <p class="text-center text-sm text-gray-500 mt-4">
+        <a href="{{ url_for('auth.resend_verification') }}" class="text-blue-600 font-medium hover:underline">
+          Resend verification email
+        </a>
+      </p>
+      {% endif %}
+
       <div class="relative my-6">
         <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-gray-100"></div></div>
         <div class="relative text-center"><span class="bg-white px-4 text-xs text-gray-400">or</span></div>
@@ -61,3 +69,4 @@
   </div>
 </div>
 {% endblock %}
+

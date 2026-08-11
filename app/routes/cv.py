@@ -84,6 +84,19 @@ def _plan_allows_docx() -> bool:
     return bool(plan and plan.allow_docx)
 
 
+def _plan_allows_public_link() -> bool:
+    """Same shape as _plan_allows_docx() — public CV links are a per-plan
+    toggle now (admin can flip it off the Free plan to force upgrades),
+    not a hardcoded free-tier freebie."""
+    if current_user.is_premium:
+        plan = _current_plan()
+        if plan:
+            return bool(plan.allow_public_link)
+        return True
+    plan = _current_plan()
+    return bool(plan and plan.allow_public_link)
+
+
 def _cleanup_after_send(file_path: str):
     """Register a cleanup callback so generated PDF/DOCX temp files don't
     pile up in /tmp — pdf_service/docx_service both create files with
@@ -103,7 +116,8 @@ def _cleanup_after_send(file_path: str):
 def list_cvs():
     resumes = (Resume.query.filter_by(user_id=current_user.id)
                .order_by(Resume.updated_at.desc()).all())
-    return render_template("cv/list.html", resumes=resumes)
+    return render_template("cv/list.html", resumes=resumes,
+                           allow_public_link=_plan_allows_public_link())
 
 
 @cv_bp.route("/start")
@@ -341,6 +355,7 @@ def wizard_step(resume_id, step):
         plan = _current_plan()
         allow_docx = _plan_allows_docx()
         allow_coach = bool(current_user.is_premium and plan and plan.allow_career_coach)
+        allow_public_link = _plan_allows_public_link()
         coach_feedback, coach_error = None, None
         gaps = _detect_gaps(resume)
 
@@ -358,6 +373,7 @@ def wizard_step(resume_id, step):
 
         context.update(
             allow_docx=allow_docx, allow_coach=allow_coach,
+            allow_public_link=allow_public_link,
             coach_feedback=coach_feedback, coach_error=coach_error,
             gaps=gaps,
         )
@@ -771,6 +787,9 @@ def delete(resume_id):
 @login_required
 def toggle_public(resume_id):
     resume = Resume.query.filter_by(id=resume_id, user_id=current_user.id).first_or_404()
+    if not resume.is_public and not _plan_allows_public_link():
+        return jsonify({"error": "Public CV links aren't available on your plan.",
+                        "is_public": False, "public_url": None}), 403
     if not resume.is_public:
         resume.is_public = True
         resume.public_token = secrets.token_urlsafe(32)

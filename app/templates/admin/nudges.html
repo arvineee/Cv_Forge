@@ -1,7 +1,9 @@
 {% extends "base_dashboard.html" %}
-{# Your admin/*.html templates weren't in what you shared, so this assumes
-   they extend base_dashboard.html the same way index.html does. If admin
-   actually has its own base template, just swap the extends line. #}
+{# Confirmed against your other admin templates (pricing.html, users.html,
+   templates.html, etc.) — they all extend base_dashboard.html directly,
+   same as this. (visitors.html is the one outlier, extending
+   "admin/base_dashboard.html" instead — worth double-checking that's
+   intentional on your end.) #}
 
 {% block title %}Pro-Upgrade Nudges — Admin{% endblock %}
 {% block page_title %}Pro-Upgrade Reminders{% endblock %}
@@ -61,5 +63,6 @@
   </table>
 </div>
 {% endblock %}
+
 
 

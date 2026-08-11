@@ -55,6 +55,7 @@
         ('allow_docx', 'Allow DOCX Download', plan.allow_docx if plan else False),
         ('allow_version_history', 'Allow Version History', plan.allow_version_history if plan else False),
         ('allow_career_coach', 'Allow Career Coach', plan.allow_career_coach if plan else False),
+        ('allow_public_link', 'Allow Public CV Link', plan.allow_public_link if plan else True),
       ] %}
       <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
         <input type="checkbox" name="{{ name }}" value="1" {% if checked %}checked{% endif %}
@@ -77,3 +78,4 @@
   </form>
 </div>
 {% endblock %}
+

@@ -44,9 +44,10 @@
 
 <div class="border border-gray-100 rounded-lg p-4 mb-6">
   <p class="text-sm font-semibold text-gray-900 mb-1">Share your CV publicly 🔗</p>
+  {% if allow_public_link %}
   <p class="text-xs text-gray-500 mb-3">
     Get a public link you can drop straight into a job application, LinkedIn, or WhatsApp —
-    no login required for whoever's viewing it. Free on every plan.
+    no login required for whoever's viewing it.
   </p>
   <div x-data='{
         isPublic: {{ "true" if resume.is_public else "false" }},
@@ -84,6 +85,16 @@
       </button>
     </div>
   </div>
+  {% else %}
+  {# Plan doesn't allow public links — no toggle at all, just the lock + nudge. #}
+  <p class="text-xs text-gray-500 mb-3">
+    Sharing a public CV link is a paid-plan feature. 🔒
+  </p>
+  <a href="{{ url_for('billing.plans') }}"
+     class="inline-block px-4 py-2 rounded-lg gradient-brand text-white text-xs font-semibold">
+    Upgrade to unlock sharing →
+  </a>
+  {% endif %}
 </div>
 
 <div class="border border-gray-100 rounded-lg p-4 mb-6">

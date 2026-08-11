@@ -148,6 +148,7 @@ class PricingPlan(db.Model):
     allow_docx = db.Column(db.Boolean, default=False)
     allow_version_history = db.Column(db.Boolean, default=False)
     allow_career_coach = db.Column(db.Boolean, default=False)
+    allow_public_link = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime(timezone=True), default=utcnow)
     updated_at = db.Column(db.DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
@@ -508,5 +509,6 @@ class PageVisit(db.Model):
 
     def __repr__(self):
         return f"<PageVisit {self.path} user={self.user_id}>"
+
 
 

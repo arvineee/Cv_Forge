@@ -10,7 +10,7 @@ import secrets
 import requests as http_requests
 from datetime import datetime, timezone, timedelta
 
-from app.models import db, User, Profile, ActivityLog, UserSettings
+from app.models import db, User, Profile, ActivityLog, UserSettings, PricingPlan
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
 
@@ -36,6 +36,15 @@ def _safe_next(next_url):
     if next_url and urlparse(next_url).netloc == "" and next_url.startswith("/"):
         return next_url
     return None
+
+
+def _free_tier_requires_payment() -> bool:
+    """The 'free' plan is only actually free while its price is 0. Admin can
+    flip the Free plan's price in /admin/pricing at any time to turn it into
+    a paywall for everyone signing up from then on — flip it back to 0 and
+    new signups go straight through again, unchanged."""
+    free_plan = PricingPlan.query.filter_by(slug="free", is_active=True).first()
+    return bool(free_plan and free_plan.price_kes > 0)
 
 
 # FIX: this file's docstring has claimed "rate limiting" for a while, but no
@@ -118,9 +127,10 @@ def register():
         except Exception as e:
             current_app.logger.warning(f"Verification email failed: {e}")
 
-        flash("Account created! Please check your email to verify your account.", "success")
-        login_user(user, remember=True)
-        return redirect(url_for("dashboard.index"))
+        # No session is created here — verify_email() is what grants the
+        # first login-eligible state, not registration.
+        flash("Account created! Check your email for a verification link before logging in.", "success")
+        return redirect(url_for("auth.login"))
 
     return render_template("auth/register.html")
 
@@ -157,11 +167,23 @@ def login():
             flash("Your account has been deactivated. Please contact support.", "error")
             return render_template("auth/login.html", email=email)
 
+        if not user.is_verified:
+            flash("Please verify your email before logging in. "
+                  "Check your inbox, or request a new link below.", "error")
+            return render_template("auth/login.html", email=email, show_resend=True)
+
         user.last_login_at = datetime.now(timezone.utc)
         _log_activity(user.id, "login", {"method": "email"})
         db.session.commit()
 
         login_user(user, remember=remember)
+
+        # If admin has made the Free plan a paid plan, unpaid users land on
+        # plan selection instead of the dashboard until they subscribe. If
+        # Free is still priced at 0, this is a no-op.
+        if _free_tier_requires_payment() and user.plan == "free" and not user.is_premium:
+            return redirect(url_for("billing.plans"))
+
         next_page = _safe_next(request.args.get("next"))
         return redirect(next_page or url_for("dashboard.index"))
 
@@ -192,41 +214,45 @@ def verify_email(token):
         expires = expires.replace(tzinfo=timezone.utc)
     if expires and expires < datetime.now(timezone.utc):
         flash("That verification link has expired. Please request a new one.", "error")
-        return redirect(url_for("auth.resend_verification") if current_user.is_authenticated
-                         else url_for("auth.login"))
+        return redirect(url_for("auth.resend_verification"))
 
     user.is_verified = True
     user.verification_token = None
     user.verification_token_expires = None
     db.session.commit()
-    flash("Email verified! Your account is now active.", "success")
-    if current_user.is_authenticated:
-        return redirect(url_for("dashboard.index"))
+    flash("Email verified! You can now log in.", "success")
     return redirect(url_for("auth.login"))
 
 
-@auth_bp.route("/resend-verification")
-@login_required
+@auth_bp.route("/resend-verification", methods=["GET", "POST"])
 def resend_verification():
-    if current_user.is_verified:
-        flash("Your email is already verified.", "info")
-        return redirect(url_for("dashboard.index"))
+    """Was @login_required, which is now a dead end: an unverified user
+    can't log in anymore, so they'd have no way to reach this page at all.
+    Reworked to take an email address directly, the same enumeration-safe
+    shape as forgot_password() below — it never reveals whether an account
+    exists for a given address."""
+    if request.method == "POST":
+        if _rate_limited("resend_verification", limit=5, window_minutes=15):
+            flash("Too many requests. Please try again in a few minutes.", "error")
+            return render_template("auth/resend_verification.html")
+        _record_attempt("resend_verification")
 
-    if _rate_limited("resend_verification", limit=3, window_minutes=15):
-        flash("Too many requests. Please wait a few minutes before trying again.", "warning")
-        return redirect(url_for("dashboard.index"))
-    _record_attempt("resend_verification", user_id=current_user.id)
+        email = request.form.get("email", "").strip().lower()
+        user = User.query.filter_by(email=email).first()
+        if user and not user.is_verified:
+            user.verification_token = secrets.token_urlsafe(32)
+            user.verification_token_expires = datetime.now(timezone.utc) + timedelta(hours=24)
+            db.session.commit()
+            try:
+                from app.services.email_service import send_verification_email
+                send_verification_email(user)
+            except Exception as e:
+                current_app.logger.warning(f"Verification email failed: {e}")
+        flash("If an account exists with that email and isn't verified yet, "
+              "a new verification link has been sent.", "info")
+        return redirect(url_for("auth.login"))
 
-    current_user.verification_token = secrets.token_urlsafe(32)
-    current_user.verification_token_expires = datetime.now(timezone.utc) + timedelta(hours=24)
-    db.session.commit()
-    try:
-        from app.services.email_service import send_verification_email
-        send_verification_email(current_user)
-        flash("Verification email sent!", "success")
-    except Exception:
-        flash("Could not send email. Please try again later.", "error")
-    return redirect(url_for("dashboard.index"))
+    return render_template("auth/resend_verification.html")
 
 
 @auth_bp.route("/forgot-password", methods=["GET", "POST"])
@@ -364,5 +390,6 @@ def google_callback():
     login_user(user, remember=True)
     flash(f"Welcome, {user.first_name or user.email}!", "success")
     return redirect(url_for("dashboard.index"))
+
 
 

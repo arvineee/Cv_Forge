@@ -16,11 +16,13 @@ def index():
     recent_report = (ATSReport.query.filter_by(user_id=current_user.id)
                      .order_by(ATSReport.created_at.desc()).first())
     daily_ai_used = AIUsage.get_daily_count(current_user.id)
+    from app.cv import _plan_allows_public_link
     return render_template("dashboard/index.html",
                            resumes=resumes,
                            cover_letters=cover_letters,
                            recent_report=recent_report,
-                           daily_ai_used=daily_ai_used)
+                           daily_ai_used=daily_ai_used,
+                           allow_public_link=_plan_allows_public_link())
 
 
 @dashboard_bp.route("/dashboard/profile")
@@ -71,4 +73,5 @@ def change_password():
         flash("Password updated successfully.", "success")
 
     return redirect(url_for("dashboard.profile"))
+
 

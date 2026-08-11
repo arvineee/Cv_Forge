@@ -143,6 +143,7 @@ def pricing_new():
             allow_docx=bool(request.form.get("allow_docx")),
             allow_version_history=bool(request.form.get("allow_version_history")),
             allow_career_coach=bool(request.form.get("allow_career_coach")),
+            allow_public_link=bool(request.form.get("allow_public_link")),
         )
         db.session.add(plan)
         db.session.commit()
@@ -176,6 +177,7 @@ def pricing_edit(plan_id):
         plan.allow_docx = bool(request.form.get("allow_docx"))
         plan.allow_version_history = bool(request.form.get("allow_version_history"))
         plan.allow_career_coach = bool(request.form.get("allow_career_coach"))
+        plan.allow_public_link = bool(request.form.get("allow_public_link"))
         db.session.commit()
         flash(f"Plan '{plan.name}' updated.", "success")
         return redirect(url_for("admin.pricing"))
@@ -346,5 +348,6 @@ def visitors():
                            unique_visitors=unique_visitors,
                            logged_in_visits=logged_in_visits,
                            top_pages=top_pages, daily=daily, days=days)
+
 
 
