@@ -62,6 +62,11 @@
       {% endif %}
     </div>
     <div class="flex gap-2 mt-2">
+      <a href="{{ url_for('cv.wizard_step', resume_id=resume.id, step='review') }}"
+         class="text-xs {{ 'text-green-600' if resume.is_public else 'text-gray-400' }} hover:text-green-700 transition font-medium">
+        {{ '🔗 Public link on' if resume.is_public else '🔗 Share' }}
+      </a>
+      <span class="text-gray-200">|</span>
       <a href="{{ url_for('cv.compare_versions', resume_id=resume.id) }}"
          class="text-xs text-gray-400 hover:text-gray-600 transition">Versions</a>
       <span class="text-gray-200">|</span>
