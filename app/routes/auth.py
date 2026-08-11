@@ -389,6 +389,13 @@ def google_callback():
     db.session.commit()
     login_user(user, remember=True)
     flash(f"Welcome, {user.first_name or user.email}!", "success")
+
+    # Same paywall as the regular login() route — Google sign-in was
+    # skipping it entirely since it has its own login_user() call and never
+    # ran this check.
+    if _free_tier_requires_payment() and user.plan == "free" and not user.is_premium:
+        return redirect(url_for("billing.plans"))
+
     return redirect(url_for("dashboard.index"))
 
 
