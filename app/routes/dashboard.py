@@ -16,7 +16,7 @@ def index():
     recent_report = (ATSReport.query.filter_by(user_id=current_user.id)
                      .order_by(ATSReport.created_at.desc()).first())
     daily_ai_used = AIUsage.get_daily_count(current_user.id)
-    from app.cv import _plan_allows_public_link
+    from app.routes.cv import _plan_allows_public_link
     return render_template("dashboard/index.html",
                            resumes=resumes,
                            cover_letters=cover_letters,
