@@ -67,7 +67,11 @@
             {{ resume.ats_score }}%
           </span>
           {% endif %}
-          <a href="{{ url_for('cv.builder', resume_id=resume.id) }}"
+          <a href="{{ url_for('cv.wizard_step', resume_id=resume.id, step='review') }}"
+             class="text-xs {{ 'text-green-600' if resume.is_public else 'text-gray-400' }} hover:text-green-700 transition font-medium">
+            🔗{% if resume.is_public %} Shared{% endif %}
+          </a>
+          <a href="{{ url_for('cv.wizard_start', resume_id=resume.id) }}"
              class="text-xs text-blue-600 hover:underline font-medium">Edit</a>
         </div>
       </li>
@@ -112,4 +116,5 @@
   </div>
 </div>
 {% endblock %}
+
 
