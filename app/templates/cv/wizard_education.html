@@ -1,0 +1,54 @@
+{% extends "cv/_wizard_base.html" %}
+{% block wizard_content %}
+<h2 class="text-lg font-semibold text-gray-900 mb-1">Education</h2>
+<p class="text-sm text-gray-500 mb-6">Add your qualifications, most recent first.</p>
+
+<form method="POST" action="{{ url_for('cv.wizard_step_save', resume_id=resume.id, step=step) }}" class="space-y-6">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="action" value="next">
+
+  <div id="edu-container" class="space-y-4">
+    {% set entries = resume.education or [{}] %}
+    {% for entry in entries %}
+    <div class="edu-block grid grid-cols-4 gap-3">
+      <input name="degree" placeholder="Degree / qualification" value="{{ entry.get('degree', '') }}"
+             class="rounded-lg border border-gray-200 px-3 py-2 text-sm col-span-2">
+      <input name="institution" placeholder="Institution" value="{{ entry.get('institution', '') }}"
+             class="rounded-lg border border-gray-200 px-3 py-2 text-sm col-span-1">
+      <input name="year" placeholder="Year" value="{{ entry.get('year', '') }}"
+             class="rounded-lg border border-gray-200 px-3 py-2 text-sm col-span-1">
+      <input name="grade" placeholder="Grade (optional)" value="{{ entry.get('grade', '') }}"
+             class="rounded-lg border border-gray-200 px-3 py-2 text-sm col-span-4">
+    </div>
+    {% endfor %}
+  </div>
+
+  <button type="button" id="add-edu-btn" class="text-sm font-semibold text-indigo-700 hover:text-indigo-800">
+    + Add another qualification
+  </button>
+
+  <div class="flex justify-between items-center pt-4">
+    <a href="{{ url_for('cv.wizard_step', resume_id=resume.id, step=prev_step) }}"
+       class="px-4 py-2 rounded-lg text-gray-500 text-sm font-medium hover:bg-gray-50">← Back</a>
+    <button type="submit" class="px-5 py-2 rounded-lg gradient-brand text-white text-sm font-semibold">
+      Continue →
+    </button>
+  </div>
+</form>
+
+<template id="edu-template">
+  <div class="edu-block grid grid-cols-4 gap-3">
+    <input name="degree" placeholder="Degree / qualification" class="rounded-lg border border-gray-200 px-3 py-2 text-sm col-span-2">
+    <input name="institution" placeholder="Institution" class="rounded-lg border border-gray-200 px-3 py-2 text-sm col-span-1">
+    <input name="year" placeholder="Year" class="rounded-lg border border-gray-200 px-3 py-2 text-sm col-span-1">
+    <input name="grade" placeholder="Grade (optional)" class="rounded-lg border border-gray-200 px-3 py-2 text-sm col-span-4">
+  </div>
+</template>
+<script>
+  document.getElementById('add-edu-btn').addEventListener('click', function() {
+    var tpl = document.getElementById('edu-template');
+    document.getElementById('edu-container').appendChild(tpl.content.cloneNode(true));
+  });
+</script>
+{% endblock %}
+

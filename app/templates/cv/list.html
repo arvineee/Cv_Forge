@@ -46,7 +46,7 @@
     </div>
 
     <div class="mt-auto flex gap-2 flex-wrap">
-      <a href="{{ url_for('cv.builder', resume_id=resume.id) }}"
+      <a href="{{ url_for('cv.wizard_start', resume_id=resume.id) }}"
          class="flex-1 text-center text-sm py-2 px-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition font-medium text-gray-700">
         Edit
       </a>
@@ -98,3 +98,4 @@
 </div>
 {% endif %}
 {% endblock %}
+

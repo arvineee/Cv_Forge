@@ -3,7 +3,7 @@
 {% block page_title %}Version History{% endblock %}
 {% block page_subtitle %}{{ resume.title }}{% endblock %}
 {% block page_actions %}
-  <a href="{{ url_for('cv.builder', resume_id=resume.id) }}"
+  <a href="{{ url_for('cv.wizard_start', resume_id=resume.id) }}"
      class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 bg-white text-sm font-medium hover:bg-gray-50 transition">
     ← Back to Editor
   </a>
@@ -65,3 +65,4 @@
 </div>
 {% endif %}
 {% endblock %}
+

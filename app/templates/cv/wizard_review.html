@@ -1,0 +1,79 @@
+{% extends "cv/_wizard_base.html" %}
+{% block wizard_content %}
+<h2 class="text-lg font-semibold text-gray-900 mb-1">Your CV is ready</h2>
+<p class="text-sm text-gray-500 mb-6">Review the feedback below, then download.</p>
+
+{% if allow_coach %}
+  {# ---- Pro+ AI Coach: directive, whole-resume critique ---- #}
+  <div class="mb-6 p-4 rounded-lg bg-indigo-50 border border-indigo-100">
+    <p class="text-xs font-semibold text-indigo-700 mb-2">🎯 AI Coach review</p>
+    {% if coach_feedback %}
+      <div class="text-sm text-gray-800 whitespace-pre-line">{{ coach_feedback }}</div>
+    {% elif coach_error %}
+      <p class="text-sm text-gray-600">{{ coach_error }}</p>
+    {% endif %}
+  </div>
+{% else %}
+  {# ---- Free tier: rule-based gaps teaser + upgrade nudge ---- #}
+  {% if gaps %}
+  <div class="mb-6 p-4 rounded-lg bg-amber-50 border border-amber-100">
+    <p class="text-xs font-semibold text-amber-800 mb-2">⚠️ Things worth fixing before you send this out</p>
+    <ul class="text-sm text-gray-800 space-y-1.5 list-disc list-inside mb-4">
+      {% for gap in gaps %}
+      <li>{{ gap }}</li>
+      {% endfor %}
+    </ul>
+    <div class="p-3 rounded-lg bg-white border border-amber-200">
+      <p class="text-sm text-gray-800 mb-2">
+        <strong>Pro unlocks the AI Coach</strong> — a line-by-line review that tells you exactly
+        what to fix and why, not just what's missing. 😉
+      </p>
+      <a href="{{ url_for('billing.plans') }}"
+         class="inline-block px-4 py-2 rounded-lg gradient-brand text-white text-xs font-semibold">
+        See Pro plans →
+      </a>
+    </div>
+  </div>
+  {% else %}
+  <div class="mb-6 p-4 rounded-lg bg-green-50 border border-green-100">
+    <p class="text-sm text-gray-800">Nice — the basics all look covered. Upgrade to Pro for a deeper,
+    line-by-line AI Coach review before you send this out. 😉</p>
+  </div>
+  {% endif %}
+{% endif %}
+
+<div class="border border-gray-100 rounded-lg p-4 mb-6">
+  <p class="text-sm font-semibold text-gray-900 mb-3">Download</p>
+  <div class="flex gap-3">
+    <a href="{{ url_for('cv.download', resume_id=resume.id, fmt='pdf') }}"
+       class="px-4 py-2 rounded-lg gradient-brand text-white text-sm font-semibold">
+      Download PDF
+    </a>
+    {% if allow_docx %}
+    <a href="{{ url_for('cv.download', resume_id=resume.id, fmt='docx') }}"
+       class="px-4 py-2 rounded-lg border border-gray-200 text-gray-700 text-sm font-semibold hover:bg-gray-50">
+      Download DOCX
+    </a>
+    {% else %}
+    <span class="px-4 py-2 rounded-lg bg-gray-50 text-gray-400 text-sm font-semibold cursor-not-allowed"
+          title="DOCX downloads are a Pro feature">
+      Download DOCX 🔒
+    </span>
+    {% endif %}
+  </div>
+  {% if not allow_docx %}
+  <p class="text-xs text-gray-400 mt-2">DOCX export is on Pro plans — 
+    <a href="{{ url_for('billing.plans') }}" class="text-indigo-600 font-medium">upgrade to unlock it</a>.</p>
+  {% endif %}
+</div>
+
+<div class="flex justify-between items-center">
+  <a href="{{ url_for('cv.wizard_step', resume_id=resume.id, step=prev_step) }}"
+     class="px-4 py-2 rounded-lg text-gray-500 text-sm font-medium hover:bg-gray-50">← Back to edit</a>
+  <a href="{{ url_for('cv.list_cvs') }}"
+     class="px-5 py-2 rounded-lg bg-gray-900 text-white text-sm font-semibold">
+    Done
+  </a>
+</div>
+{% endblock %}
+

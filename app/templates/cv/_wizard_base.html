@@ -1,0 +1,28 @@
+{% extends "base_dashboard.html" %}
+{# Matches the block structure used by cv/list.html, cv/start.html,
+   cv/builder.html etc.: title / page_title / page_subtitle / content.
+   Flash messages are NOT re-rendered here — base.html (which
+   base_dashboard.html extends) already renders get_flashed_messages()
+   globally, so doing it again here would show every flash twice. #}
+
+{% block title %}{{ resume.title }} — Step {{ step_index }} of {{ total_steps }}{% endblock %}
+{% block page_title %}{{ resume.title }}{% endblock %}
+{% block page_subtitle %}Step {{ step_index }} of {{ total_steps }}{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl">
+
+  <div class="mb-6">
+    <div class="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+      <div class="h-full gradient-brand rounded-full transition-all"
+           style="width: {{ ((step_index / total_steps) * 100) | round | int }}%"></div>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+    {% block wizard_content %}{% endblock %}
+  </div>
+
+</div>
+{% endblock %}
+

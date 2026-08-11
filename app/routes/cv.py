@@ -156,7 +156,27 @@ def create_cv():
     db.session.flush()
     _log("cv_create", resume.id, {"title": title})
     db.session.commit()
+    # NOTE: builder.html's Alpine init() calls this via fetch() and regexes
+    # the response URL for /cv/builder/(\d+) to pick up resumeId — keep
+    # this redirect target as-is or that JS breaks. The wizard has its own
+    # entry point (wizard_new below) instead of taking over this route.
     return redirect(url_for("cv.builder", resume_id=resume.id, step=1))
+
+
+@cv_bp.route("/wizard/new")
+@login_required
+def wizard_new():
+    """Entry point for the guided wizard — creates a blank resume and drops
+    the user straight into step 1, no theme picker required first."""
+    title = request.args.get("title", "My Resume").strip() or "My Resume"
+    template_id = request.args.get("template_id", type=int)
+    resume = Resume(user_id=current_user.id, title=title,
+                    template_id=template_id, status="draft", source="wizard")
+    db.session.add(resume)
+    db.session.flush()
+    _log("cv_create", resume.id, {"title": title, "via": "wizard"})
+    db.session.commit()
+    return redirect(url_for("cv.wizard_step", resume_id=resume.id, step="personal_info"))
 
 
 @cv_bp.route("/builder/<int:resume_id>/save", methods=["POST"])
@@ -218,6 +238,246 @@ def ai_assist(resume_id):
     except Exception as e:
         current_app.logger.error(f"AI assist error: {e}")
         return jsonify({"error": "AI service unavailable. Please try again."}), 503
+
+
+# ---------------------------------------------------------------------------
+# Guided CV wizard — step-by-step Q&A alternative to the free-form builder.
+# "Create a CV" now lands here: one section per page, with an optional
+# "Enhance with AI" pass on the sections that benefit from it, ending in a
+# Review step that generates the documents the user's plan allows, and
+# either an AI Coach critique (Pro+) or a rule-based gaps teaser + upgrade
+# nudge (free).
+# ---------------------------------------------------------------------------
+
+WIZARD_STEPS = [
+    "personal_info", "professional_summary", "work_experience",
+    "education", "skills", "certifications", "review",
+]
+
+# Sections the AI can enhance inline, mapped onto assist_section()'s prompts.
+WIZARD_AI_SECTIONS = {"professional_summary", "work_experience", "skills", "certifications"}
+
+
+def _wizard_next_step(step: str) -> "str | None":
+    i = WIZARD_STEPS.index(step)
+    return WIZARD_STEPS[i + 1] if i + 1 < len(WIZARD_STEPS) else None
+
+
+def _wizard_prev_step(step: str) -> "str | None":
+    i = WIZARD_STEPS.index(step)
+    return WIZARD_STEPS[i - 1] if i > 0 else None
+
+
+def _detect_gaps(resume) -> list:
+    """Cheap, non-AI heuristic pass over the resume. Used to give free-tier
+    users something concrete ("here's what's weak") without burning an AI
+    call — and to entice them toward the real AI Coach on Pro+."""
+    gaps = []
+    summary = (resume.professional_summary or "").strip()
+    if not summary:
+        gaps.append("You don't have a professional summary yet — it's the first thing recruiters read.")
+    elif len(summary) < 60:
+        gaps.append("Your professional summary is very short. A few more sentences of impact would help.")
+
+    work = resume.work_experience or []
+    if not work:
+        gaps.append("No work experience added yet.")
+    else:
+        has_numbers = any(
+            any(ch.isdigit() for ch in " ".join(job.get("achievements", []) or []))
+            for job in work
+        )
+        if not has_numbers:
+            gaps.append("None of your work experience bullets have numbers. Quantified results "
+                        "(%, $, team size, time saved) rank higher with recruiters and ATS software.")
+
+    if not resume.skills:
+        gaps.append("No skills listed — many ATS systems filter out resumes with no skills section.")
+    if not resume.certifications and not resume.projects:
+        gaps.append("No certifications or projects listed — these help you stand out for less experience.")
+    if resume.ats_score is None:
+        gaps.append("You haven't run an ATS check on this resume yet.")
+    elif resume.ats_score < 70:
+        gaps.append(f"Your last ATS score was {resume.ats_score}/100 — there's real room to improve it.")
+    return gaps
+
+
+@cv_bp.route("/wizard/<int:resume_id>")
+@login_required
+def wizard_start(resume_id):
+    """Resolves to whichever step still needs the user's attention, so
+    returning to an in-progress CV picks up where they left off instead of
+    always restarting at personal info."""
+    resume = Resume.query.filter_by(id=resume_id, user_id=current_user.id).first_or_404()
+    order = {
+        "personal_info": resume.personal_info,
+        "professional_summary": resume.professional_summary,
+        "work_experience": resume.work_experience,
+        "education": resume.education,
+        "skills": resume.skills,
+    }
+    for step, value in order.items():
+        if not value:
+            return redirect(url_for("cv.wizard_step", resume_id=resume_id, step=step))
+    return redirect(url_for("cv.wizard_step", resume_id=resume_id, step="review"))
+
+
+@cv_bp.route("/wizard/<int:resume_id>/<step>", methods=["GET"])
+@login_required
+def wizard_step(resume_id, step):
+    if step not in WIZARD_STEPS:
+        abort(404)
+    resume = Resume.query.filter_by(id=resume_id, user_id=current_user.id).first_or_404()
+
+    context = dict(
+        resume=resume, step=step,
+        steps=WIZARD_STEPS, step_index=WIZARD_STEPS.index(step) + 1,
+        total_steps=len(WIZARD_STEPS),
+        prev_step=_wizard_prev_step(step), next_step=_wizard_next_step(step),
+        ai_enabled=step in WIZARD_AI_SECTIONS,
+    )
+
+    if step == "review":
+        plan = _current_plan()
+        allow_docx = _plan_allows_docx()
+        allow_coach = bool(current_user.is_premium and plan and plan.allow_career_coach)
+        coach_feedback, coach_error = None, None
+        gaps = _detect_gaps(resume)
+
+        if allow_coach:
+            can_use, err = _check_ai_limit("career_coach")
+            if can_use:
+                try:
+                    coach_feedback = get_ai_service().coach_review(resume, user_id=current_user.id)
+                    db.session.commit()
+                except Exception as e:
+                    current_app.logger.error(f"Coach review error: {e}")
+                    coach_error = "AI Coach is temporarily unavailable. Please try again."
+            else:
+                coach_error = err
+
+        context.update(
+            allow_docx=allow_docx, allow_coach=allow_coach,
+            coach_feedback=coach_feedback, coach_error=coach_error,
+            gaps=gaps,
+        )
+
+    return render_template(f"cv/wizard_{step}.html", **context)
+
+
+@cv_bp.route("/wizard/<int:resume_id>/<step>", methods=["POST"])
+@login_required
+def wizard_step_save(resume_id, step):
+    if step not in WIZARD_STEPS or step == "review":
+        abort(404)
+    resume = Resume.query.filter_by(id=resume_id, user_id=current_user.id).first_or_404()
+    action = request.form.get("action", "next")
+
+    # -- Enhance with AI: run assist_section(), show the suggestion back on
+    # the same step for the user to accept/edit before saving. Nothing is
+    # written to the resume until they hit "Continue".
+    if action == "enhance" and step in WIZARD_AI_SECTIONS:
+        can_use, err = _check_ai_limit("cv_generate")
+        if not can_use:
+            flash(err, "warning")
+            return redirect(url_for("cv.wizard_step", resume_id=resume_id, step=step))
+        raw_input = request.form.get("draft", "")
+        try:
+            ai = get_ai_service()
+            suggestion = ai.assist_section(section=step, context=raw_input,
+                                           resume=resume, user_id=current_user.id)
+            db.session.commit()
+            # skills/certifications come back as a JSON array per the
+            # assist_section() prompt — render as a comma/line list instead
+            # of raw JSON text.
+            if step in ("skills", "certifications"):
+                import json as _json
+                try:
+                    items = _json.loads(suggestion)
+                    if isinstance(items, list):
+                        suggestion = ", ".join(items) if step == "skills" else "\n".join(items)
+                except (ValueError, TypeError):
+                    pass
+        except Exception as e:
+            current_app.logger.error(f"Wizard AI enhance error: {e}")
+            flash("AI enhancement failed. You can keep editing manually.", "warning")
+            suggestion = None
+        return render_template(
+            f"cv/wizard_{step}.html", resume=resume, step=step,
+            steps=WIZARD_STEPS, step_index=WIZARD_STEPS.index(step) + 1,
+            total_steps=len(WIZARD_STEPS),
+            prev_step=_wizard_prev_step(step), next_step=_wizard_next_step(step),
+            ai_enabled=True, ai_suggestion=suggestion, draft=raw_input,
+        )
+
+    # -- Save this step's answer (skip is allowed everywhere except
+    # personal_info, so the wizard never blocks a user who just wants to
+    # get to the end and download something).
+    if step == "personal_info":
+        resume.personal_info = {
+            "full_name": request.form.get("full_name", "").strip(),
+            "job_title": request.form.get("job_title", "").strip(),
+            "email": request.form.get("email", "").strip(),
+            "phone": request.form.get("phone", "").strip(),
+            "location": request.form.get("location", "").strip(),
+            "linkedin": request.form.get("linkedin", "").strip(),
+        }
+    elif step == "professional_summary":
+        resume.professional_summary = request.form.get("content", "").strip() or None
+    elif step == "work_experience":
+        # One job per submitted block; achievements as one bullet per line.
+        titles = request.form.getlist("job_title")
+        companies = request.form.getlist("company")
+        locations = request.form.getlist("location")
+        starts = request.form.getlist("start_date")
+        ends = request.form.getlist("end_date")
+        achievements_raw = request.form.getlist("achievements")
+        jobs = []
+        for i, title in enumerate(titles):
+            if not title.strip():
+                continue
+            jobs.append({
+                "job_title": title.strip(),
+                "company": companies[i].strip() if i < len(companies) else "",
+                "location": locations[i].strip() if i < len(locations) else "",
+                "start_date": starts[i].strip() if i < len(starts) else "",
+                "end_date": ends[i].strip() if i < len(ends) else "",
+                "achievements": [l.strip() for l in achievements_raw[i].splitlines() if l.strip()]
+                                if i < len(achievements_raw) else [],
+            })
+        if jobs:
+            resume.work_experience = jobs
+    elif step == "education":
+        # Field names match what builder.html / docx_service / pdf_service
+        # already expect: degree, institution, year, grade.
+        degrees = request.form.getlist("degree")
+        institutions = request.form.getlist("institution")
+        years = request.form.getlist("year")
+        grades = request.form.getlist("grade")
+        entries = []
+        for i, degree in enumerate(degrees):
+            if not degree.strip():
+                continue
+            entries.append({
+                "degree": degree.strip(),
+                "institution": institutions[i].strip() if i < len(institutions) else "",
+                "year": years[i].strip() if i < len(years) else "",
+                "grade": grades[i].strip() if i < len(grades) else "",
+            })
+        if entries:
+            resume.education = entries
+    elif step == "skills":
+        raw = request.form.get("content", "")
+        resume.skills = [s.strip() for s in raw.split(",") if s.strip()]
+    elif step == "certifications":
+        raw = request.form.get("content", "")
+        resume.certifications = [l.strip() for l in raw.splitlines() if l.strip()]
+
+    _log("cv_wizard_step", resume.id, {"step": step})
+    db.session.commit()
+
+    nxt = _wizard_next_step(step)
+    return redirect(url_for("cv.wizard_step", resume_id=resume_id, step=nxt or "review"))
 
 
 @cv_bp.route("/upload", methods=["GET", "POST"])
@@ -523,6 +783,7 @@ def toggle_public(resume_id):
         "public_url": url_for("main.public_resume", token=resume.public_token, _external=True)
         if resume.is_public else None,
     })
+
 
 
 

@@ -37,7 +37,7 @@
       <p class="font-medium text-gray-900 text-sm truncate">{{ r.title }}</p>
       <div class="flex items-center gap-3 flex-shrink-0 ml-4">
         <span class="text-xs text-gray-400">{{ r.updated_at.strftime('%d %b %Y') }}</span>
-        <a href="{{ url_for('cv.builder', resume_id=r.id) }}"
+        <a href="{{ url_for('cv.wizard_start', resume_id=r.id) }}"
            class="text-xs text-blue-600 hover:underline font-medium">Continue</a>
       </div>
     </li>
@@ -46,4 +46,5 @@
 </div>
 {% endif %}
 {% endblock %}
+
 

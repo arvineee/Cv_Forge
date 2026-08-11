@@ -285,6 +285,27 @@ Provide a comprehensive ATS analysis. Return ONLY valid JSON:
                 "summary": raw[:300],
             }
 
+    def coach_review(self, resume, user_id: int = None) -> str:
+        """Directive, whole-resume review used by the Pro+ AI Coach step in
+        the CV wizard. Unlike career_coach() (which answers a free-form
+        question), this proactively audits the resume and tells the user
+        exactly what's wrong and how to fix it — no question required."""
+        resume_data = json.dumps(resume.to_dict(), indent=2)
+        prompt = f"""You are a blunt, expert resume coach reviewing a client's CV
+before they submit it to employers.
+
+RESUME DATA:
+{resume_data}
+
+Give direct, specific feedback:
+1. Point out exactly what's weak, vague, or missing — name the section.
+2. For each issue, say precisely what to change to fix it.
+3. Briefly note anything that's genuinely strong.
+
+Address the reader as "you". Be honest, not falsely encouraging. Use short
+bullet points. Keep the whole response under 250 words."""
+        return self._call(prompt, "career_coach", user_id=user_id)
+
     def career_coach(self, question: str, resume=None, user_id: int = None) -> str:
         resume_context = ""
         if resume:
@@ -386,4 +407,5 @@ RULES:
 
         prompt = f"{user_context}\n\nUser question: {question}"
         return self._call(prompt, "support_chat", user_id=user_id, system_instruction=system_instruction)
+
 

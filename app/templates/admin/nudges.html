@@ -9,6 +9,7 @@
 
 {% block page_actions %}
   <form method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <button type="submit"
             onclick="return confirm('Send an upgrade reminder email to {{ candidates|length }} user(s) now?')"
             class="inline-flex items-center gap-2 px-4 py-2 rounded-lg gradient-brand text-white text-sm font-semibold hover:opacity-90 transition">
@@ -60,4 +61,5 @@
   </table>
 </div>
 {% endblock %}
+
 

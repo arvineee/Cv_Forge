@@ -1,0 +1,54 @@
+{% extends "cv/_wizard_base.html" %}
+{% block wizard_content %}
+<h2 class="text-lg font-semibold text-gray-900 mb-1">Let's start with the basics</h2>
+<p class="text-sm text-gray-500 mb-6">This goes at the top of every version of your CV.</p>
+
+<form method="POST" action="{{ url_for('cv.wizard_step_save', resume_id=resume.id, step=step) }}" class="space-y-4">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="action" value="next">
+
+  <div class="grid grid-cols-2 gap-4">
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Full name</label>
+      <input name="full_name" required value="{{ (resume.personal_info or {}).get('full_name', '') }}"
+             class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Job title / headline</label>
+      <input name="job_title" placeholder="e.g. Software Engineer" value="{{ (resume.personal_info or {}).get('job_title', '') }}"
+             class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
+    </div>
+  </div>
+  <div class="grid grid-cols-2 gap-4">
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+      <input name="email" type="email" value="{{ (resume.personal_info or {}).get('email', '') }}"
+             class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+      <input name="phone" value="{{ (resume.personal_info or {}).get('phone', '') }}"
+             class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
+    </div>
+  </div>
+  <div class="grid grid-cols-2 gap-4">
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Location</label>
+      <input name="location" value="{{ (resume.personal_info or {}).get('location', '') }}"
+             class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">LinkedIn (optional)</label>
+      <input name="linkedin" value="{{ (resume.personal_info or {}).get('linkedin', '') }}"
+             class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
+    </div>
+  </div>
+
+  <div class="flex justify-end pt-4">
+    <button type="submit" class="px-5 py-2 rounded-lg gradient-brand text-white text-sm font-semibold">
+      Continue →
+    </button>
+  </div>
+</form>
+{% endblock %}
+
