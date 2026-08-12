@@ -3,9 +3,36 @@
 {% block body %}
 <div class="min-h-screen bg-gray-50 py-16 px-4">
   <div class="max-w-5xl mx-auto">
-    <div class="text-center mb-12">
+    <div class="text-center mb-8">
       <h1 class="text-4xl font-bold text-gray-900">Simple, transparent pricing</h1>
-      <p class="text-gray-500 mt-3 text-lg">Cancel anytime. Pay with M-Pesa or Card.</p>
+      <p class="text-gray-500 mt-3 text-lg">
+        Most CVs never reach a human — applicant tracking software filters them out first.
+        Build one that gets through.
+      </p>
+      <div class="flex items-center justify-center gap-2 mt-4 text-sm text-gray-400">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+        </svg>
+        Secure payments via M-Pesa or Card · Cancel anytime · No auto-renewal
+      </div>
+    </div>
+
+    <div class="grid sm:grid-cols-3 gap-4 mb-12 max-w-3xl mx-auto">
+      <div class="text-center px-3">
+        <div class="text-2xl mb-1">🎯</div>
+        <p class="text-sm font-semibold text-gray-900">ATS-optimized</p>
+        <p class="text-xs text-gray-500 mt-1">Built to pass the same filters recruiters use to screen CVs</p>
+      </div>
+      <div class="text-center px-3">
+        <div class="text-2xl mb-1">✨</div>
+        <p class="text-sm font-semibold text-gray-900">AI-assisted, every step</p>
+        <p class="text-xs text-gray-500 mt-1">Stronger summaries and bullet points without staring at a blank page</p>
+      </div>
+      <div class="text-center px-3">
+        <div class="text-2xl mb-1">⚡</div>
+        <p class="text-sm font-semibold text-gray-900">Done in minutes</p>
+        <p class="text-xs text-gray-500 mt-1">Answer a few questions, download a polished CV</p>
+      </div>
     </div>
 
     <div class="grid md:grid-cols-{{ plans|length }} gap-6">
@@ -29,6 +56,11 @@
             <span class="text-gray-400 mb-1">/{{ plan.billing_period }}</span>
             {% endif %}
           </div>
+          {% if plan.allow_career_coach %}
+          <p class="mt-2 inline-block text-xs font-semibold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-full">
+            🎯 Includes AI Career Coach
+          </p>
+          {% endif %}
         </div>
 
         <ul class="space-y-3 mb-8 flex-1">
@@ -91,10 +123,30 @@
       {% endfor %}
     </div>
 
+    <div class="max-w-2xl mx-auto mt-16">
+      <h2 class="text-lg font-bold text-gray-900 text-center mb-6">Common questions</h2>
+      <div class="space-y-3">
+        {% for q, a in [
+          ('How does payment work?', 'Click Subscribe and choose M-Pesa or Card. With M-Pesa, enter your Safaricom number and confirm the STK push on your phone. With Card, you\'ll be taken to a secure checkout page. Either way, your plan activates within seconds of payment.'),
+          ('Can I cancel anytime?', 'Yes. Your plan runs for 30 days from payment date. It won\'t auto-renew — you\'ll need to manually subscribe again if you want to continue.'),
+          ('What does the AI Career Coach do?', 'On plans that include it, you get a direct, line-by-line review of your CV — what\'s weak, what\'s missing, and exactly how to fix it, not just a generic checklist.'),
+        ] %}
+        <details class="bg-white rounded-xl border border-gray-100 p-4 group">
+          <summary class="text-sm font-semibold text-gray-900 cursor-pointer flex justify-between items-center">
+            {{ q }}
+            <span class="text-gray-400 group-open:rotate-180 transition-transform">▾</span>
+          </summary>
+          <p class="text-sm text-gray-500 mt-2">{{ a }}</p>
+        </details>
+        {% endfor %}
+      </div>
+    </div>
+
     <p class="text-center text-xs text-gray-400 mt-8">
       Secure payments via M-Pesa or Card, powered by IntaSend.
     </p>
   </div>
 </div>
 {% endblock %}
+
 
