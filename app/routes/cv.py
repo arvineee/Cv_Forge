@@ -110,14 +110,13 @@ def _plan_allows_docx() -> bool:
 
 
 def _plan_allows_public_link() -> bool:
-    """Same shape as _plan_allows_docx() — public CV links are a per-plan
-    toggle now (admin can flip it off the Free plan to force upgrades),
-    not a hardcoded free-tier freebie."""
-    if current_user.is_premium:
-        plan = _current_plan()
-        if plan:
-            return bool(plan.allow_public_link)
-        return True
+    """Public CV sharing requires an active paid plan at minimum — anyone
+    without a paid, unexpired subscription (i.e. still effectively on the
+    free tier) can never share their CV publicly, full stop. Admins can
+    further restrict it per paid tier via each plan's allow_public_link
+    flag, but paid status is now a hard prerequisite either way."""
+    if not _has_active_paid_plan():
+        return False
     plan = _current_plan()
     return bool(plan and plan.allow_public_link)
 
