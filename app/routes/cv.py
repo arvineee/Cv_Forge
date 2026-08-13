@@ -72,6 +72,31 @@ def _current_plan() -> "PricingPlan | None":
     return PricingPlan.query.filter_by(slug=current_user.plan, is_active=True).first()
 
 
+def _has_active_paid_plan() -> bool:
+    """True only for a real, unexpired paid subscription (basic/pro/premium).
+
+    Unlike User.is_premium (which only ever recognizes 'pro'/'premium' and
+    ignores 'basic' entirely), this treats any paid tier as "paid" — this
+    is the actual download gate now, so a Basic subscriber who's paid
+    should not be treated the same as someone who never paid at all.
+    """
+    if current_user.plan not in ("basic", "pro", "premium"):
+        return False
+    if not current_user.plan_expires_at:
+        return False
+    expires = current_user.plan_expires_at
+    if expires.tzinfo is None:
+        expires = expires.replace(tzinfo=timezone.utc)
+    return expires > datetime.now(timezone.utc)
+
+
+def _can_download() -> bool:
+    """The actual paywall moment now — everyone gets full dashboard/wizard
+    access regardless of payment status, and only hits a paywall here,
+    at download time, with the watermarked preview shown instead."""
+    return _has_active_paid_plan()
+
+
 def _plan_allows_docx() -> bool:
     if current_user.is_premium:
         plan = _current_plan()
@@ -356,6 +381,7 @@ def wizard_step(resume_id, step):
         allow_docx = _plan_allows_docx()
         allow_coach = bool(current_user.is_premium and plan and plan.allow_career_coach)
         allow_public_link = _plan_allows_public_link()
+        can_download = _can_download()
         coach_feedback, coach_error = None, None
         gaps = _detect_gaps(resume)
 
@@ -373,7 +399,7 @@ def wizard_step(resume_id, step):
 
         context.update(
             allow_docx=allow_docx, allow_coach=allow_coach,
-            allow_public_link=allow_public_link,
+            allow_public_link=allow_public_link, can_download=can_download,
             coach_feedback=coach_feedback, coach_error=coach_error,
             gaps=gaps,
         )
@@ -742,6 +768,13 @@ def download(resume_id, fmt):
     if fmt not in ("pdf", "docx"):
         abort(400)
 
+    # The paywall now lives here, not at login/dashboard access. Everyone
+    # can build a full CV for free; paying is only required to get the
+    # actual file out.
+    if not _can_download():
+        flash("Subscribe to a plan to download your CV. You can preview it first below.", "warning")
+        return redirect(url_for("cv.wizard_step", resume_id=resume_id, step="review"))
+
     if fmt == "docx" and not _plan_allows_docx():
         flash("DOCX download is a Pro feature. Upgrade your plan to download as Word.", "warning")
         return redirect(url_for("billing.plans"))
@@ -768,7 +801,7 @@ def download(resume_id, fmt):
     except Exception as e:
         current_app.logger.error(f"Download error: {e}")
         flash("Download failed. Please try again.", "error")
-        return redirect(url_for("cv.builder", resume_id=resume_id))
+        return redirect(url_for("cv.wizard_step", resume_id=resume_id, step="review"))
 
 
 @cv_bp.route("/<int:resume_id>/delete", methods=["POST"])

@@ -10,7 +10,7 @@ import secrets
 import requests as http_requests
 from datetime import datetime, timezone, timedelta
 
-from app.models import db, User, Profile, ActivityLog, UserSettings, PricingPlan
+from app.models import db, User, Profile, ActivityLog, UserSettings
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
 
@@ -38,13 +38,10 @@ def _safe_next(next_url):
     return None
 
 
-def _free_tier_requires_payment() -> bool:
-    """The 'free' plan is only actually free while its price is 0. Admin can
-    flip the Free plan's price in /admin/pricing at any time to turn it into
-    a paywall for everyone signing up from then on — flip it back to 0 and
-    new signups go straight through again, unchanged."""
-    free_plan = PricingPlan.query.filter_by(slug="free", is_active=True).first()
-    return bool(free_plan and free_plan.price_kes > 0)
+# NOTE: the paywall moved from here (login-time) to cv.py's download() route
+# — everyone gets full dashboard access now regardless of payment status,
+# and only hits a paywall when they try to download a finished CV. See
+# _can_download() / _current_plan() in cv.py.
 
 
 # FIX: this file's docstring has claimed "rate limiting" for a while, but no
@@ -177,12 +174,6 @@ def login():
         db.session.commit()
 
         login_user(user, remember=remember)
-
-        # If admin has made the Free plan a paid plan, unpaid users land on
-        # plan selection instead of the dashboard until they subscribe. If
-        # Free is still priced at 0, this is a no-op.
-        if _free_tier_requires_payment() and user.plan == "free" and not user.is_premium:
-            return redirect(url_for("billing.plans"))
 
         next_page = _safe_next(request.args.get("next"))
         return redirect(next_page or url_for("dashboard.index"))
@@ -389,13 +380,6 @@ def google_callback():
     db.session.commit()
     login_user(user, remember=True)
     flash(f"Welcome, {user.first_name or user.email}!", "success")
-
-    # Same paywall as the regular login() route — Google sign-in was
-    # skipping it entirely since it has its own login_user() call and never
-    # ran this check.
-    if _free_tier_requires_payment() and user.plan == "free" and not user.is_premium:
-        return redirect(url_for("billing.plans"))
-
     return redirect(url_for("dashboard.index"))
 
 

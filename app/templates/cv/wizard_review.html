@@ -99,6 +99,7 @@
 
 <div class="border border-gray-100 rounded-lg p-4 mb-6">
   <p class="text-sm font-semibold text-gray-900 mb-3">Download</p>
+  {% if can_download %}
   <div class="flex gap-3">
     <a href="{{ url_for('cv.download', resume_id=resume.id, fmt='pdf') }}"
        class="px-4 py-2 rounded-lg gradient-brand text-white text-sm font-semibold">
@@ -119,6 +120,56 @@
   {% if not allow_docx %}
   <p class="text-xs text-gray-400 mt-2">DOCX export is on Pro plans — 
     <a href="{{ url_for('billing.plans') }}" class="text-indigo-600 font-medium">upgrade to unlock it</a>.</p>
+  {% endif %}
+
+  {% else %}
+  {# ---- Not paid yet: watermarked preview alongside the paywall CTA,
+       so they can see exactly what they're paying for before they pay. ---- #}
+  <div class="flex flex-col md:flex-row gap-4 items-start">
+
+    <div class="relative overflow-hidden rounded-lg border border-gray-200 bg-white p-4 text-xs leading-snug select-none w-full md:w-56 flex-shrink-0"
+         style="min-height: 200px;">
+      <div class="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden">
+        <span class="text-gray-100 text-2xl font-black uppercase tracking-widest -rotate-45 whitespace-nowrap">
+          SAMPLE · SAMPLE · SAMPLE
+        </span>
+      </div>
+      <div class="relative">
+        <p class="font-bold text-gray-900">
+          {{ (resume.personal_info or {}).get('full_name', 'Your Name') }}
+        </p>
+        {% set job_title = (resume.personal_info or {}).get('job_title', '') %}
+        {% if job_title %}<p class="text-gray-500 mb-2">{{ job_title }}</p>{% endif %}
+        {% if resume.professional_summary %}
+        <p class="text-gray-600 mb-2">
+          {{ resume.professional_summary[:110] }}{% if resume.professional_summary|length > 110 %}…{% endif %}
+        </p>
+        {% endif %}
+        <div class="filter blur-[3px] select-none mt-2">
+          {% for job in (resume.work_experience or [])[:2] %}
+          <p class="font-semibold text-gray-700">{{ job.get('job_title', '') }} — {{ job.get('company', '') }}</p>
+          <ul class="list-disc list-inside text-gray-500 mb-1">
+            {% for achievement in (job.get('achievements') or [])[:2] %}
+            <li>{{ achievement }}</li>
+            {% endfor %}
+          </ul>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <div class="flex-1">
+      <p class="text-sm font-semibold text-gray-900 mb-1">Your CV is ready — unlock it to download 🔒</p>
+      <p class="text-xs text-gray-500 mb-3">
+        That's a watermarked sample of your actual CV on the left, so you know exactly what
+        you're getting. Subscribe to any plan to download the clean PDF (DOCX on Pro+).
+      </p>
+      <a href="{{ url_for('billing.plans') }}"
+         class="inline-block px-4 py-2 rounded-lg gradient-brand text-white text-sm font-semibold">
+        Choose a plan to download →
+      </a>
+    </div>
+  </div>
   {% endif %}
 </div>
 
