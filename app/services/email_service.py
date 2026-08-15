@@ -68,34 +68,61 @@ def send_password_reset_email(user):
         current_app.logger.warning(f"Password reset email failed: {e}")
 
 
+def _static_nudge_content(user):
+    """The original hand-written copy — used whenever AI generation is
+    unavailable or fails, so a Gemini hiccup never blocks the send."""
+    return {
+        "subject": "Get more out of CVForge AI",
+        "body_html": """
+            <p>Just a quick note — Pro removes your daily AI generation limits,
+            unlocks every template, adds Word (DOCX) downloads, keeps your
+            version history, and gives you the AI career coach.</p>
+            <p>No pressure — the free plan still works great. This is just here
+            in case it's useful.</p>
+            """,
+    }
+
+
 def send_pro_nudge_email(user):
     """
     Occasional reminder to free-tier users about what Pro unlocks.
     Called from cli.py's `flask send-nudges` command — never called
     directly from a request, so cadence/opt-out is enforced by the
     caller, not here.
+
+    Copy is generated per-user by Gemini (see AIService.generate_nudge_email)
+    so the message can reference the user's own resume/ATS activity. If AI
+    generation is unavailable, fails, or returns something unusable, this
+    falls back to the original static template — the send is never blocked
+    on the AI call succeeding.
     """
     Mail, Message = _get_mailer()
     if not Mail or not current_app.config.get("MAIL_USERNAME"):
         current_app.logger.info(f"[email stub] Pro nudge email skipped for {user.email}")
         return
 
+    content = {}
+    try:
+        from app.services.ai_service import get_ai_service
+        content = get_ai_service().generate_nudge_email(user, user_id=user.id) or {}
+    except Exception as e:
+        current_app.logger.warning(f"AI nudge generation failed, using static template: {e}")
+
+    if not content.get("subject") or not content.get("body_html"):
+        content = _static_nudge_content(user)
+
     try:
         from flask_mail import Mail, Message
         mail = Mail(current_app)
         billing_url = url_for("billing.plans", _external=True)
         msg = Message(
-            subject="Get more out of CVForge AI",
+            subject=content["subject"],
             sender=current_app.config["MAIL_DEFAULT_SENDER"],
             recipients=[user.email],
             html=f"""
             <p>Hi {user.first_name or 'there'},</p>
-            <p>Just a quick note — Pro removes your daily AI generation limits,
-            unlocks every template, adds Word (DOCX) downloads, keeps your
-            version history, and gives you the AI career coach.</p>
+            {content["body_html"]}
             <p><a href="{billing_url}">See plans and pricing</a></p>
-            <p>No pressure — the free plan still works great. This is just here
-            in case it's useful.</p>
             <p>— CVForge AI</p>
             <p style="font-size:12px;color:#888;">
             Don't want these emails? Turn off "Newsletter" in your account settings.
@@ -105,5 +132,6 @@ def send_pro_nudge_email(user):
         mail.send(msg)
     except Exception as e:
         current_app.logger.warning(f"Pro nudge email failed: {e}")
+
 
 

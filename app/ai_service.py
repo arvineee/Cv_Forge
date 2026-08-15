@@ -356,6 +356,68 @@ Write in third person. Highlight expertise, achievements, and value proposition.
 Return only the bio text."""
         return self._call(prompt, "bio_generate", user_id=user_id)
 
+    def generate_nudge_email(self, user, user_id: int = None) -> dict:
+        """
+        Personalized Pro-upgrade nudge email copy, generated per user.
+        Returns {"subject": str, "body_html": str} — body_html is a handful
+        of inline-styled <p> tags only (no head/body/doctype), matching the
+        shape email_service.send_pro_nudge_email() already sends. Callers
+        MUST fall back to the static template if this raises or returns
+        something unusable — this should never be the only path to sending
+        the email.
+        """
+        first_name = (getattr(user, "first_name", None) or "there")
+        resume_count = user.resumes.count() if hasattr(user, "resumes") else 0
+        latest_ats = None
+        try:
+            latest = (
+                user.resumes
+                .filter(user.resumes.property.mapper.class_.ats_score.isnot(None))
+                .order_by(user.resumes.property.mapper.class_.updated_at.desc())
+                .first()
+            )
+            latest_ats = latest.ats_score if latest else None
+        except Exception:
+            latest_ats = None
+
+        context = f"""User's first name: {first_name}
+Number of resumes created: {resume_count}
+Most recent ATS score (if known): {latest_ats if latest_ats is not None else "unknown"}
+Current plan: free"""
+
+        prompt = f"""Write a short, friendly marketing email nudging a free-tier
+CVForge AI user to upgrade to Pro. Do not be pushy or use hype/salesy language.
+
+{self.SUPPORT_KNOWLEDGE}
+
+USER CONTEXT:
+{context}
+
+REQUIREMENTS:
+- Reference something concrete from the user context above (e.g. their resume
+  count or ATS score) if it's genuinely useful — don't force it if unknown.
+- Mention 2-3 specific Pro benefits from the product facts above, not invented ones.
+- Warm, low-pressure tone. No exclamation-point spam. No emojis.
+- Keep the body under 100 words, as 2-3 short paragraphs.
+- Do NOT include a greeting salutation line, a sign-off, an unsubscribe line,
+  or any links/URLs — those are added separately by the calling code.
+- Do NOT invent pricing, limits, or features not listed in the product facts.
+
+Return ONLY valid JSON, no markdown fences:
+{{
+  "subject": "<short subject line, under 60 characters>",
+  "body_html": "<2-3 short paragraphs as <p>...</p> tags, no other HTML>"
+}}"""
+        raw = self._call(prompt, "pro_nudge_email", user_id=user_id)
+        try:
+            data = json.loads(_clean_json_fence(raw))
+            if not data.get("subject") or not data.get("body_html"):
+                raise ValueError("missing subject/body_html")
+            return data
+        except Exception:
+            current_app.logger.warning("Nudge email JSON parse failed, falling back to static template")
+            return {}
+
     # Static knowledge grounding for the support assistant — keeps answers
     # anchored to what CVForge actually does/costs instead of the model
     # guessing or inventing features/pricing. Update this when plans,
@@ -407,5 +469,6 @@ RULES:
 
         prompt = f"{user_context}\n\nUser question: {question}"
         return self._call(prompt, "support_chat", user_id=user_id, system_instruction=system_instruction)
+
 
 
