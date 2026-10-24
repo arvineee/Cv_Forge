@@ -10,15 +10,15 @@
   <div id="edu-container" class="space-y-4">
     {% set entries = resume.education or [{}] %}
     {% for entry in entries %}
-    <div class="edu-block grid grid-cols-4 gap-3">
+    <div class="edu-block grid grid-cols-1 sm:grid-cols-4 gap-3">
       <input name="degree" placeholder="Degree / qualification" value="{{ entry.get('degree', '') }}"
-             class="rounded-lg border border-gray-200 px-3 py-2 text-sm col-span-2">
+             class="rounded-lg border border-gray-200 px-3 py-2.5 min-h-[44px] text-base sm:text-sm col-span-full sm:col-span-2">
       <input name="institution" placeholder="Institution" value="{{ entry.get('institution', '') }}"
-             class="rounded-lg border border-gray-200 px-3 py-2 text-sm col-span-1">
+             class="rounded-lg border border-gray-200 px-3 py-2.5 min-h-[44px] text-base sm:text-sm col-span-full sm:col-span-1">
       <input name="year" placeholder="Year" value="{{ entry.get('year', '') }}"
-             class="rounded-lg border border-gray-200 px-3 py-2 text-sm col-span-1">
+             class="rounded-lg border border-gray-200 px-3 py-2.5 min-h-[44px] text-base sm:text-sm col-span-full sm:col-span-1">
       <input name="grade" placeholder="Grade (optional)" value="{{ entry.get('grade', '') }}"
-             class="rounded-lg border border-gray-200 px-3 py-2 text-sm col-span-4">
+             class="rounded-lg border border-gray-200 px-3 py-2.5 min-h-[44px] text-base sm:text-sm col-span-full sm:col-span-4">
     </div>
     {% endfor %}
   </div>
@@ -29,19 +29,19 @@
 
   <div class="flex justify-between items-center pt-4">
     <a href="{{ url_for('cv.wizard_step', resume_id=resume.id, step=prev_step) }}"
-       class="px-4 py-2 rounded-lg text-gray-500 text-sm font-medium hover:bg-gray-50">← Back</a>
-    <button type="submit" class="px-5 py-2 rounded-lg gradient-brand text-white text-sm font-semibold">
+       class="px-4 py-3 sm:py-2 min-h-[44px] rounded-lg text-gray-500 text-sm font-medium hover:bg-gray-50">← Back</a>
+    <button type="submit" class="px-5 py-3 sm:py-2 min-h-[44px] rounded-lg gradient-brand text-white text-sm font-semibold">
       Continue →
     </button>
   </div>
 </form>
 
 <template id="edu-template">
-  <div class="edu-block grid grid-cols-4 gap-3">
-    <input name="degree" placeholder="Degree / qualification" class="rounded-lg border border-gray-200 px-3 py-2 text-sm col-span-2">
-    <input name="institution" placeholder="Institution" class="rounded-lg border border-gray-200 px-3 py-2 text-sm col-span-1">
-    <input name="year" placeholder="Year" class="rounded-lg border border-gray-200 px-3 py-2 text-sm col-span-1">
-    <input name="grade" placeholder="Grade (optional)" class="rounded-lg border border-gray-200 px-3 py-2 text-sm col-span-4">
+  <div class="edu-block grid grid-cols-1 sm:grid-cols-4 gap-3">
+    <input name="degree" placeholder="Degree / qualification" class="rounded-lg border border-gray-200 px-3 py-2.5 min-h-[44px] text-base sm:text-sm col-span-full sm:col-span-2">
+    <input name="institution" placeholder="Institution" class="rounded-lg border border-gray-200 px-3 py-2.5 min-h-[44px] text-base sm:text-sm col-span-full sm:col-span-1">
+    <input name="year" placeholder="Year" class="rounded-lg border border-gray-200 px-3 py-2.5 min-h-[44px] text-base sm:text-sm col-span-full sm:col-span-1">
+    <input name="grade" placeholder="Grade (optional)" class="rounded-lg border border-gray-200 px-3 py-2.5 min-h-[44px] text-base sm:text-sm col-span-full sm:col-span-4">
   </div>
 </template>
 <script>

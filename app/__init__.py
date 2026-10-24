@@ -1,6 +1,6 @@
 """
 CVForge AI - Application Factory
-Includes Flask-WTF CSRF protection, Flask-Limiter rate limiting,
+Includes Flask-WTF CSRF protection, IP-based rate limiting (see routes/auth.py),
 errorhandler for 403/404/500, and CLI commands for admin management.
 """
 import click
@@ -82,6 +82,20 @@ def create_app(config_object=None):
     # ── Visitor tracking ─────────────────────────────────────────
     from app.services.visitor_tracking import register_visitor_tracking
     register_visitor_tracking(app)
+
+    @app.after_request
+    def _security_headers(response):
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        response.headers.setdefault(
+            "Permissions-Policy", "camera=(), microphone=(), geolocation=()"
+        )
+        if app.config.get("SESSION_COOKIE_SECURE"):
+            response.headers.setdefault(
+                "Strict-Transport-Security", "max-age=31536000; includeSubDomains"
+            )
+        return response
 
     # ── Pro-upgrade nudge scheduler (optional, in-process) ─────────
     # Off by default — the admin panel's "Send reminders now" button

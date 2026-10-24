@@ -29,7 +29,7 @@
         what to fix and why, not just what's missing. 😉
       </p>
       <a href="{{ url_for('billing.plans') }}"
-         class="inline-block px-4 py-2 rounded-lg gradient-brand text-white text-xs font-semibold">
+         class="inline-block px-4 py-3 sm:py-2 min-h-[44px] rounded-lg gradient-brand text-white text-xs font-semibold">
         See Pro plans →
       </a>
     </div>
@@ -71,7 +71,7 @@
         }
       }'>
     <button @click="toggle()" :disabled="loading"
-            class="px-4 py-2 rounded-lg text-sm font-semibold transition disabled:opacity-50"
+            class="px-4 py-3 sm:py-2 min-h-[44px] rounded-lg text-sm font-semibold transition disabled:opacity-50"
             :class="isPublic ? 'border border-gray-200 text-gray-700 hover:bg-gray-50' : 'gradient-brand text-white'">
       <span x-show="!isPublic">Enable public link</span>
       <span x-show="isPublic">Disable public link</span>
@@ -91,7 +91,7 @@
     Sharing a public CV link is a paid-plan feature. 🔒
   </p>
   <a href="{{ url_for('billing.plans') }}"
-     class="inline-block px-4 py-2 rounded-lg gradient-brand text-white text-xs font-semibold">
+     class="inline-block px-4 py-3 sm:py-2 min-h-[44px] rounded-lg gradient-brand text-white text-xs font-semibold">
     Upgrade to unlock sharing →
   </a>
   {% endif %}
@@ -102,16 +102,16 @@
   {% if can_download %}
   <div class="flex gap-3">
     <a href="{{ url_for('cv.download', resume_id=resume.id, fmt='pdf') }}"
-       class="px-4 py-2 rounded-lg gradient-brand text-white text-sm font-semibold">
+       class="px-4 py-3 sm:py-2 min-h-[44px] rounded-lg gradient-brand text-white text-sm font-semibold">
       Download PDF
     </a>
     {% if allow_docx %}
     <a href="{{ url_for('cv.download', resume_id=resume.id, fmt='docx') }}"
-       class="px-4 py-2 rounded-lg border border-gray-200 text-gray-700 text-sm font-semibold hover:bg-gray-50">
+       class="px-4 py-3 sm:py-2 min-h-[44px] rounded-lg border border-gray-200 text-gray-700 text-sm font-semibold hover:bg-gray-50">
       Download DOCX
     </a>
     {% else %}
-    <span class="px-4 py-2 rounded-lg bg-gray-50 text-gray-400 text-sm font-semibold cursor-not-allowed"
+    <span class="px-4 py-3 sm:py-2 min-h-[44px] rounded-lg bg-gray-50 text-gray-400 text-sm font-semibold cursor-not-allowed"
           title="DOCX downloads are a Pro feature">
       Download DOCX 🔒
     </span>
@@ -165,7 +165,7 @@
         you're getting. Subscribe to any plan to download the clean PDF (DOCX on Pro+).
       </p>
       <a href="{{ url_for('billing.plans') }}"
-         class="inline-block px-4 py-2 rounded-lg gradient-brand text-white text-sm font-semibold">
+         class="inline-block px-4 py-3 sm:py-2 min-h-[44px] rounded-lg gradient-brand text-white text-sm font-semibold">
         Choose a plan to download →
       </a>
     </div>
@@ -175,9 +175,9 @@
 
 <div class="flex justify-between items-center">
   <a href="{{ url_for('cv.wizard_step', resume_id=resume.id, step=prev_step) }}"
-     class="px-4 py-2 rounded-lg text-gray-500 text-sm font-medium hover:bg-gray-50">← Back to edit</a>
+     class="px-4 py-3 sm:py-2 min-h-[44px] rounded-lg text-gray-500 text-sm font-medium hover:bg-gray-50">← Back to edit</a>
   <a href="{{ url_for('cv.list_cvs') }}"
-     class="px-5 py-2 rounded-lg bg-gray-900 text-white text-sm font-semibold">
+     class="px-5 py-3 sm:py-2 min-h-[44px] rounded-lg bg-gray-900 text-white text-sm font-semibold">
     Done
   </a>
 </div>

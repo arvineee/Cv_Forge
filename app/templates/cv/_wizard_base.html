@@ -12,14 +12,47 @@
 {% block content %}
 <div class="max-w-2xl">
 
-  <div class="mb-6">
-    <div class="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+  {% set step_labels = {
+      'personal_info': 'Basics', 'professional_summary': 'Summary',
+      'work_experience': 'Experience', 'education': 'Education',
+      'skills': 'Skills', 'certifications': 'Certifications', 'review': 'Review'} %}
+
+  <!-- Step navigator: completed and current steps are links; later steps are locked -->
+  <nav aria-label="Wizard progress" class="mb-6">
+    <p class="text-xs font-medium text-gray-500 mb-2 sm:hidden">
+      Step {{ step_index }} of {{ total_steps }}: <span class="text-gray-900">{{ step_labels.get(step, '') }}</span>
+    </p>
+    <div class="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden mb-3">
       <div class="h-full gradient-brand rounded-full transition-all"
            style="width: {{ ((step_index / total_steps) * 100) | round | int }}%"></div>
     </div>
-  </div>
+    <ol class="flex gap-2 overflow-x-auto snap-x pb-1 -mx-4 px-4 sm:mx-0 sm:px-0 sm:flex-wrap">
+      {% for s in steps %}
+        {% set i = loop.index %}
+        {% set is_current = (s == step) %}
+        {% set reachable = i <= step_index %}
+        <li class="shrink-0 snap-start">
+          {% if reachable %}
+          <a href="{{ url_for('cv.wizard_step', resume_id=resume.id, step=s) }}"
+             {% if is_current %}aria-current="step"{% endif %}
+             class="inline-flex items-center gap-2 min-h-[40px] px-3 rounded-full text-sm font-medium border transition
+             {% if is_current %}bg-blue-600 text-white border-blue-600
+             {% else %}bg-white text-gray-700 border-gray-200 hover:border-blue-300{% endif %}">
+            <span class="text-xs {% if is_current %}opacity-80{% else %}text-gray-400{% endif %}">{{ i }}</span>
+            {{ step_labels.get(s, s) }}
+          </a>
+          {% else %}
+          <span class="inline-flex items-center gap-2 min-h-[40px] px-3 rounded-full text-sm text-gray-400 border border-dashed border-gray-200"
+                aria-disabled="true">
+            <span class="text-xs">{{ i }}</span>{{ step_labels.get(s, s) }}
+          </span>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ol>
+  </nav>
 
-  <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+  <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-4 sm:p-6">
     {% block wizard_content %}{% endblock %}
   </div>
 

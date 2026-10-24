@@ -25,6 +25,8 @@ from flask import (Blueprint, render_template, request, jsonify, current_app,
                    flash, redirect, url_for, after_this_request)
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
+from app.services.upload_validation import validate_upload, UploadRejected
+from app.services.storage import resolve_upload_folder
 from app.models import db, Resume, ATSReport, JobMatch, AIUsage, ActivityLog
 from app.ai_service import get_ai_service
 
@@ -202,13 +204,16 @@ def check_upload():
 
     filename = secure_filename(file.filename)
     ext = filename.rsplit(".", 1)[1].lower()
+    try:
+        validate_upload(file, ext)
+    except UploadRejected as e:
+        if request.is_json:
+            return jsonify({"error": str(e)}), 400
+        flash(str(e), "error")
+        return redirect(url_for("ats.index"))
     safe_name = f"ats_{secrets.token_hex(8)}_{filename}"
 
-    upload_folder = current_app.config["UPLOAD_FOLDER"]
-    if not os.path.isabs(upload_folder):
-        upload_folder = os.path.join(current_app.root_path, "..", upload_folder)
-    upload_folder = os.path.abspath(upload_folder)
-    os.makedirs(upload_folder, exist_ok=True)
+    upload_folder = resolve_upload_folder()
 
     upload_path = os.path.join(upload_folder, safe_name)
     file.save(upload_path)

@@ -13,18 +13,18 @@
 <form method="POST" action="{{ url_for('cv.wizard_step_save', resume_id=resume.id, step=step) }}" class="space-y-4">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <textarea name="content" rows="4" placeholder="e.g. PMP, Google Analytics Certified"
-            class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">{{ draft or ((resume.certifications | join('\n')) if resume.certifications else '') }}</textarea>
+            class="w-full rounded-lg border border-gray-200 px-3 py-2.5 min-h-[44px] text-base sm:text-sm">{{ draft or ((resume.certifications | join('\n')) if resume.certifications else '') }}</textarea>
 
   <div class="flex justify-between items-center pt-2">
     <button type="submit" name="action" value="enhance" formnovalidate
-            class="px-4 py-2 rounded-lg border border-indigo-200 text-indigo-700 text-sm font-semibold hover:bg-indigo-50">
+            class="px-4 py-3 sm:py-2 min-h-[44px] rounded-lg border border-indigo-200 text-indigo-700 text-sm font-semibold hover:bg-indigo-50">
       ✨ Suggest certifications with AI
     </button>
     <div class="flex gap-2">
       <a href="{{ url_for('cv.wizard_step', resume_id=resume.id, step=prev_step) }}"
-         class="px-4 py-2 rounded-lg text-gray-500 text-sm font-medium hover:bg-gray-50">← Back</a>
+         class="px-4 py-3 sm:py-2 min-h-[44px] rounded-lg text-gray-500 text-sm font-medium hover:bg-gray-50">← Back</a>
       <button type="submit" name="action" value="next"
-              class="px-5 py-2 rounded-lg gradient-brand text-white text-sm font-semibold">
+              class="px-5 py-3 sm:py-2 min-h-[44px] rounded-lg gradient-brand text-white text-sm font-semibold">
         Review & finish →
       </button>
     </div>

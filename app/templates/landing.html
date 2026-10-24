@@ -38,32 +38,58 @@
 <div class="cv-page">
 
 <!-- NAV -->
-<nav class="sticky top-0 z-50 bg-[var(--paper)]/95 backdrop-blur-sm border-b border-rule">
-  <div class="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
-    <a href="{{ url_for('main.index') }}" class="flex items-center gap-2 font-display font-semibold text-xl">
+<nav class="sticky top-0 z-50 bg-[var(--paper)]/95 backdrop-blur-sm border-b border-rule"
+     x-data="{ open: false }" @keydown.escape.window="open = false" @click.outside="open = false">
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
+    <a href="{{ url_for('main.index') }}" class="flex items-center gap-2 font-display font-semibold text-xl min-h-[44px]">
       <span class="w-7 h-7 border-2 border-[var(--ink)] flex items-center justify-center font-mono text-[10px] font-semibold">CV</span>
       CVForge
     </a>
+
+    <!-- Desktop links -->
     <div class="hidden md:flex items-center gap-8 text-sm font-mono text-ink-soft">
       <a href="{{ url_for('main.pricing') }}" class="hover:text-[var(--ink)] transition">Pricing</a>
       <a href="{{ url_for('templates_gallery.index') }}" class="hover:text-[var(--ink)] transition">Templates</a>
       <a href="{{ url_for('main.about') }}" class="hover:text-[var(--ink)] transition">About</a>
     </div>
-    <div class="flex items-center gap-4">
+
+    <div class="flex items-center gap-3 sm:gap-4">
       {% if current_user.is_authenticated %}
       <a href="{{ url_for('dashboard.index') }}"
-         class="px-4 py-2 bg-stamp text-white text-sm font-semibold rounded-sm hover:opacity-90 transition">
+         class="px-4 py-2.5 bg-stamp text-white text-sm font-semibold rounded-sm hover:opacity-90 transition min-h-[44px] inline-flex items-center">
         Dashboard
       </a>
       {% else %}
       <a href="{{ url_for('auth.login') }}"
-         class="text-sm font-medium text-ink-soft hover:text-[var(--ink)] transition hidden sm:inline">Sign in</a>
+         class="text-sm font-medium text-ink-soft hover:text-[var(--ink)] transition hidden sm:inline-flex items-center min-h-[44px] px-2">Sign in</a>
       <a href="{{ url_for('auth.register') }}"
-         class="px-4 py-2 bg-stamp text-white text-sm font-semibold rounded-sm hover:opacity-90 transition">
+         class="px-4 py-2.5 bg-stamp text-white text-sm font-semibold rounded-sm hover:opacity-90 transition min-h-[44px] inline-flex items-center">
         Get started
       </a>
       {% endif %}
+
+      <!-- Mobile menu button -->
+      <button type="button" class="md:hidden min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-ink-soft"
+              @click="open = !open" :aria-expanded="open.toString()" aria-controls="mobile-menu" aria-label="Toggle menu">
+        <svg x-show="!open" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
+        <svg x-show="open" x-cloak class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
     </div>
+  </div>
+
+  <!-- Mobile menu panel -->
+  <div id="mobile-menu" x-show="open" x-cloak
+       x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 -translate-y-2"
+       x-transition:enter-end="opacity-100 translate-y-0"
+       class="md:hidden border-t border-rule bg-[var(--paper)] px-4 py-3">
+    <ul class="flex flex-col font-mono text-sm text-ink-soft">
+      <li><a href="{{ url_for('main.pricing') }}" class="flex items-center min-h-[48px] border-b border-rule">Pricing</a></li>
+      <li><a href="{{ url_for('templates_gallery.index') }}" class="flex items-center min-h-[48px] border-b border-rule">Templates</a></li>
+      <li><a href="{{ url_for('main.about') }}" class="flex items-center min-h-[48px] border-b border-rule">About</a></li>
+      {% if not current_user.is_authenticated %}
+      <li><a href="{{ url_for('auth.login') }}" class="flex items-center min-h-[48px]">Sign in</a></li>
+      {% endif %}
+    </ul>
   </div>
 </nav>
 

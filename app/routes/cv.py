@@ -29,9 +29,12 @@ from flask import (Blueprint, render_template, redirect, url_for, flash,
                    request, jsonify, current_app, send_file, abort, after_this_request)
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
+from app.services.upload_validation import validate_upload, UploadRejected
+from app.services.cv_diff import diff_snapshots
+from app.services.storage import resolve_upload_folder
 
 from app.models import db, Resume, ResumeVersion, Template, ActivityLog, AIUsage, PricingPlan
-from app.ai_service import get_ai_service
+from app.ai_service import get_ai_service, RevampError
 
 cv_bp = Blueprint("cv", __name__)
 
@@ -546,14 +549,15 @@ def upload():
 
         filename = secure_filename(file.filename)
         ext = filename.rsplit(".", 1)[1].lower()
+        try:
+            validate_upload(file, ext)
+        except UploadRejected as e:
+            flash(str(e), "error")
+            return redirect(request.url)
         safe_name = f"{secrets.token_hex(8)}_{filename}"
 
         # Resolve upload folder to absolute path so it works on PythonAnywhere
-        upload_folder = current_app.config["UPLOAD_FOLDER"]
-        if not os.path.isabs(upload_folder):
-            upload_folder = os.path.join(current_app.root_path, "..", upload_folder)
-        upload_folder = os.path.abspath(upload_folder)
-        os.makedirs(upload_folder, exist_ok=True)
+        upload_folder = resolve_upload_folder()
 
         upload_path = os.path.join(upload_folder, safe_name)
         file.save(upload_path)
@@ -712,7 +716,13 @@ def revamp(resume_id):
             db.session.commit()
             flash("Resume revamped successfully! Compare versions below.", "success")
             return redirect(url_for("cv.compare_versions", resume_id=resume_id))
+        except RevampError as e:
+            db.session.rollback()
+            current_app.logger.warning(f"Revamp rejected: {e}")
+            flash("The AI could not produce a reliable revamp for this CV. "
+                  "Your CV has not been changed. Please try again in a moment.", "error")
         except Exception as e:
+            db.session.rollback()
             current_app.logger.error(f"Revamp error: {e}")
             flash("AI revamp failed. Please try again.", "error")
 
@@ -724,7 +734,16 @@ def revamp(resume_id):
 def compare_versions(resume_id):
     resume = Resume.query.filter_by(id=resume_id, user_id=current_user.id).first_or_404()
     versions = resume.versions.order_by(ResumeVersion.version_number.desc()).all()
-    return render_template("cv/versions.html", resume=resume, versions=versions)
+
+    # Each version is compared with the one immediately before it, so the page
+    # can show exactly what a revamp (or a restore) changed.
+    by_number = {v.version_number: v for v in versions}
+    diffs = {}
+    for v in versions:
+        prev = by_number.get(v.version_number - 1)
+        if prev is not None:
+            diffs[v.id] = diff_snapshots(prev.snapshot or {}, v.snapshot or {})
+    return render_template("cv/versions.html", resume=resume, versions=versions, diffs=diffs)
 
 
 @cv_bp.route("/<int:resume_id>/versions/<int:version_id>/restore", methods=["POST"])
