@@ -28,6 +28,14 @@ REGISTERED_GRACE_DAYS = 3
 # user base at once.
 MAX_NUDGES = 200
 
+# In-app notification copy. Kept as constants so the wording is easy to
+# review and change without touching the sending logic.
+NUDGE_TITLE = "Get more from CVForge with Pro"
+NUDGE_MESSAGE = (
+    "Pro gives you unlimited AI generations, DOCX downloads and version "
+    "history for every CV you create. Pay with M-Pesa. Each subscription lasts 30 days and does not renew automatically."
+)
+
 
 def get_nudge_candidates():
     """Free-tier users eligible for a Pro-upgrade reminder right now:
@@ -81,9 +89,8 @@ def send_pro_upgrade_nudges() -> dict:
 
         db.session.add(Notification(
             user_id=user.id,
-            title="Unlock unlimited CVs with Pro",
-            message=("Upgrade to Pro for unlimited AI generations, DOCX "
-                      "downloads, and version history."),
+            title=NUDGE_TITLE,
+            message=NUDGE_MESSAGE,
             type="upgrade",
             action_url="/billing/plans",
         ))
@@ -92,4 +99,3 @@ def send_pro_upgrade_nudges() -> dict:
 
     db.session.commit()
     return {"sent": sent, "failed": failed}
-

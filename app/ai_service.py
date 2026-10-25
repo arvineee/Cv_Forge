@@ -460,37 +460,73 @@ Write in third person. Highlight expertise, achievements, and value proposition.
 Return only the bio text."""
         return self._call(prompt, "bio_generate", user_id=user_id)
 
+    NUDGE_SYSTEM = (
+        "You write concise, courteous, professional customer emails in plain English. "
+        "You never use hype, urgency, flattery, emojis or exclamation marks. "
+        "You respond with a single valid JSON object and nothing else."
+    )
+
+    @staticmethod
+    def _nudge_resume_count(user):
+        """How many CVs the user has created, or None if it can't be read.
+        Works for both lazy='dynamic' relationships (a query) and plain
+        lists, and never raises."""
+        try:
+            resumes = user.resumes
+            if isinstance(resumes, (list, tuple)):
+                return len(resumes)
+            return resumes.count()
+        except Exception:
+            return None
+
+    @staticmethod
+    def _clean_nudge(data) -> dict:
+        """Validate the model's JSON and return {"subject", "paragraphs"}.
+        Paragraphs are plain text only: any markup the model adds is stripped,
+        and the email template does the escaping and styling."""
+        import re
+        if not isinstance(data, dict):
+            raise ValueError("model did not return a JSON object")
+        subject = " ".join(str(data.get("subject") or "").split()).replace("!", "")[:70].strip()
+        raw = data.get("paragraphs")
+        if isinstance(raw, str):
+            raw = [raw]
+        if not isinstance(raw, list):
+            raise ValueError("paragraphs missing")
+        paragraphs = []
+        for p in raw[:3]:
+            text = " ".join(re.sub(r"<[^>]+>", "", str(p)).split()).replace("!", ".")
+            if text and "http" not in text.lower() and len(text) <= 500:
+                paragraphs.append(text)
+        if not subject or not paragraphs:
+            raise ValueError("empty subject or paragraphs")
+        return {"subject": subject, "paragraphs": paragraphs}
+
     def generate_nudge_email(self, user, user_id: int = None) -> dict:
         """
-        Personalized Pro-upgrade nudge email copy, generated per user.
-        Returns {"subject": str, "body_html": str} — body_html is a handful
-        of inline-styled <p> tags only (no head/body/doctype), matching the
-        shape email_service.send_pro_nudge_email() already sends. Callers
-        MUST fall back to the static template if this raises or returns
-        something unusable — this should never be the only path to sending
-        the email.
+        Personalised copy for the Pro-upgrade nudge email.
+        Returns {"subject": str, "paragraphs": [str, ...]} (plain text), or {}
+        if nothing usable was produced. The caller (email_service) then falls
+        back to its static copy, so this is never the only path to a send.
+
+        Asks Gemini for JSON in a response_mime_type=application/json call, so
+        the output is always parseable. (The earlier version asked for HTML
+        inside a JSON string; the model's quote characters in HTML attributes
+        broke the JSON and silently triggered the static fallback.)
         """
-        first_name = (getattr(user, "first_name", None) or "there")
-        resume_count = user.resumes.count() if hasattr(user, "resumes") else 0
-        latest_ats = None
-        try:
-            latest = (
-                user.resumes
-                .filter(user.resumes.property.mapper.class_.ats_score.isnot(None))
-                .order_by(user.resumes.property.mapper.class_.updated_at.desc())
-                .first()
-            )
-            latest_ats = latest.ats_score if latest else None
-        except Exception:
-            latest_ats = None
+        count = self._nudge_resume_count(user)
+        if count is None:
+            context = "Number of CVs the user has created: unknown (do not mention it)"
+        elif count == 0:
+            context = "Number of CVs the user has created: 0 (they have not started one yet)"
+        else:
+            context = f"Number of CVs the user has created: {count}"
 
-        context = f"""User's first name: {first_name}
-Number of resumes created: {resume_count}
-Most recent ATS score (if known): {latest_ats if latest_ats is not None else "unknown"}
-Current plan: free"""
-
-        prompt = f"""Write a short, friendly marketing email nudging a free-tier
-CVForge AI user to upgrade to Pro. Do not be pushy or use hype/salesy language.
+        prompt = f"""Write the personal part of a short, professional email from CVForge AI
+to a user on the free plan. The email already contains, added separately by
+our system: a greeting, a list of everything Pro includes, an upgrade button
+and the price. You write only the short text between the greeting and that list,
+plus the subject line.
 
 {self.SUPPORT_KNOWLEDGE}
 
@@ -498,29 +534,35 @@ USER CONTEXT:
 {context}
 
 REQUIREMENTS:
-- Reference something concrete from the user context above (e.g. their resume
-  count or ATS score) if it's genuinely useful — don't force it if unknown.
-- Mention 2-3 specific Pro benefits from the product facts above, not invented ones.
-- Warm, low-pressure tone. No exclamation-point spam. No emojis.
-- Keep the body under 100 words, as 2-3 short paragraphs.
-- Do NOT include a greeting salutation line, a sign-off, an unsubscribe line,
-  or any links/URLs — those are added separately by the calling code.
-- Do NOT invent pricing, limits, or features not listed in the product facts.
+- Two short paragraphs, 70 words at most in total, plain text only.
+- Paragraph 1: acknowledge where the user is (for example that they have
+  already created CVs, or that they are getting started) and name one
+  real frustration job seekers have that Pro addresses.
+- Paragraph 2: explain in one idea how Pro helps them apply with more
+  confidence, naming at most two Pro benefits from the product facts.
+  Do not write a list.
+- Respectful, low-pressure, warm but not casual. No hype, no urgency or
+  scarcity ("limited time", "don't miss out"), no flattery, no emojis,
+  no exclamation marks.
+- Never mention an ATS score or imply the user's CV is weak.
+- Do NOT include a greeting, sign-off, links, prices or an unsubscribe line.
+- Do NOT invent prices, limits, statistics or features not in the product facts.
+- Subject line: sentence case, specific and calm, under 55 characters,
+  no emojis, no exclamation marks, no clickbait.
 
-Return ONLY valid JSON, no markdown fences:
-{{
-  "subject": "<short subject line, under 60 characters>",
-  "body_html": "<2-3 short paragraphs as <p>...</p> tags, no other HTML>"
-}}"""
-        raw = self._call(prompt, "pro_nudge_email", user_id=user_id)
-        try:
-            data = json.loads(_clean_json_fence(raw))
-            if not data.get("subject") or not data.get("body_html"):
-                raise ValueError("missing subject/body_html")
-            return data
-        except Exception:
-            current_app.logger.warning("Nudge email JSON parse failed, falling back to static template")
-            return {}
+Return JSON with exactly these keys:
+{{"subject": "<subject line>", "paragraphs": ["<paragraph 1>", "<paragraph 2>"]}}"""
+
+        for attempt in (1, 2):
+            try:
+                data = self._call_json(prompt, "pro_nudge_email", user_id,
+                                       self.NUDGE_SYSTEM, attempt)
+                return self._clean_nudge(data)
+            except Exception as e:
+                current_app.logger.warning(
+                    f"Nudge copy attempt {attempt} failed: {type(e).__name__}: {e}"
+                )
+        return {}
 
     # Static knowledge grounding for the support assistant — keeps answers
     # anchored to what CVForge actually does/costs instead of the model
