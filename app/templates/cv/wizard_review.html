@@ -1,7 +1,122 @@
 {% extends "cv/_wizard_base.html" %}
 {% block wizard_content %}
+{% if not can_download %}
+{# ================= Unpaid: professional preview + unlock pitch ================= #}
+{% set pi = resume.personal_info or {} %}
+{% set first_name = (pi.get('full_name') or '').split(' ')[0] %}
+{% set roles = (resume.work_experience or [])|length %}
+{% set skill_count = (resume.skills or [])|length %}
+{% set preview_v = (resume.updated_at.timestamp()|int) if resume.updated_at else 0 %}
+{% set paid_href = url_for('billing.plans') %}
+
+<div class="mb-6 rounded-2xl border border-blue-100 bg-gradient-to-b from-blue-50/70 to-white p-4 sm:p-6"
+     x-data="{ loaded: false, failed: false }">
+  <p class="inline-flex items-center gap-1.5 text-xs font-semibold text-green-700 bg-green-50 border border-green-100 rounded-full px-2.5 py-1 mb-3">
+    ✓ Your CV is built
+  </p>
+  <h2 class="text-xl sm:text-2xl font-bold text-gray-900 leading-tight">
+    {% if first_name %}{{ first_name }}, your{% else %}Your{% endif %} CV is ready to download
+  </h2>
+  <p class="text-sm text-gray-500 mt-1 mb-5">
+    {% if roles %}{{ roles }} role{{ 's' if roles != 1 }}{% endif %}{% if roles and skill_count %} · {% endif %}{% if skill_count %}{{ skill_count }} skill{{ 's' if skill_count != 1 }}{% endif %}{% if resume.ats_score is not none %}{% if roles or skill_count %} · {% endif %}ATS score {{ resume.ats_score }}/100{% endif %}
+    {% if roles or skill_count or resume.ats_score is not none %}— {% endif %}here's exactly how it looks.
+  </p>
+
+  <div class="grid md:grid-cols-5 gap-6 items-start">
+
+    {# ---- Preview (real render, blur + watermark baked into the image) ---- #}
+    <div class="md:col-span-3">
+      <div x-show="!failed">
+        <div class="relative mx-auto max-w-[380px] rounded-lg bg-white shadow-xl ring-1 ring-gray-200 overflow-hidden select-none"
+             style="aspect-ratio: 210 / 297;"
+             oncontextmenu="return false">
+          <div x-show="!loaded" class="absolute inset-0 animate-pulse bg-gray-100"></div>
+          <img x-ref="pv"
+               x-init="if ($refs.pv.complete && $refs.pv.naturalWidth) loaded = true"
+               src="{{ url_for('cv.preview_image', resume_id=resume.id, v=preview_v) }}"
+               alt="Preview of your CV"
+               draggable="false"
+               @load="loaded = true" @error="failed = true"
+               class="absolute inset-0 w-full h-full object-cover transition-opacity duration-300 pointer-events-none"
+               :class="loaded ? 'opacity-100' : 'opacity-0'">
+          <span class="absolute top-2 left-2 text-[10px] font-bold tracking-wider uppercase bg-gray-900/80 text-white rounded px-2 py-0.5">
+            Preview
+          </span>
+          {# Unlock card sits over the blurred lower half #}
+          <div class="absolute inset-x-0 bottom-0 pt-20 pb-4 px-4 text-center bg-gradient-to-t from-white via-white/95 to-transparent">
+            <p class="text-sm font-semibold text-gray-900">🔒 Unlock your full CV</p>
+            <p class="text-xs text-gray-500 mb-3">Clean version, no watermark</p>
+            <a href="{{ paid_href }}"
+               class="inline-block px-5 py-3 sm:py-2.5 min-h-[44px] rounded-lg gradient-brand text-white text-sm font-semibold shadow-md">
+              Unlock &amp; download →
+            </a>
+          </div>
+        </div>
+        <p class="text-[11px] text-gray-400 text-center mt-2">
+          Contact details and lower sections are hidden in the preview.
+        </p>
+      </div>
+
+      {# ---- Fallback if the preview image can't be rendered ---- #}
+      <div x-show="failed" x-cloak
+           class="relative overflow-hidden rounded-lg border border-gray-200 bg-white p-4 text-xs leading-snug select-none w-full max-w-[380px] mx-auto"
+           style="min-height: 200px;">
+        <div class="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden">
+          <span class="text-gray-100 text-2xl font-black uppercase tracking-widest -rotate-45 whitespace-nowrap">
+            PREVIEW · PREVIEW · PREVIEW
+          </span>
+        </div>
+        <div class="relative">
+          <p class="font-bold text-gray-900">{{ pi.get('full_name', 'Your Name') }}</p>
+          {% if pi.get('job_title') %}<p class="text-gray-500 mb-2">{{ pi.get('job_title') }}</p>{% endif %}
+          {% if resume.professional_summary %}
+          <p class="text-gray-600 mb-2">
+            {{ resume.professional_summary[:110] }}{% if resume.professional_summary|length > 110 %}…{% endif %}
+          </p>
+          {% endif %}
+          <div class="filter blur-[3px] select-none mt-2">
+            {% for job in (resume.work_experience or [])[:2] %}
+            <p class="font-semibold text-gray-700">{{ job.get('job_title', '') }} — {{ job.get('company', '') }}</p>
+            <ul class="list-disc list-inside text-gray-500 mb-1">
+              {% for achievement in (job.get('achievements') or [])[:2] %}<li>{{ achievement }}</li>{% endfor %}
+            </ul>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {# ---- What you get + CTA ---- #}
+    <div class="md:col-span-2">
+      <p class="text-sm font-semibold text-gray-900 mb-3">Unlock it and you get:</p>
+      <ul class="space-y-2.5 text-sm text-gray-700 mb-5">
+        <li class="flex gap-2"><span class="text-green-600 font-bold">✓</span> Clean, print-ready PDF — no watermark, nothing hidden</li>
+        <li class="flex gap-2"><span class="text-green-600 font-bold">✓</span> Instant download, right after payment</li>
+        <li class="flex gap-2"><span class="text-green-600 font-bold">✓</span> Edit anytime and re-download while your plan is active</li>
+        <li class="flex gap-2"><span class="text-green-600 font-bold">✓</span> Shareable link to drop into WhatsApp or applications</li>
+        <li class="flex gap-2"><span class="text-indigo-500 font-bold">★</span> Word (DOCX) and AI Coach on Pro plans</li>
+      </ul>
+
+      {% if lowest_plan %}
+      <p class="text-xs text-gray-500">Plans from</p>
+      <p class="text-3xl font-extrabold text-gray-900 leading-none mb-1">
+        KES {{ lowest_plan.price_kes }}<span class="text-sm font-medium text-gray-500"> / {{ lowest_plan.billing_period }}</span>
+      </p>
+      {% endif %}
+      <p class="text-xs text-gray-500 mb-4">Pay with M-Pesa or card · takes about a minute</p>
+
+      <a href="{{ paid_href }}"
+         class="block text-center px-5 py-3 min-h-[48px] rounded-lg gradient-brand text-white text-sm font-semibold shadow-md">
+        Choose a plan &amp; download →
+      </a>
+      <p class="text-[11px] text-gray-400 text-center mt-2">🔒 Secure payment via IntaSend</p>
+    </div>
+  </div>
+</div>
+{% else %}
 <h2 class="text-lg font-semibold text-gray-900 mb-1">Your CV is ready</h2>
 <p class="text-sm text-gray-500 mb-6">Review the feedback below, then download.</p>
+{% endif %}
 
 {% if allow_coach %}
   {# ---- Pro+ AI Coach: directive, whole-resume critique ---- #}
@@ -97,9 +212,9 @@
   {% endif %}
 </div>
 
+{% if can_download %}
 <div class="border border-gray-100 rounded-lg p-4 mb-6">
   <p class="text-sm font-semibold text-gray-900 mb-3">Download</p>
-  {% if can_download %}
   <div class="flex gap-3">
     <a href="{{ url_for('cv.download', resume_id=resume.id, fmt='pdf') }}"
        class="px-4 py-3 sm:py-2 min-h-[44px] rounded-lg gradient-brand text-white text-sm font-semibold">
@@ -122,56 +237,8 @@
     <a href="{{ url_for('billing.plans') }}" class="text-indigo-600 font-medium">upgrade to unlock it</a>.</p>
   {% endif %}
 
-  {% else %}
-  {# ---- Not paid yet: watermarked preview alongside the paywall CTA,
-       so they can see exactly what they're paying for before they pay. ---- #}
-  <div class="flex flex-col md:flex-row gap-4 items-start">
-
-    <div class="relative overflow-hidden rounded-lg border border-gray-200 bg-white p-4 text-xs leading-snug select-none w-full md:w-56 flex-shrink-0"
-         style="min-height: 200px;">
-      <div class="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden">
-        <span class="text-gray-100 text-2xl font-black uppercase tracking-widest -rotate-45 whitespace-nowrap">
-          SAMPLE · SAMPLE · SAMPLE
-        </span>
-      </div>
-      <div class="relative">
-        <p class="font-bold text-gray-900">
-          {{ (resume.personal_info or {}).get('full_name', 'Your Name') }}
-        </p>
-        {% set job_title = (resume.personal_info or {}).get('job_title', '') %}
-        {% if job_title %}<p class="text-gray-500 mb-2">{{ job_title }}</p>{% endif %}
-        {% if resume.professional_summary %}
-        <p class="text-gray-600 mb-2">
-          {{ resume.professional_summary[:110] }}{% if resume.professional_summary|length > 110 %}…{% endif %}
-        </p>
-        {% endif %}
-        <div class="filter blur-[3px] select-none mt-2">
-          {% for job in (resume.work_experience or [])[:2] %}
-          <p class="font-semibold text-gray-700">{{ job.get('job_title', '') }} — {{ job.get('company', '') }}</p>
-          <ul class="list-disc list-inside text-gray-500 mb-1">
-            {% for achievement in (job.get('achievements') or [])[:2] %}
-            <li>{{ achievement }}</li>
-            {% endfor %}
-          </ul>
-          {% endfor %}
-        </div>
-      </div>
-    </div>
-
-    <div class="flex-1">
-      <p class="text-sm font-semibold text-gray-900 mb-1">Your CV is ready — unlock it to download 🔒</p>
-      <p class="text-xs text-gray-500 mb-3">
-        That's a watermarked sample of your actual CV on the left, so you know exactly what
-        you're getting. Subscribe to any plan to download the clean PDF (DOCX on Pro+).
-      </p>
-      <a href="{{ url_for('billing.plans') }}"
-         class="inline-block px-4 py-3 sm:py-2 min-h-[44px] rounded-lg gradient-brand text-white text-sm font-semibold">
-        Choose a plan to download →
-      </a>
-    </div>
-  </div>
-  {% endif %}
 </div>
+{% endif %}
 
 <div class="flex justify-between items-center">
   <a href="{{ url_for('cv.wizard_step', resume_id=resume.id, step=prev_step) }}"

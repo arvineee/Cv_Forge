@@ -22,6 +22,7 @@ Fixes applied in this pass:
   service calls so the AIUsage cache (previously always-dead) actually
   activates for repeat requests.
 """
+import io
 import os
 import secrets
 from datetime import datetime, timezone
@@ -399,11 +400,19 @@ def wizard_step(resume_id, step):
             else:
                 coach_error = err
 
+        # Cheapest paid plan, so the unpaid preview can show a real
+        # "from KES X" price instead of a vague "choose a plan".
+        lowest_plan = None
+        if not can_download:
+            lowest_plan = (PricingPlan.query
+                           .filter(PricingPlan.is_active.is_(True), PricingPlan.price_kes > 0)
+                           .order_by(PricingPlan.price_kes).first())
+
         context.update(
             allow_docx=allow_docx, allow_coach=allow_coach,
             allow_public_link=allow_public_link, can_download=can_download,
             coach_feedback=coach_feedback, coach_error=coach_error,
-            gaps=gaps,
+            gaps=gaps, lowest_plan=lowest_plan,
         )
 
     return render_template(f"cv/wizard_{step}.html", **context)
@@ -776,6 +785,25 @@ def restore_version(resume_id, version_id):
     db.session.commit()
     flash(f"Restored to version {version.version_number}.", "success")
     return redirect(url_for("cv.compare_versions", resume_id=resume_id))
+
+
+@cv_bp.route("/<int:resume_id>/preview.jpg")
+@login_required
+def preview_image(resume_id):
+    """Pay-to-download teaser: the user's real CV with contact details masked,
+    everything below the header blurred, and a watermark — all baked into the
+    pixels (see app/services/cv_preview.py). Owner-only."""
+    resume = Resume.query.filter_by(id=resume_id, user_id=current_user.id).first_or_404()
+    try:
+        from app.services.cv_preview import build_preview
+        data = build_preview(resume)
+    except Exception as e:
+        current_app.logger.error(f"Preview render error (resume {resume_id}): {e}")
+        abort(503)
+    resp = send_file(io.BytesIO(data), mimetype="image/jpeg")
+    # The template adds ?v=<updated_at>, so a short private cache is safe.
+    resp.headers["Cache-Control"] = "private, max-age=300"
+    return resp
 
 
 @cv_bp.route("/<int:resume_id>/download/<fmt>")
