@@ -4,72 +4,116 @@
 
 {% block body %}
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,500&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=DM+Sans:wght@400;500;600;700&display=swap');
 
-  .cv-page {
-    --paper: #F6F3EC;
-    --card: #FFFFFF;
-    --ink: #1C1B19;
-    --ink-soft: #6B6558;
-    --stamp: #1F6F4A;
-    --stamp-soft: #E4EEE7;
-    --rule: #DEDACD;
-    background-color: var(--paper);
+  .lp {
+    --ink: #0E1A2B;
+    --ink-2: #4B5A6E;
+    --paper: #FFFFFF;
+    --mist: #EEF3F8;
+    --line: #D9E2EC;
+    --green: #0B8F5B;
+    --green-deep: #06613E;
+    --mark: #FFD94A;
+    --coral: #E4572E;
+    font-family: 'DM Sans', system-ui, sans-serif;
     color: var(--ink);
-    font-family: 'IBM Plex Sans', sans-serif;
+    background: var(--paper);
+    -webkit-font-smoothing: antialiased;
   }
-  .cv-page .font-display { font-family: 'Fraunces', serif; }
-  .cv-page .font-mono { font-family: 'IBM Plex Mono', monospace; letter-spacing: 0.04em; }
-  .cv-page .text-stamp { color: var(--stamp); }
-  .cv-page .bg-stamp { background-color: var(--stamp); }
-  .cv-page .bg-stamp-soft { background-color: var(--stamp-soft); }
-  .cv-page .text-ink-soft { color: var(--ink-soft); }
-  .cv-page .border-rule { border-color: var(--rule); }
-  .cv-page .bg-card { background-color: var(--card); }
-  .cv-page .stamp-badge {
-    border: 2px solid var(--stamp);
-    color: var(--stamp);
-    font-family: 'IBM Plex Mono', monospace;
-    transform: rotate(-7deg);
+  .lp h1, .lp h2, .lp h3, .lp .display { font-family: 'Bricolage Grotesque', 'DM Sans', sans-serif; letter-spacing: -0.02em; }
+  .lp a:focus-visible, .lp button:focus-visible, .lp summary:focus-visible {
+    outline: 3px solid var(--green); outline-offset: 3px; border-radius: 6px;
   }
-  .cv-page .doc-shadow { box-shadow: 7px 7px 0 0 rgba(28,27,25,0.07); }
+  .lp .wrap { max-width: 1160px; margin: 0 auto; padding: 0 20px; }
+  @media (min-width: 640px) { .lp .wrap { padding: 0 32px; } }
+
+  /* Buttons */
+  .lp .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    min-height: 48px; padding: 0 24px; border-radius: 999px;
+    font-weight: 600; font-size: 16px; transition: transform .15s, background-color .15s, color .15s;
+    text-decoration: none; cursor: pointer; border: 2px solid transparent;
+  }
+  .lp .btn-primary { background: var(--green); color: #fff; }
+  .lp .btn-primary:hover { background: var(--green-deep); transform: translateY(-1px); }
+  .lp .btn-ghost { border-color: var(--ink); color: var(--ink); background: transparent; }
+  .lp .btn-ghost:hover { background: var(--ink); color: #fff; }
+  .lp .btn-light { background: #fff; color: var(--ink); }
+  .lp .btn-light:hover { background: var(--mark); }
+
+  /* Highlighter mark — used for the words the AI changed */
+  .lp mark { background: linear-gradient(transparent 12%, var(--mark) 12%, var(--mark) 92%, transparent 92%); color: inherit; padding: 0 2px; }
+
+  /* Hero CV sheet */
+  .lp .sheet {
+    background: #fff; border: 1.5px solid var(--ink); border-radius: 14px;
+    box-shadow: 10px 10px 0 var(--ink);
+  }
+  .lp .toggle {
+    display: inline-flex; padding: 4px; border-radius: 999px; background: var(--mist); border: 1px solid var(--line);
+  }
+  .lp .toggle button {
+    min-height: 40px; padding: 0 16px; border-radius: 999px; font-size: 14px; font-weight: 600; color: var(--ink-2);
+    transition: background-color .2s, color .2s;
+  }
+  .lp .toggle button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+
+  /* Score ring */
+  .lp .ring { --p: 86; width: 132px; height: 132px; border-radius: 50%;
+    background: conic-gradient(var(--green) calc(var(--p) * 1%), var(--line) 0);
+    display: grid; place-items: center; }
+  .lp .ring::after { content: attr(data-label); width: 100px; height: 100px; border-radius: 50%; background: #fff;
+    display: grid; place-items: center; font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: 34px; }
+
+  .lp .chip { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 12px; border-radius: 999px; font-size: 14px; font-weight: 500; }
+  .lp .chip-ok { background: #DDF4E8; color: var(--green-deep); }
+  .lp .chip-miss { background: #FCE3DB; color: #9C2F10; }
+
+  /* Pricing grid adapts to however many plans exist */
+  .lp .plans { display: grid; gap: 20px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+
+  .lp details > summary { list-style: none; cursor: pointer; }
+  .lp details > summary::-webkit-details-marker { display: none; }
+  .lp details[open] .plus { transform: rotate(45deg); }
+  .lp .plus { transition: transform .2s; }
+
+  /* One orchestrated entrance: the hero sheet */
+  @keyframes lp-settle { from { opacity: 0; transform: translateY(14px) rotate(1.5deg); } to { opacity: 1; transform: none; } }
+  .lp .settle { animation: lp-settle .7s cubic-bezier(.2,.8,.2,1) both; }
+  @media (prefers-reduced-motion: reduce) {
+    .lp .settle { animation: none; }
+    .lp .btn, .lp .plus { transition: none; }
+  }
+  [x-cloak] { display: none !important; }
 </style>
 
-<div class="cv-page">
+<div class="lp">
 
 <!-- NAV -->
-<nav class="sticky top-0 z-50 bg-[var(--paper)]/95 backdrop-blur-sm border-b border-rule"
-     x-data="{ open: false }" @keydown.escape.window="open = false" @click.outside="open = false">
-  <div class="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
-    <a href="{{ url_for('main.index') }}" class="flex items-center gap-2 font-display font-semibold text-xl min-h-[44px]">
-      <span class="w-7 h-7 border-2 border-[var(--ink)] flex items-center justify-center font-mono text-[10px] font-semibold">CV</span>
+<header class="sticky top-0 z-50" style="background: rgba(255,255,255,.94); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line);"
+        x-data="{ open: false }" @keydown.escape.window="open = false" @click.outside="open = false">
+  <div class="wrap flex items-center justify-between" style="min-height: 68px;">
+    <a href="{{ url_for('main.index') }}" class="display flex items-center gap-2" style="font-weight: 800; font-size: 22px; min-height: 44px;">
+      <span style="width: 30px; height: 30px; background: var(--green); color: #fff; border-radius: 8px; display: grid; place-items: center; font-size: 13px;">CV</span>
       CVForge
     </a>
 
-    <!-- Desktop links -->
-    <div class="hidden md:flex items-center gap-8 text-sm font-mono text-ink-soft">
-      <a href="{{ url_for('main.pricing') }}" class="hover:text-[var(--ink)] transition">Pricing</a>
-      <a href="{{ url_for('templates_gallery.index') }}" class="hover:text-[var(--ink)] transition">Templates</a>
-      <a href="{{ url_for('main.about') }}" class="hover:text-[var(--ink)] transition">About</a>
-    </div>
+    <nav class="hidden md:flex items-center gap-8" style="font-weight: 500; color: var(--ink-2);" aria-label="Main">
+      <a href="#how" class="hover:underline">How it works</a>
+      <a href="{{ url_for('templates_gallery.index') }}" class="hover:underline">Templates</a>
+      <a href="{{ url_for('main.pricing') }}" class="hover:underline">Pricing</a>
+      <a href="{{ url_for('main.about') }}" class="hover:underline">About</a>
+    </nav>
 
-    <div class="flex items-center gap-3 sm:gap-4">
+    <div class="flex items-center gap-2">
       {% if current_user.is_authenticated %}
-      <a href="{{ url_for('dashboard.index') }}"
-         class="px-4 py-2.5 bg-stamp text-white text-sm font-semibold rounded-sm hover:opacity-90 transition min-h-[44px] inline-flex items-center">
-        Dashboard
-      </a>
+      <a href="{{ url_for('dashboard.index') }}" class="btn btn-primary" style="min-height: 44px;">Dashboard</a>
       {% else %}
-      <a href="{{ url_for('auth.login') }}"
-         class="text-sm font-medium text-ink-soft hover:text-[var(--ink)] transition hidden sm:inline-flex items-center min-h-[44px] px-2">Sign in</a>
-      <a href="{{ url_for('auth.register') }}"
-         class="px-4 py-2.5 bg-stamp text-white text-sm font-semibold rounded-sm hover:opacity-90 transition min-h-[44px] inline-flex items-center">
-        Get started
-      </a>
+      <a href="{{ url_for('auth.login') }}" class="hidden sm:inline-flex items-center px-3" style="min-height: 44px; font-weight: 600;">Sign in</a>
+      <a href="{{ url_for('auth.register') }}" class="btn btn-primary" style="min-height: 44px; padding: 0 20px;">Start free</a>
       {% endif %}
-
-      <!-- Mobile menu button -->
-      <button type="button" class="md:hidden min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-ink-soft"
+      <button type="button" class="md:hidden inline-flex items-center justify-center" style="min-width: 44px; min-height: 44px;"
               @click="open = !open" :aria-expanded="open.toString()" aria-controls="mobile-menu" aria-label="Toggle menu">
         <svg x-show="!open" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
         <svg x-show="open" x-cloak class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M6 6l12 12M18 6L6 18"/></svg>
@@ -77,221 +121,261 @@
     </div>
   </div>
 
-  <!-- Mobile menu panel -->
-  <div id="mobile-menu" x-show="open" x-cloak
-       x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 -translate-y-2"
-       x-transition:enter-end="opacity-100 translate-y-0"
-       class="md:hidden border-t border-rule bg-[var(--paper)] px-4 py-3">
-    <ul class="flex flex-col font-mono text-sm text-ink-soft">
-      <li><a href="{{ url_for('main.pricing') }}" class="flex items-center min-h-[48px] border-b border-rule">Pricing</a></li>
-      <li><a href="{{ url_for('templates_gallery.index') }}" class="flex items-center min-h-[48px] border-b border-rule">Templates</a></li>
-      <li><a href="{{ url_for('main.about') }}" class="flex items-center min-h-[48px] border-b border-rule">About</a></li>
+  <div id="mobile-menu" x-show="open" x-cloak class="md:hidden wrap pb-3" style="border-top: 1px solid var(--line); background: #fff;">
+    <ul class="flex flex-col" style="font-weight: 500;">
+      <li><a href="#how" @click="open = false" class="flex items-center" style="min-height: 48px; border-bottom: 1px solid var(--line);">How it works</a></li>
+      <li><a href="{{ url_for('templates_gallery.index') }}" class="flex items-center" style="min-height: 48px; border-bottom: 1px solid var(--line);">Templates</a></li>
+      <li><a href="{{ url_for('main.pricing') }}" class="flex items-center" style="min-height: 48px; border-bottom: 1px solid var(--line);">Pricing</a></li>
+      <li><a href="{{ url_for('main.about') }}" class="flex items-center" style="min-height: 48px;">About</a></li>
       {% if not current_user.is_authenticated %}
-      <li><a href="{{ url_for('auth.login') }}" class="flex items-center min-h-[48px]">Sign in</a></li>
+      <li><a href="{{ url_for('auth.login') }}" class="flex items-center" style="min-height: 48px; border-top: 1px solid var(--line);">Sign in</a></li>
       {% endif %}
     </ul>
   </div>
-</nav>
+</header>
+
+<main>
 
 <!-- HERO -->
-<section class="pt-16 pb-20 px-4 sm:px-6">
-  <div class="max-w-6xl mx-auto grid lg:grid-cols-2 gap-16 items-center">
+<section style="background: var(--mist); overflow: hidden;">
+  <div class="wrap grid lg:grid-cols-[1.05fr_1fr] gap-14 items-center" style="padding-top: 64px; padding-bottom: 88px;">
     <div>
-      <p class="font-mono text-xs text-stamp uppercase mb-6">Built for the Kenyan job market</p>
-      <h1 class="font-display text-4xl sm:text-5xl lg:text-6xl leading-[1.05] mb-6">
-        Your CV should open<br class="hidden sm:block"/>
-        every <span class="italic font-medium text-stamp">door.</span>
+      <h1 style="font-weight: 800; font-size: clamp(2.5rem, 6.2vw, 4.6rem); line-height: 1.02;">
+        Say what you did.<br/>We'll make it sound like it mattered.
       </h1>
-      <p class="text-lg text-ink-soft mb-10 max-w-md leading-relaxed">
-        AI drafts the language, checks it against the job description, and formats it
-        to pass the screening software — before a human ever sees it.
+      <p style="font-size: 19px; line-height: 1.6; color: var(--ink-2); max-width: 30em; margin-top: 24px;">
+        CVForge turns your work history into a clean, recruiter-ready CV, checks it against the job you're applying for, and lets you pay with M-Pesa.
       </p>
-      <div class="flex flex-col sm:flex-row gap-4 mb-4">
-        <a href="{{ url_for('auth.register') }}"
-           class="px-7 py-3.5 bg-stamp text-white font-semibold rounded-sm text-base hover:opacity-90 transition text-center">
-          Build my CV — free
-        </a>
-        <a href="{{ url_for('main.pricing') }}"
-           class="px-7 py-3.5 border-2 border-[var(--ink)] text-[var(--ink)] font-semibold rounded-sm text-base hover:bg-[var(--ink)] hover:text-white transition text-center">
-          See pricing
-        </a>
+      <div class="flex flex-col sm:flex-row gap-3" style="margin-top: 36px;">
+        <a href="{{ url_for('auth.register') }}" class="btn btn-primary">Build my CV free</a>
+        <a href="{{ url_for('templates_gallery.index') }}" class="btn btn-ghost">Browse templates</a>
       </div>
-      <p class="font-mono text-xs text-ink-soft">No card needed · Pay with M-Pesa when you're ready</p>
+      <p style="margin-top: 16px; font-size: 14px; color: var(--ink-2);">No card needed. Upgrade with an M-Pesa STK push when you want more.</p>
     </div>
 
-    <div class="relative flex justify-center lg:justify-end">
-      <div class="bg-card border border-rule rounded-sm doc-shadow p-7 w-full max-w-xs">
-        <div class="h-3 w-28 bg-[var(--ink)] rounded-sm mb-2"></div>
-        <div class="h-2 w-20 bg-[var(--rule)] rounded-sm mb-6"></div>
-        <div class="h-2 w-full bg-[var(--rule)] rounded-sm mb-2"></div>
-        <div class="h-2 w-5/6 bg-[var(--rule)] rounded-sm mb-2"></div>
-        <div class="h-2 w-full bg-[var(--rule)] rounded-sm mb-6"></div>
-        <div class="h-2 w-16 bg-stamp-soft rounded-sm mb-2"></div>
-        <div class="h-2 w-full bg-[var(--rule)] rounded-sm mb-2"></div>
-        <div class="h-2 w-4/6 bg-[var(--rule)] rounded-sm mb-2"></div>
-        <div class="h-2 w-full bg-[var(--rule)] rounded-sm"></div>
+    <!-- Live before/after demo -->
+    <div class="settle" x-data="{ ai: false }">
+      <div class="flex items-center justify-between flex-wrap gap-3" style="margin-bottom: 16px;">
+        <span style="font-weight: 600; font-size: 15px;">Try it: one bullet, two versions</span>
+        <div class="toggle" role="group" aria-label="Compare versions">
+          <button type="button" :aria-pressed="(!ai).toString()" @click="ai = false">Your draft</button>
+          <button type="button" :aria-pressed="ai.toString()" @click="ai = true">After CVForge</button>
+        </div>
       </div>
-      <div class="stamp-badge absolute -top-4 -right-2 sm:right-4 rounded-full w-28 h-28 flex flex-col items-center justify-center text-center bg-[var(--paper)]">
-        <span class="text-[10px] font-semibold leading-tight">ATS</span>
-        <span class="text-2xl font-bold leading-none my-0.5">94</span>
-        <span class="text-[9px] leading-tight">APPROVED</span>
+
+      <div class="sheet" style="padding: 28px;">
+        <div style="border-bottom: 1.5px solid var(--line); padding-bottom: 16px; margin-bottom: 18px;">
+          <p class="display" style="font-weight: 800; font-size: 24px;">Amina W. Otieno</p>
+          <p style="color: var(--ink-2); font-size: 15px;">Sales Supervisor · Nairobi</p>
+        </div>
+        <p style="font-weight: 700; font-size: 14px; margin-bottom: 10px;">Experience</p>
+        <div style="min-height: 132px;" aria-live="polite">
+          <p x-show="!ai" style="line-height: 1.65; font-size: 16px;">
+            &bull; Was in charge of sales at the shop and helped the team do better. Handled customers and stock.
+          </p>
+          <p x-show="ai" x-cloak style="line-height: 1.65; font-size: 16px;">
+            &bull; <mark>Led a team of 6</mark> across 3 branches, <mark>growing monthly sales 32%</mark> in 8 months while <mark>cutting stock-outs by a quarter</mark> through weekly reorder checks.
+          </p>
+        </div>
+        <p x-show="ai" x-cloak style="font-size: 13px; color: var(--ink-2); margin-top: 12px;">Example for illustration. The yellow parts are what the rewrite added.</p>
+        <p x-show="!ai" style="font-size: 13px; color: var(--ink-2); margin-top: 12px;">Flip the switch to see what a recruiter would rather read.</p>
       </div>
     </div>
   </div>
 </section>
 
-<!-- STATS -->
-<section class="py-12 px-4 border-y border-rule">
-  <div class="max-w-4xl mx-auto grid grid-cols-3 gap-6 text-center">
-    {% for value, label in [('10,000+','CVs built'),('92%','land an interview'),('2 min','average first draft')] %}
+<!-- ATS CHECK -->
+<section style="padding: 96px 0;">
+  <div class="wrap grid lg:grid-cols-2 gap-14 items-center">
     <div>
-      <p class="font-display text-3xl sm:text-4xl">{{ value }}</p>
-      <p class="font-mono text-xs text-ink-soft mt-1 uppercase">{{ label }}</p>
+      <h2 style="font-weight: 800; font-size: clamp(2rem, 4vw, 3rem); line-height: 1.08;">Know how your CV scores before the recruiter does</h2>
+      <p style="font-size: 18px; line-height: 1.65; color: var(--ink-2); margin-top: 20px; max-width: 30em;">
+        Many employers filter applications with screening software. Paste the job posting and CVForge shows which keywords you already cover, which you're missing, and what to change.
+      </p>
+      <a href="{{ url_for('auth.register') }}" class="btn btn-ghost" style="margin-top: 28px;">Check my CV</a>
     </div>
-    {% endfor %}
+
+    <div class="sheet" style="padding: 28px;">
+      <div class="flex items-center gap-6 flex-wrap">
+        <div class="ring" style="--p: 86;" data-label="86" role="img" aria-label="Example match score: 86 out of 100"></div>
+        <div>
+          <p class="display" style="font-weight: 800; font-size: 22px;">Strong match</p>
+          <p style="color: var(--ink-2); font-size: 15px;">Example: Sales Supervisor posting</p>
+        </div>
+      </div>
+      <p style="font-weight: 600; font-size: 14px; margin: 24px 0 10px;">Found in your CV</p>
+      <div class="flex flex-wrap gap-2">
+        <span class="chip chip-ok">Team leadership</span>
+        <span class="chip chip-ok">Inventory control</span>
+        <span class="chip chip-ok">Customer service</span>
+        <span class="chip chip-ok">Sales targets</span>
+      </div>
+      <p style="font-weight: 600; font-size: 14px; margin: 20px 0 10px;">Missing from your CV</p>
+      <div class="flex flex-wrap gap-2">
+        <span class="chip chip-miss">Merchandising</span>
+        <span class="chip chip-miss">POS systems</span>
+      </div>
+    </div>
   </div>
 </section>
 
 <!-- FEATURES -->
-<section class="py-20 px-4 sm:px-6">
-  <div class="max-w-4xl mx-auto">
-    <div class="mb-12 max-w-lg">
-      <h2 class="font-display text-3xl mb-3">What's actually inside</h2>
-      <p class="text-ink-soft">From first draft to final download — no design skill required.</p>
-    </div>
-    <div class="divide-y divide-[var(--rule)] border-t border-b border-rule">
-      {% for tag, title, desc in [
-        ('WRITE', 'AI content writer', 'Paste your work history and it comes back as bullet points with action verbs and real numbers, not filler.'),
-        ('SCORE', 'ATS score checker', 'Paste a job posting and see exactly how your CV scores against it, with specific fixes.'),
-        ('LETTER', 'Cover letter generator', 'A letter tailored to one specific job, ready in under 30 seconds.'),
-        ('DESIGN', '12+ templates', 'Built for different industries — tech, finance, creative, clinical, and more.'),
-        ('PAY', 'M-Pesa payments', 'Subscribe with an STK push. No card, no forms. Cancel whenever.'),
-        ('EXPORT', 'PDF & DOCX export', 'One button, both formats — PDF to apply with, DOCX to keep editing.'),
-      ] %}
-      <div class="grid sm:grid-cols-[100px_1fr] gap-2 sm:gap-8 py-6">
-        <span class="font-mono text-xs text-stamp uppercase pt-1">{{ tag }}</span>
-        <div>
-          <h3 class="font-semibold mb-1">{{ title }}</h3>
-          <p class="text-sm text-ink-soft leading-relaxed max-w-md">{{ desc }}</p>
-        </div>
+<section style="background: var(--ink); color: #fff; padding: 96px 0;">
+  <div class="wrap">
+    <h2 style="font-weight: 800; font-size: clamp(2rem, 4vw, 3rem); line-height: 1.08; max-width: 14em;">Everything between "I need a job" and "Application sent"</h2>
+
+    <div class="grid md:grid-cols-6 gap-5" style="margin-top: 48px;">
+      <div class="md:col-span-4" style="background: var(--green); border-radius: 20px; padding: 32px;">
+        <h3 style="font-weight: 800; font-size: 28px;">AI that writes like a professional</h3>
+        <p style="font-size: 17px; line-height: 1.6; margin-top: 12px; max-width: 32em; color: rgba(255,255,255,.92);">
+          Paste your work history in plain words. Get back bullet points that open with strong verbs and carry real numbers.
+        </p>
       </div>
-      {% endfor %}
+      <div class="md:col-span-2" style="background: var(--mark); color: var(--ink); border-radius: 20px; padding: 32px;">
+        <h3 style="font-weight: 800; font-size: 24px;">Cover letters in seconds</h3>
+        <p style="font-size: 16px; line-height: 1.6; margin-top: 12px;">Written for one specific job, not a template with the name swapped.</p>
+      </div>
+      <div class="md:col-span-2" style="background: #fff; color: var(--ink); border-radius: 20px; padding: 32px;">
+        <h3 style="font-weight: 800; font-size: 24px;">12+ templates</h3>
+        <p style="font-size: 16px; line-height: 1.6; margin-top: 12px; color: var(--ink-2);">Layouts for tech, finance, creative and clinical roles. Switch any time without retyping.</p>
+      </div>
+      <div class="md:col-span-2" style="border: 2px solid rgba(255,255,255,.3); border-radius: 20px; padding: 32px;">
+        <h3 style="font-weight: 800; font-size: 24px;">PDF and Word</h3>
+        <p style="font-size: 16px; line-height: 1.6; margin-top: 12px; color: rgba(255,255,255,.8);">PDF to send, DOCX when you want to keep editing.</p>
+      </div>
+      <div class="md:col-span-2" style="background: #1B2C45; border-radius: 20px; padding: 32px;">
+        <h3 style="font-weight: 800; font-size: 24px;">Pay with M-Pesa</h3>
+        <p style="font-size: 16px; line-height: 1.6; margin-top: 12px; color: rgba(255,255,255,.8);">Approve an STK push on your phone. No card, no long forms.</p>
+      </div>
     </div>
   </div>
 </section>
 
 <!-- HOW IT WORKS -->
-<section class="py-20 px-4 sm:px-6 border-y border-rule">
-  <div class="max-w-4xl mx-auto">
-    <h2 class="font-display text-3xl mb-3">Three steps, in order</h2>
-    <p class="text-ink-soft mb-14">No design skills or writing talent required.</p>
-    <div class="grid md:grid-cols-3 gap-10">
+<section id="how" style="padding: 96px 0;">
+  <div class="wrap">
+    <h2 style="font-weight: 800; font-size: clamp(2rem, 4vw, 3rem); line-height: 1.08;">From blank page to download in three steps</h2>
+    <ol class="grid md:grid-cols-3 gap-10" style="margin-top: 52px; list-style: none; padding: 0;">
       {% for num, title, desc in [
-        ('01', 'Fill in your details', 'Use the guided builder, or upload what you already have. Two minutes, most of the time.'),
-        ('02', 'AI does the editing', 'It rewrites your content, checks it against the job description, and flags anything a screener would trip on.'),
-        ('03', 'Download and send', 'PDF for applying, DOCX if you still want to tweak it.'),
+        ('1', 'Add your details', 'Fill in the guided builder, or start from what you already have.'),
+        ('2', 'Let the AI edit', 'It rewrites your content, compares it to the job posting and flags what a screener would miss.'),
+        ('3', 'Download and apply', 'Save as PDF to send, or DOCX to keep working on it.'),
       ] %}
-      <div>
-        <p class="font-mono text-stamp text-sm mb-3">{{ num }}</p>
-        <h3 class="font-semibold mb-2">{{ title }}</h3>
-        <p class="text-sm text-ink-soft leading-relaxed">{{ desc }}</p>
-      </div>
+      <li>
+        <span class="display" style="display: grid; place-items: center; width: 52px; height: 52px; border-radius: 50%; background: var(--mist); border: 2px solid var(--ink); font-weight: 800; font-size: 22px;">{{ num }}</span>
+        <h3 style="font-weight: 700; font-size: 22px; margin-top: 20px;">{{ title }}</h3>
+        <p style="color: var(--ink-2); line-height: 1.6; margin-top: 8px; max-width: 22em;">{{ desc }}</p>
+      </li>
       {% endfor %}
-    </div>
+    </ol>
   </div>
 </section>
 
-<!-- PRICING PREVIEW -->
-<section class="py-20 px-4 sm:px-6">
-  <div class="max-w-4xl mx-auto">
-    <div class="text-center mb-12">
-      <h2 class="font-display text-3xl mb-3">Simple pricing, no surprises</h2>
-      <p class="text-ink-soft">Pay with M-Pesa. Cancel anytime.</p>
+<!-- PRICING -->
+<section style="background: var(--mist); padding: 96px 0;">
+  <div class="wrap">
+    <div style="max-width: 36em;">
+      <h2 style="font-weight: 800; font-size: clamp(2rem, 4vw, 3rem); line-height: 1.08;">Start free. Pay only if you need more.</h2>
+      <p style="font-size: 18px; color: var(--ink-2); margin-top: 16px;">Every paid plan is billed through M-Pesa, and you can cancel any time.</p>
     </div>
-    <div class="grid md:grid-cols-{{ plans|length }} gap-6 mb-8">
+
+    <div class="plans" style="margin-top: 48px;">
       {% for plan in plans %}
-      <div class="relative rounded-sm border {% if plan.is_popular %}border-stamp{% else %}border-rule{% endif %} p-6 text-left bg-card">
+      <div class="relative" style="background: #fff; border-radius: 20px; padding: 32px;
+           border: {% if plan.is_popular %}3px solid var(--green){% else %}1.5px solid var(--line){% endif %};">
         {% if plan.is_popular %}
-        <span class="stamp-badge absolute -top-4 -right-3 rounded-full w-16 h-16 flex items-center justify-center text-[9px] font-semibold text-center leading-tight bg-[var(--paper)]">
-          MOST<br/>POPULAR
-        </span>
+        <span style="position: absolute; top: -14px; left: 28px; background: var(--green); color: #fff; font-weight: 700; font-size: 13px; padding: 5px 14px; border-radius: 999px;">Most popular</span>
         {% endif %}
-        <p class="font-semibold text-lg">{{ plan.name }}</p>
-        <p class="mt-2 mb-4">
+        <p style="font-weight: 700; font-size: 20px;">{{ plan.name }}</p>
+        <p style="margin: 12px 0 20px;">
           {% if plan.price_kes == 0 %}
-          <span class="font-display text-3xl">Free</span>
+          <span class="display" style="font-weight: 800; font-size: 40px;">Free</span>
           {% else %}
-          <span class="font-display text-3xl">KES {{ plan.price_kes }}</span>
-          <span class="font-mono text-ink-soft text-sm">/{{ plan.billing_period }}</span>
+          <span class="display" style="font-weight: 800; font-size: 40px;">KES {{ plan.price_kes }}</span>
+          <span style="color: var(--ink-2);">/{{ plan.billing_period }}</span>
           {% endif %}
         </p>
-        <ul class="space-y-2 mb-6">
-          {% for feat in (plan.features or [])[:4] %}
-          <li class="flex items-start gap-2 text-sm text-ink-soft">
-            <span class="text-stamp mt-1">—</span>
-            {{ feat }}
+        <ul style="display: grid; gap: 10px; margin-bottom: 28px; padding: 0; list-style: none;">
+          {% for feat in (plan.features or [])[:5] %}
+          <li class="flex items-start gap-3" style="font-size: 15px; line-height: 1.5;">
+            <svg aria-hidden="true" width="18" height="18" viewBox="0 0 20 20" fill="none" style="flex: none; margin-top: 2px;"><circle cx="10" cy="10" r="10" fill="#DDF4E8"/><path d="M5.5 10.5l3 3 6-6.5" stroke="#0B8F5B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span>{{ feat }}</span>
           </li>
           {% endfor %}
         </ul>
-        <a href="{{ url_for('auth.register') }}"
-           class="block w-full text-center py-2.5 rounded-sm text-sm font-semibold transition
-           {% if plan.is_popular %}bg-stamp text-white hover:opacity-90{% else %}border border-[var(--ink)] text-[var(--ink)] hover:bg-[var(--ink)] hover:text-white{% endif %}">
-          Get started
-        </a>
+        <a href="{{ url_for('auth.register') }}" class="btn {% if plan.is_popular %}btn-primary{% else %}btn-ghost{% endif %}" style="width: 100%;">Choose {{ plan.name }}</a>
       </div>
       {% endfor %}
     </div>
-    <p class="text-center">
-      <a href="{{ url_for('main.pricing') }}" class="text-sm font-mono text-stamp hover:underline">See full feature comparison →</a>
-    </p>
+
+    <p style="margin-top: 28px;"><a href="{{ url_for('main.pricing') }}" class="underline" style="font-weight: 600;">Compare every feature</a></p>
   </div>
 </section>
 
-<!-- CTA -->
-<section class="py-20 px-4 sm:px-6 bg-[var(--ink)]">
-  <div class="max-w-2xl mx-auto text-center text-[var(--paper)]">
-    <h2 class="font-display text-3xl sm:text-4xl mb-4">Your next job posting doesn't wait.</h2>
-    <p class="text-white/60 text-lg mb-8">Build a CV that's ready before the closing date.</p>
-    <a href="{{ url_for('auth.register') }}"
-       class="inline-block px-8 py-4 bg-stamp text-white font-semibold rounded-sm hover:opacity-90 transition">
-      Start building — free
-    </a>
+<!-- FAQ -->
+<section style="padding: 96px 0;">
+  <div class="wrap grid lg:grid-cols-[1fr_1.4fr] gap-14">
+    <h2 style="font-weight: 800; font-size: clamp(2rem, 4vw, 3rem); line-height: 1.08;">Questions before you start</h2>
+    <div style="border-top: 1.5px solid var(--line);">
+      {% for q, a in [
+        ('Do I need to pay to try it?', 'No. You can create an account and build a CV on the free plan. Paid plans unlock more of the AI tools.'),
+        ('How does M-Pesa payment work?', 'Choose a plan, enter your Safaricom number and approve the STK push on your phone. That is the whole process.'),
+        ('Can I use a CV I already have?', 'Yes. Upload a PDF or DOCX and CVForge reads it so you can edit and improve it instead of starting over.'),
+        ('Will my CV pass screening software?', 'No tool can promise that, but CVForge uses clean, single-column layouts and shows how your wording matches the job posting, so you can fix gaps before you apply.'),
+        ('Which file formats can I download?', 'PDF for sending to employers and DOCX if you want to keep editing in Word.'),
+      ] %}
+      <details style="border-bottom: 1.5px solid var(--line);">
+        <summary class="flex items-center justify-between gap-4" style="min-height: 64px; font-weight: 600; font-size: 18px; padding: 12px 0;">
+          {{ q }}
+          <span class="plus display" style="font-size: 28px; line-height: 1; flex: none;" aria-hidden="true">+</span>
+        </summary>
+        <p style="color: var(--ink-2); line-height: 1.65; padding: 0 0 22px; max-width: 36em;">{{ a }}</p>
+      </details>
+      {% endfor %}
+    </div>
   </div>
 </section>
+
+<!-- FINAL CTA -->
+<section style="background: var(--green); color: #fff; padding: 88px 0;">
+  <div class="wrap" style="text-align: left;">
+    <h2 style="font-weight: 800; font-size: clamp(2.2rem, 5vw, 3.6rem); line-height: 1.04; max-width: 14em;">The closing date won't move. Your CV can be ready today.</h2>
+    <a href="{{ url_for('auth.register') }}" class="btn btn-light" style="margin-top: 32px;">Build my CV free</a>
+  </div>
+</section>
+
+</main>
 
 <!-- FOOTER -->
-<footer class="bg-[var(--ink)] text-white/50 py-12 px-4 sm:px-6 border-t border-white/10">
-  <div class="max-w-5xl mx-auto grid md:grid-cols-4 gap-8">
+<footer style="background: var(--ink); color: rgba(255,255,255,.7); padding: 56px 0 32px;">
+  <div class="wrap grid md:grid-cols-4 gap-10">
     <div>
-      <div class="flex items-center gap-2 mb-3">
-        <span class="w-6 h-6 border-2 border-white flex items-center justify-center font-mono text-[9px] text-white font-semibold">CV</span>
-        <span class="font-display text-white">CVForge</span>
-      </div>
-      <p class="text-sm leading-relaxed">AI-powered CV builder for African professionals. Pay with M-Pesa.</p>
+      <p class="display" style="color: #fff; font-weight: 800; font-size: 20px;">CVForge</p>
+      <p style="font-size: 15px; line-height: 1.6; margin-top: 10px; max-width: 18em;">An AI CV builder for African professionals. Pay with M-Pesa.</p>
     </div>
     <div>
-      <p class="font-mono text-white text-xs uppercase mb-3">Product</p>
-      <ul class="space-y-2 text-sm">
-        <li><a href="{{ url_for('templates_gallery.index') }}" class="hover:text-white transition">Templates</a></li>
-        <li><a href="{{ url_for('main.pricing') }}" class="hover:text-white transition">Pricing</a></li>
+      <p style="color: #fff; font-weight: 600; margin-bottom: 12px;">Product</p>
+      <ul style="display: grid; gap: 8px; font-size: 15px; padding: 0; list-style: none;">
+        <li><a href="{{ url_for('templates_gallery.index') }}" class="hover:text-white">Templates</a></li>
+        <li><a href="{{ url_for('main.pricing') }}" class="hover:text-white">Pricing</a></li>
       </ul>
     </div>
     <div>
-      <p class="font-mono text-white text-xs uppercase mb-3">Company</p>
-      <ul class="space-y-2 text-sm">
-        <li><a href="{{ url_for('main.about') }}" class="hover:text-white transition">About</a></li>
+      <p style="color: #fff; font-weight: 600; margin-bottom: 12px;">Company</p>
+      <ul style="display: grid; gap: 8px; font-size: 15px; padding: 0; list-style: none;">
+        <li><a href="{{ url_for('main.about') }}" class="hover:text-white">About</a></li>
       </ul>
     </div>
     <div>
-      <p class="font-mono text-white text-xs uppercase mb-3">Account</p>
-      <ul class="space-y-2 text-sm">
-        <li><a href="{{ url_for('auth.login') }}" class="hover:text-white transition">Sign in</a></li>
-        <li><a href="{{ url_for('auth.register') }}" class="hover:text-white transition">Sign up free</a></li>
+      <p style="color: #fff; font-weight: 600; margin-bottom: 12px;">Account</p>
+      <ul style="display: grid; gap: 8px; font-size: 15px; padding: 0; list-style: none;">
+        <li><a href="{{ url_for('auth.login') }}" class="hover:text-white">Sign in</a></li>
+        <li><a href="{{ url_for('auth.register') }}" class="hover:text-white">Create free account</a></li>
       </ul>
     </div>
   </div>
-  <div class="max-w-5xl mx-auto mt-10 pt-6 border-t border-white/10 text-center font-mono text-xs">
-    © {{ 2026 }} CVForge AI. Built in Kenya.
+  <div class="wrap" style="margin-top: 40px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,.12); font-size: 14px;">
+    &copy; 2026 CVForge AI. Built in Kenya.
   </div>
 </footer>
 
