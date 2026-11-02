@@ -17,6 +17,7 @@
       </div>
     </div>
 
+    {% include "_offer_banner.html" %}
     <div class="grid sm:grid-cols-3 gap-4 mb-12 max-w-3xl mx-auto">
       <div class="text-center px-3">
         <div class="text-2xl mb-1">🎯</div>
@@ -52,7 +53,7 @@
             {% if plan.price_kes == 0 %}
             <span class="text-4xl font-bold text-gray-900">Free</span>
             {% else %}
-            <span class="text-4xl font-bold text-gray-900">KES {{ plan.price_kes }}</span>
+            {% if plan.live_offer %}<span class="block text-sm font-semibold text-gray-400 line-through">KES {{ plan.base_price }}</span>{% endif %}<span class="text-4xl font-bold text-gray-900">KES {{ plan.display_price }}</span>
             <span class="text-gray-400 mb-1">/{{ plan.billing_period }}</span>
             {% endif %}
           </div>
@@ -83,7 +84,7 @@
         <div x-data="{open: false}" class="relative">
           <button @click="open=!open"
                   class="w-full py-3 gradient-brand text-white font-semibold rounded-xl hover:opacity-90 transition text-sm">
-            Subscribe — KES {{ plan.price_kes }}
+            Subscribe — KES {{ plan.display_price }}
           </button>
           <div x-show="open" x-cloak @click.away="open=false"
                class="absolute bottom-full mb-2 left-0 right-0 bg-white rounded-xl border border-gray-200 shadow-xl p-4 z-10">

@@ -1,0 +1,98 @@
+{% extends "base_dashboard.html" %}
+{% block title %}{{ 'Edit' if offer else 'New' }} Offer — Admin{% endblock %}
+{% block page_title %}{{ 'Edit' if offer else 'New' }} Offer{% endblock %}
+{% block page_subtitle %}Prices are not changed. This discount applies only while the offer is live.{% endblock %}
+{% block page_actions %}
+  <a href="{{ url_for('admin.offers') }}" class="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50 transition">← Back</a>
+{% endblock %}
+
+{% block content %}
+<form method="POST" class="max-w-2xl bg-white rounded-xl border border-gray-100 shadow-sm divide-y divide-gray-100">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
+  <div class="p-6 grid sm:grid-cols-2 gap-4">
+    <div class="sm:col-span-2">
+      <label class="block text-xs font-semibold text-gray-700 mb-1">Internal name *</label>
+      <input name="name" required maxlength="100" value="{{ form.get('name', '') if form is not none else (offer.name if offer else '') }}"
+             placeholder="e.g. Christmas 2026 Pro discount"
+             class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+    </div>
+    <div class="sm:col-span-2">
+      <label class="block text-xs font-semibold text-gray-700 mb-1">Public label *</label>
+      <input name="public_label" required maxlength="120" value="{{ form.get('public_label', '') if form is not none else (offer.public_label if offer else '') }}"
+             placeholder="e.g. Festive season: 30% off every plan"
+             class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+      <p class="text-xs text-gray-400 mt-1">Shown to customers on the pricing page and as a badge on the price.</p>
+    </div>
+
+    <div>
+      <label class="block text-xs font-semibold text-gray-700 mb-1">Discount type *</label>
+      {% set dt = form.get('discount_type', 'percent') if form is not none else (offer.discount_type if offer else 'percent') %}
+      <select name="discount_type" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <option value="percent" {{ 'selected' if dt == 'percent' }}>Percent off</option>
+        <option value="fixed" {{ 'selected' if dt == 'fixed' }}>Fixed KES off</option>
+      </select>
+    </div>
+    <div>
+      <label class="block text-xs font-semibold text-gray-700 mb-1">Discount value *</label>
+      <input name="discount_value" type="number" min="1" required
+             value="{{ form.get('discount_value', '') if form is not none else (offer.discount_value if offer else '') }}"
+             class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+      <p class="text-xs text-gray-400 mt-1">Percent: 1–90. Fixed: KES amount off each payment.</p>
+    </div>
+
+    <div class="sm:col-span-2">
+      <label class="block text-xs font-semibold text-gray-700 mb-2">Applies to</label>
+      {% set chosen = (form.getlist('plan_slugs') if form is not none else (offer.plan_slugs or [] if offer else [])) %}
+      <div class="flex flex-wrap gap-4">
+        {% for p in paid_plans %}
+        <label class="flex items-center gap-2 text-sm text-gray-700">
+          <input type="checkbox" name="plan_slugs" value="{{ p.slug }}" {{ 'checked' if p.slug in chosen }}
+                 class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"/>
+          {{ p.name }} (KES {{ p.price_kes }}/{{ p.billing_period }})
+        </label>
+        {% endfor %}
+      </div>
+      <p class="text-xs text-gray-400 mt-1">Leave all unticked to apply to every paid plan.</p>
+    </div>
+
+    <div>
+      <label class="block text-xs font-semibold text-gray-700 mb-1">Starts (Nairobi time)</label>
+      <input name="starts_at" type="datetime-local"
+             value="{{ form.get('starts_at', '') if form is not none else (offer.starts_at_input if offer else '') }}"
+             class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+      <p class="text-xs text-gray-400 mt-1">Blank = starts immediately.</p>
+    </div>
+    <div>
+      <label class="block text-xs font-semibold text-gray-700 mb-1">Ends (Nairobi time)</label>
+      <input name="ends_at" type="datetime-local"
+             value="{{ form.get('ends_at', '') if form is not none else (offer.ends_at_input if offer else '') }}"
+             class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+      <p class="text-xs text-gray-400 mt-1">Blank = no end date. Prices revert automatically after this.</p>
+    </div>
+
+    <div>
+      <label class="block text-xs font-semibold text-gray-700 mb-1">Maximum uses</label>
+      <input name="max_redemptions" type="number" min="1"
+             value="{{ form.get('max_redemptions', '') if form is not none else (offer.max_redemptions if offer and offer.max_redemptions else '') }}"
+             class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+      <p class="text-xs text-gray-400 mt-1">Blank = unlimited. Reverts when the limit is reached.</p>
+    </div>
+    <div class="flex items-end">
+      <label class="flex items-center gap-2 text-sm text-gray-700 pb-2">
+        <input type="checkbox" name="is_active" value="1"
+               {% if (form is none and (offer is none or offer.is_active)) or (form is not none and form.get('is_active')) %}checked{% endif %}
+               class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"/>
+        Active (uncheck to void)
+      </label>
+    </div>
+  </div>
+
+  <div class="p-6 flex gap-3">
+    <button type="submit" class="px-6 py-2.5 gradient-brand text-white font-semibold rounded-lg text-sm hover:opacity-90 transition">
+      {{ 'Save changes' if offer else 'Create offer' }}
+    </button>
+    <a href="{{ url_for('admin.offers') }}" class="px-6 py-2.5 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50 transition">Cancel</a>
+  </div>
+</form>
+{% endblock %}

@@ -1,0 +1,8 @@
+{% if offer_banner %}
+<div class="max-w-5xl mx-auto mb-10 rounded-2xl px-5 py-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 text-center">
+  <p class="font-bold text-amber-900">🏷️ {{ offer_banner.public_label }}</p>
+  {% if offer_banner.ends_at %}
+  <p class="text-sm text-amber-800 mt-1">Ends {{ offer_banner.ends_at_label }}. Prices return to normal after this.</p>
+  {% endif %}
+</div>
+{% endif %}

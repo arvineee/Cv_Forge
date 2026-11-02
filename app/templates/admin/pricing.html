@@ -3,6 +3,10 @@
 {% block page_title %}Pricing Plans{% endblock %}
 {% block page_subtitle %}Edit plans that appear on the pricing page{% endblock %}
 {% block page_actions %}
+  <a href="{{ url_for('admin.offers') }}"
+     class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold hover:bg-gray-50 transition">
+    Offers
+  </a>
   <a href="{{ url_for('admin.pricing_new') }}"
      class="inline-flex items-center gap-2 px-4 py-2 rounded-lg gradient-brand text-white text-sm font-semibold hover:opacity-90 transition">
     + New Plan
@@ -27,6 +31,7 @@
         </div>
         <div class="flex flex-wrap gap-4 text-sm text-gray-600">
           <span class="font-semibold">KES {{ plan.price_kes }}/{{ plan.billing_period }}</span>
+          {% if plan.billing_period == 'week' %}<span class="text-xs text-gray-400">(7 days)</span>{% elif plan.billing_period == 'year' %}<span class="text-xs text-gray-400">(365 days)</span>{% endif %}
           <span>CV limit: {{ plan.daily_cv_limit }}/day</span>
           <span>ATS: {{ plan.daily_ats_limit }}/day</span>
           <span>DOCX: {{ '✓' if plan.allow_docx else '✗' }}</span>

@@ -579,7 +579,7 @@ CVForge AI — Product Facts (use these, don't invent anything not listed here):
 - Free plan: limited daily AI generations, limited templates, no DOCX export
 - Pro plan: unlimited AI generations, all templates, DOCX export, version history, AI career coach
 - Payment: M-Pesa (STK Push) or card, via IntaSend
-- Subscriptions run 30 days from payment and do not auto-renew
+- Subscriptions run for the period paid for (weekly, monthly or yearly, starting from payment) and do not auto-renew
 - Support contact: use the in-app support page; there is no phone support
 """
 

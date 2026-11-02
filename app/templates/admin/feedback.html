@@ -1,0 +1,55 @@
+{% extends "base_dashboard.html" %}
+{% block title %}Feedback — Admin{% endblock %}
+{% block page_title %}User Feedback{% endblock %}
+{% block page_subtitle %}{% if avg_rating %}Average rating {{ avg_rating }} / 5 · {% endif %}{{ counts.get('new', 0) }} new{% endblock %}
+
+{% block content %}
+{% set tabs = [('new','New'),('reviewed','Reviewed'),('resolved','Resolved'),('all','All')] %}
+<div class="flex flex-wrap items-center gap-2 mb-4">
+  {% for val, label in tabs %}
+  <a href="{{ url_for('admin.feedback', status=val, category=category) }}"
+     class="px-3 py-1.5 rounded-lg text-sm font-medium {% if status == val %}bg-gray-900 text-white{% else %}border border-gray-200 text-gray-600 hover:bg-gray-50{% endif %}">
+    {{ label }}{% if val != 'all' and counts.get(val) %} <span class="opacity-70">({{ counts.get(val) }})</span>{% endif %}
+  </a>
+  {% endfor %}
+  <form method="GET" class="ml-auto">
+    <input type="hidden" name="status" value="{{ status }}"/>
+    <select name="category" onchange="this.form.submit()" class="border border-gray-200 rounded-lg px-3 py-1.5 text-sm">
+      <option value="">All categories</option>
+      {% for val, label in categories %}
+      <option value="{{ val }}" {{ 'selected' if category == val }}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </form>
+</div>
+
+<div class="space-y-3">
+  {% for item in items %}
+  <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+    <div class="flex flex-wrap items-center gap-2 mb-2 text-xs text-gray-500">
+      <span class="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-semibold">{{ item.category }}</span>
+      {% if item.rating %}<span class="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-semibold">{{ item.rating }}/5</span>{% endif %}
+      <span>{{ item.created_at.strftime('%d %b %Y %H:%M') }}</span>
+      <span>·</span>
+      <span>{% if item.user %}{{ item.user.email }}{% elif item.email %}{{ item.email }} (anonymous){% else %}anonymous{% endif %}</span>
+      {% if item.page %}<span class="truncate max-w-xs">· {{ item.page }}</span>{% endif %}
+    </div>
+    <p class="text-sm text-gray-800 whitespace-pre-line">{{ item.message }}</p>
+
+    <form method="POST" action="{{ url_for('admin.feedback_update', item_id=item.id) }}" class="mt-4 flex flex-col sm:flex-row gap-2">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+      <select name="status" class="border border-gray-200 rounded-lg px-3 py-2 text-sm">
+        {% for val, label in [('new','New'),('reviewed','Reviewed'),('resolved','Resolved')] %}
+        <option value="{{ val }}" {{ 'selected' if item.status == val }}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <input name="admin_note" value="{{ item.admin_note or '' }}" placeholder="Internal note (not shown to the user)"
+             class="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm"/>
+      <button type="submit" class="px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 font-medium">Save</button>
+    </form>
+  </div>
+  {% else %}
+  <div class="text-center py-12 text-gray-400">Nothing here.</div>
+  {% endfor %}
+</div>
+{% endblock %}

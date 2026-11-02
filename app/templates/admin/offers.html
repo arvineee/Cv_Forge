@@ -1,0 +1,79 @@
+{% extends "base_dashboard.html" %}
+{% block title %}Offers — Admin{% endblock %}
+{% block page_title %}Offers & Discounts{% endblock %}
+{% block page_subtitle %}Time-limited discounts. Prices revert to base automatically when an offer ends, sells out, or is voided.{% endblock %}
+{% block page_actions %}
+  <a href="{{ url_for('admin.offer_new') }}"
+     class="inline-flex items-center gap-2 px-4 py-2 rounded-lg gradient-brand text-white text-sm font-semibold hover:opacity-90 transition">
+    + New Offer
+  </a>
+{% endblock %}
+
+{% block content %}
+<div class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-x-auto">
+  <table class="w-full text-sm">
+    <thead class="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
+      <tr>
+        <th class="px-4 py-3 text-left">Offer</th>
+        <th class="px-4 py-3 text-left">Discount</th>
+        <th class="px-4 py-3 text-left">Window</th>
+        <th class="px-4 py-3 text-left">Seats</th>
+        <th class="px-4 py-3 text-left">Status</th>
+        <th class="px-4 py-3 text-right">Actions</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100">
+      {% for row in rows %}
+      {% set o = row.offer %}
+      <tr>
+        <td class="px-4 py-3">
+          <p class="font-semibold text-gray-900">{{ o.name }}</p>
+          <p class="text-xs text-gray-500">{{ o.public_label }}</p>
+          <p class="text-xs text-gray-400">{{ 'All paid plans' if not o.plan_slugs else o.plan_slugs|join(', ') }}</p>
+        </td>
+        <td class="px-4 py-3 font-semibold">
+          {% if o.discount_type == 'percent' %}{{ o.discount_value }}% off{% else %}KES {{ o.discount_value }} off{% endif %}
+        </td>
+        <td class="px-4 py-3 text-xs text-gray-600">
+          {% if o.starts_at %}from {{ o.starts_at.strftime('%d %b %Y') }}<br>{% else %}from now<br>{% endif %}
+          {% if o.ends_at %}until {{ o.ends_at_label }}{% else %}no end date{% endif %}
+        </td>
+        <td class="px-4 py-3 text-xs text-gray-600">
+          {{ row.seats_used }}{% if o.max_redemptions %} / {{ o.max_redemptions }}{% endif %} used<br>
+          <span class="text-gray-400">{{ row.paid_count }} paid · KES {{ row.kes_given_away }} given off</span>
+        </td>
+        <td class="px-4 py-3">
+          {% set styles = {
+            'live': 'bg-green-100 text-green-700',
+            'scheduled': 'bg-blue-100 text-blue-700',
+            'expired': 'bg-gray-100 text-gray-500',
+            'sold_out': 'bg-orange-100 text-orange-700',
+            'voided': 'bg-red-100 text-red-600',
+          } %}
+          <span class="px-2 py-0.5 rounded-full text-xs font-semibold {{ styles[row.status] }}">
+            {{ {'live':'Live','scheduled':'Scheduled','expired':'Expired','sold_out':'Sold out','voided':'Voided'}[row.status] }}
+          </span>
+        </td>
+        <td class="px-4 py-3 text-right whitespace-nowrap">
+          <a href="{{ url_for('admin.offer_edit', offer_id=o.id) }}" class="px-3 py-1.5 text-xs border border-gray-200 rounded-lg hover:bg-gray-50 font-medium">Edit</a>
+          {% if o.is_active %}
+          <form method="POST" action="{{ url_for('admin.offer_void', offer_id=o.id) }}" class="inline"
+                onsubmit="return confirm('Void this offer? Prices return to base immediately.')">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <button type="submit" class="px-3 py-1.5 text-xs border border-red-100 text-red-500 rounded-lg hover:bg-red-50">Void</button>
+          </form>
+          {% else %}
+          <form method="POST" action="{{ url_for('admin.offer_restore', offer_id=o.id) }}" class="inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <button type="submit" class="px-3 py-1.5 text-xs border border-green-100 text-green-600 rounded-lg hover:bg-green-50">Restore</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="px-4 py-12 text-center text-gray-400">No offers yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

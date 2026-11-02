@@ -6,7 +6,8 @@ added pricing plan management, template management
 from flask import Blueprint, render_template, request, flash, redirect, url_for, current_app, abort
 from flask_login import login_required, current_user
 from functools import wraps
-from app.models import db, User, Payment, Subscription, ActivityLog, AIUsage, Template, PricingPlan
+from app.models import (db, User, Payment, Subscription, ActivityLog, AIUsage, Template,
+                        PricingPlan, Offer, OfferRedemption, Feedback)
 
 admin_bp = Blueprint("admin", __name__)
 
@@ -132,7 +133,7 @@ def pricing_new():
             slug=request.form.get("slug", "").lower().strip(),
             name=request.form.get("name", "").strip(),
             price_kes=int(request.form.get("price_kes", 0)),
-            billing_period=request.form.get("billing_period", "month"),
+            billing_period=request.form.get("billing_period", "month") if request.form.get("billing_period") in ("week", "month", "year", "forever") else "month",
             is_active=bool(request.form.get("is_active")),
             is_popular=bool(request.form.get("is_popular")),
             sort_order=int(request.form.get("sort_order", 0)),
@@ -351,3 +352,195 @@ def visitors():
 
 
 
+
+
+# ── Offers (time-limited discounts) ───────────────────────────────
+
+def _offer_form_values(form):
+    """
+    Validate admin input. Returns (data, errors). Prices are never touched
+    here; an offer only describes a discount that applies while it's live.
+    """
+    from app.services.pricing import parse_local_datetime
+    errors = []
+    name = form.get("name", "").strip()
+    public_label = form.get("public_label", "").strip()
+    if not name:
+        errors.append("Internal name is required.")
+    if not public_label:
+        errors.append("Public label is required (e.g. 'Launch week: 30% off').")
+    if len(public_label) > 120:
+        errors.append("Public label must be 120 characters or fewer.")
+
+    discount_type = form.get("discount_type", "percent")
+    if discount_type not in ("percent", "fixed"):
+        errors.append("Discount type must be percent or fixed.")
+    try:
+        discount_value = int(form.get("discount_value", "0"))
+    except ValueError:
+        discount_value = 0
+        errors.append("Discount value must be a whole number.")
+    if discount_type == "percent" and not (1 <= discount_value <= 90):
+        errors.append("Percent discount must be between 1 and 90.")
+    if discount_type == "fixed" and discount_value < 1:
+        errors.append("Fixed discount must be at least KES 1.")
+
+    slugs = [s for s in form.getlist("plan_slugs") if s]
+    plan_slugs = slugs or None  # none ticked = every paid plan
+
+    try:
+        starts_at = parse_local_datetime(form.get("starts_at"))
+        ends_at = parse_local_datetime(form.get("ends_at"))
+    except ValueError:
+        starts_at = ends_at = None
+        errors.append("Start or end date is not a valid date and time.")
+    if starts_at and ends_at and ends_at <= starts_at:
+        errors.append("End must be after start.")
+
+    max_raw = (form.get("max_redemptions") or "").strip()
+    max_redemptions = None
+    if max_raw:
+        try:
+            max_redemptions = int(max_raw)
+            if max_redemptions < 1:
+                errors.append("Maximum redemptions must be at least 1 (or leave blank).")
+        except ValueError:
+            errors.append("Maximum redemptions must be a whole number.")
+
+    data = dict(
+        name=name, public_label=public_label, discount_type=discount_type,
+        discount_value=discount_value, plan_slugs=plan_slugs,
+        starts_at=starts_at, ends_at=ends_at, max_redemptions=max_redemptions,
+        is_active=bool(form.get("is_active")),
+    )
+    return data, errors
+
+
+@admin_bp.route("/offers")
+@login_required
+@admin_required
+def offers():
+    from app.services.pricing import offer_status, redemption_count
+    rows = []
+    for o in Offer.query.order_by(Offer.created_at.desc()).all():
+        redeemed = OfferRedemption.query.filter_by(offer_id=o.id, status="redeemed").all()
+        rows.append({
+            "offer": o,
+            "status": offer_status(o),
+            "seats_used": redemption_count(o),
+            "paid_count": len(redeemed),
+            "kes_given_away": sum(r.base_amount - r.charged_amount for r in redeemed),
+        })
+    return render_template("admin/offers.html", rows=rows)
+
+
+@admin_bp.route("/offers/new", methods=["GET", "POST"])
+@login_required
+@admin_required
+def offer_new():
+    paid_plans = PricingPlan.query.filter(PricingPlan.price_kes > 0).order_by(PricingPlan.sort_order).all()
+    if request.method == "POST":
+        data, errors = _offer_form_values(request.form)
+        if not errors:
+            offer = Offer(**data)
+            db.session.add(offer)
+            db.session.commit()
+            flash(f"Offer '{offer.name}' created.", "success")
+            return redirect(url_for("admin.offers"))
+        for e in errors:
+            flash(e, "error")
+        return render_template("admin/offer_form.html", offer=None, paid_plans=paid_plans, form=request.form)
+    return render_template("admin/offer_form.html", offer=None, paid_plans=paid_plans, form=None)
+
+
+@admin_bp.route("/offers/<int:offer_id>/edit", methods=["GET", "POST"])
+@login_required
+@admin_required
+def offer_edit(offer_id):
+    offer = db.session.get(Offer, offer_id)
+    if not offer:
+        abort(404)
+    paid_plans = PricingPlan.query.filter(PricingPlan.price_kes > 0).order_by(PricingPlan.sort_order).all()
+    if request.method == "POST":
+        data, errors = _offer_form_values(request.form)
+        if not errors:
+            for k, v in data.items():
+                setattr(offer, k, v)
+            db.session.commit()
+            flash(f"Offer '{offer.name}' updated.", "success")
+            return redirect(url_for("admin.offers"))
+        for e in errors:
+            flash(e, "error")
+        return render_template("admin/offer_form.html", offer=offer, paid_plans=paid_plans, form=request.form)
+    return render_template("admin/offer_form.html", offer=offer, paid_plans=paid_plans, form=None)
+
+
+@admin_bp.route("/offers/<int:offer_id>/void", methods=["POST"])
+@login_required
+@admin_required
+def offer_void(offer_id):
+    """Void: the offer stops applying immediately and prices revert to base."""
+    offer = db.session.get(Offer, offer_id)
+    if not offer:
+        abort(404)
+    offer.is_active = False
+    db.session.add(ActivityLog(
+        user_id=current_user.id, action="admin_offer_void",
+        resource_type="offer", resource_id=offer.id,
+        ip_address=request.remote_addr, details={"name": offer.name},
+    ))
+    db.session.commit()
+    flash(f"Offer '{offer.name}' voided. Prices have reverted to base.", "info")
+    return redirect(url_for("admin.offers"))
+
+
+@admin_bp.route("/offers/<int:offer_id>/restore", methods=["POST"])
+@login_required
+@admin_required
+def offer_restore(offer_id):
+    offer = db.session.get(Offer, offer_id)
+    if not offer:
+        abort(404)
+    offer.is_active = True
+    db.session.commit()
+    flash(f"Offer '{offer.name}' is active again (dates and seat limit still apply).", "success")
+    return redirect(url_for("admin.offers"))
+
+
+# ── Feedback review ───────────────────────────────────────────────
+
+@admin_bp.route("/feedback")
+@login_required
+@admin_required
+def feedback():
+    from app.routes.feedback import CATEGORIES
+    status = request.args.get("status", "new")
+    category = request.args.get("category", "")
+    q = Feedback.query
+    if status != "all":
+        q = q.filter_by(status=status)
+    if category:
+        q = q.filter_by(category=category)
+    items = q.order_by(Feedback.created_at.desc()).limit(200).all()
+    counts = dict(db.session.query(Feedback.status, db.func.count(Feedback.id))
+                  .group_by(Feedback.status).all())
+    avg_rating = db.session.query(db.func.avg(Feedback.rating)).filter(Feedback.rating.isnot(None)).scalar()
+    return render_template("admin/feedback.html", items=items, status=status,
+                           category=category, categories=CATEGORIES, counts=counts,
+                           avg_rating=round(avg_rating, 1) if avg_rating else None)
+
+
+@admin_bp.route("/feedback/<int:item_id>", methods=["POST"])
+@login_required
+@admin_required
+def feedback_update(item_id):
+    item = db.session.get(Feedback, item_id)
+    if not item:
+        abort(404)
+    new_status = request.form.get("status", item.status)
+    if new_status in ("new", "reviewed", "resolved"):
+        item.status = new_status
+    item.admin_note = (request.form.get("admin_note", item.admin_note or "").strip() or None)
+    db.session.commit()
+    flash("Feedback updated.", "success")
+    return redirect(request.referrer or url_for("admin.feedback"))

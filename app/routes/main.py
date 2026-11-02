@@ -1,13 +1,14 @@
 """CVForge AI - Main / Public Blueprint"""
 from flask import Blueprint, render_template, abort
 from app.models import Resume, PricingPlan
+from app.services.pricing import annotate_plans, banner_offer
 
 main_bp = Blueprint("main", __name__)
 
 
 @main_bp.route("/")
 def index():
-    plans = PricingPlan.query.filter_by(is_active=True).order_by(PricingPlan.sort_order).all()
+    plans = annotate_plans(PricingPlan.query.filter_by(is_active=True).order_by(PricingPlan.sort_order).all())
     return render_template("landing.html", plans=plans)
 
 
@@ -18,8 +19,8 @@ def about():
 
 @main_bp.route("/pricing")
 def pricing():
-    plans = PricingPlan.query.filter_by(is_active=True).order_by(PricingPlan.sort_order).all()
-    return render_template("pricing.html", plans=plans)
+    plans = annotate_plans(PricingPlan.query.filter_by(is_active=True).order_by(PricingPlan.sort_order).all())
+    return render_template("pricing.html", plans=plans, offer_banner=banner_offer())
 
 
 @main_bp.route("/resume/<token>")

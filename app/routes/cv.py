@@ -404,9 +404,12 @@ def wizard_step(resume_id, step):
         # "from KES X" price instead of a vague "choose a plan".
         lowest_plan = None
         if not can_download:
+            from app.services.pricing import annotate_plans
             lowest_plan = (PricingPlan.query
                            .filter(PricingPlan.is_active.is_(True), PricingPlan.price_kes > 0)
                            .order_by(PricingPlan.price_kes).first())
+            if lowest_plan:
+                annotate_plans([lowest_plan])
 
         context.update(
             allow_docx=allow_docx, allow_coach=allow_coach,

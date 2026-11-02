@@ -13,11 +13,26 @@ INK = "#0E1A2B"
 MUTED = "#5B6B7F"
 FONT = "Arial,Helvetica,sans-serif"
 
-# Shown under the upgrade button. Update when pricing or billing terms change.
-NUDGE_PRICE_NOTE = (
-    "From KES 50 a month. Pay with M-Pesa. Each subscription lasts 30 days "
-    "and does not renew automatically."
-)
+def nudge_price_note() -> str:
+    """
+    Price line under the upgrade button, built from the live plan table so it
+    always matches what checkout charges (including any active offer).
+    Falls back to a neutral line if the lookup fails.
+    """
+    try:
+        from app.models import PricingPlan
+        from app.services.pricing import annotate_plans
+        cheapest = (PricingPlan.query
+                    .filter(PricingPlan.is_active.is_(True), PricingPlan.price_kes > 0)
+                    .order_by(PricingPlan.price_kes).first())
+        if cheapest:
+            annotate_plans([cheapest])
+            return (f"From KES {cheapest.display_price} per {cheapest.billing_period}. "
+                    f"Pay with M-Pesa. Each payment lasts {cheapest.period_days} days "
+                    f"and does not renew automatically.")
+    except Exception:
+        pass
+    return "Pay with M-Pesa or card. Each payment lasts for its plan period and does not renew automatically."
 
 # What Pro includes (matches AIService.SUPPORT_KNOWLEDGE).
 PRO_BENEFITS = [
@@ -256,7 +271,7 @@ def _build_nudge_email(user, content, billing_url):
         hero_text="See what changes when you move from Free to Pro.",
         cta_label="See Pro plans",
         cta_url=billing_url,
-        cta_note=NUDGE_PRICE_NOTE,
+        cta_note=nudge_price_note(),
         footer_note=(
             "You're receiving this because you're on the free plan and subscribed to "
             "updates. To stop these emails, turn off &ldquo;Newsletter&rdquo; in your account settings."
@@ -267,7 +282,7 @@ def _build_nudge_email(user, content, billing_url):
         f"Hi {user.first_name or 'there'},",
         *content["paragraphs"],
         "What Pro adds:\n" + "\n".join(f"- {t}: {d}" for t, d in PRO_BENEFITS),
-        f"See Pro plans: {billing_url}\n{NUDGE_PRICE_NOTE}",
+        f"See Pro plans: {billing_url}\n{nudge_price_note()}",
         "You're receiving this because you're on the free plan and subscribed to updates. "
         'To stop these emails, turn off "Newsletter" in your account settings.',
         f"{BRAND_NAME}. Built in Kenya.",

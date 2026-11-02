@@ -291,7 +291,7 @@
           {% if plan.price_kes == 0 %}
           <span class="display" style="font-weight: 800; font-size: 40px;">Free</span>
           {% else %}
-          <span class="display" style="font-weight: 800; font-size: 40px;">KES {{ plan.price_kes }}</span>
+          {% if plan.live_offer %}<span style="display:block; font-size: 18px; color: var(--ink-2); text-decoration: line-through;">KES {{ plan.base_price }}</span>{% endif %}<span class="display" style="font-weight: 800; font-size: 40px;">KES {{ plan.display_price }}</span>
           <span style="color: var(--ink-2);">/{{ plan.billing_period }}</span>
           {% endif %}
         </p>

@@ -7,7 +7,7 @@ import hmac
 import json
 from datetime import datetime
 from flask import Blueprint, request, jsonify, current_app
-from app.models import db, User, Payment, Subscription
+from app.models import db, User, Payment, Subscription, PricingPlan
 
 webhooks_bp = Blueprint("webhooks", __name__)
 
@@ -73,18 +73,21 @@ def _handle_payment_success(data: dict):
         db.session.rollback()  # release the row lock, nothing to write
         return
 
-    subscription.activate(transaction_id=transaction_id)
+    # Duration comes from the plan (weekly / monthly / yearly), not a hardcoded 30.
+    from datetime import timedelta, timezone as _tz
+    from app.services.pricing import period_days, confirm_redemption
+    plan_row = PricingPlan.query.filter_by(slug=subscription.plan).first()
+    days = period_days(plan_row.billing_period if plan_row else "month")
+
+    subscription.activate(transaction_id=transaction_id, days=days)
+    confirm_redemption(subscription.id)
 
     # Use db.session.get() — not User.query.get() which is deprecated in SQLAlchemy 2.x
     user = db.session.get(User, subscription.user_id)
     if user:
         user.plan = subscription.plan
-        # FIX: plan_expires_at is DateTime(timezone=True); the old code wrote
-        # utcnow() (a naive datetime, by design for other columns) into it,
-        # which is inconsistent with how reset_token_expires etc. are set
-        # elsewhere with datetime.now(timezone.utc). Standardize on aware here.
-        from datetime import timedelta, timezone as _tz
-        user.plan_expires_at = datetime.now(_tz.utc) + timedelta(days=30)
+        # plan_expires_at is DateTime(timezone=True); keep it aware here.
+        user.plan_expires_at = datetime.now(_tz.utc) + timedelta(days=days)
 
     payment = Payment.query.filter_by(
         lipana_checkout_request_id=reference
@@ -103,6 +106,8 @@ def _handle_payment_failed(data: dict):
     subscription = Subscription.query.filter_by(payment_reference=reference).first()
     if subscription:
         subscription.status = "failed"
+        from app.services.pricing import release_redemption
+        release_redemption(subscription.id)  # return the offer seat
     payment = Payment.query.filter_by(lipana_checkout_request_id=reference).first()
     if payment:
         payment.status = "failed"

@@ -1,0 +1,59 @@
+<div class="max-w-2xl">
+    <form method="POST" action="{{ url_for('feedback.index') }}"
+        class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-6">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+    <input type="hidden" name="page" value="{{ request.args.get('from', '') }}"/>
+
+    <!-- Honeypot: hidden from people, irresistible to bots -->
+    <div style="position:absolute; left:-10000px; top:auto; width:1px; height:1px; overflow:hidden;" aria-hidden="true">
+      <label>Website <input type="text" name="website" tabindex="-1" autocomplete="off"/></label>
+    </div>
+
+    <fieldset>
+      <legend class="text-sm font-semibold text-gray-900 mb-2">What is this about?</legend>
+      <div class="grid sm:grid-cols-2 gap-2">
+        {% for value, label in categories %}
+        <label class="flex items-center gap-2 px-3 py-2.5 rounded-lg border border-gray-200 text-sm text-gray-700 cursor-pointer hover:bg-gray-50 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
+          <input type="radio" name="category" value="{{ value }}" {% if loop.first %}checked{% endif %} class="text-blue-600 focus:ring-blue-500"/>
+          {{ label }}
+        </label>
+        {% endfor %}
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend class="text-sm font-semibold text-gray-900 mb-2">How would you rate your experience? <span class="font-normal text-gray-400">(optional)</span></legend>
+      <div class="flex gap-2" role="radiogroup" aria-label="Rating">
+        {% for n in range(1, 6) %}
+        <label class="w-11 h-11 flex items-center justify-center rounded-lg border border-gray-200 text-sm font-semibold text-gray-600 cursor-pointer hover:bg-gray-50 has-[:checked]:bg-amber-100 has-[:checked]:border-amber-400 has-[:checked]:text-amber-800">
+          <input type="radio" name="rating" value="{{ n }}" class="sr-only"/>{{ n }}
+        </label>
+        {% endfor %}
+      </div>
+    </fieldset>
+
+    <div>
+      <label for="message" class="block text-sm font-semibold text-gray-900 mb-2">Your feedback</label>
+      <textarea id="message" name="message" rows="6" required minlength="10" maxlength="2000"
+                placeholder="The more specific you are, the faster we can act on it. What were you trying to do?"
+                class="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"></textarea>
+      <p class="text-xs text-gray-400 mt-1">Between 10 and 2000 characters.</p>
+    </div>
+
+    {% if not current_user.is_authenticated %}
+    <div>
+      <label for="email" class="block text-sm font-semibold text-gray-900 mb-2">Email <span class="font-normal text-gray-400">(optional, only if you want a reply)</span></label>
+      <input id="email" type="email" name="email" maxlength="255" autocomplete="email"
+             class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+    </div>
+    {% endif %}
+
+    <div class="flex items-center justify-between gap-4 pt-2">
+      <p class="text-xs text-gray-400">We read every message. We won't use it for marketing.</p>
+      <button type="submit"
+              class="px-6 py-2.5 gradient-brand text-white font-semibold rounded-lg text-sm hover:opacity-90 transition">
+        Send feedback
+      </button>
+    </div>
+  </form>
+</div>

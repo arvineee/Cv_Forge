@@ -23,6 +23,7 @@
       <p class="text-gray-500 text-lg">Pay with M-Pesa or Card. Cancel anytime. No hidden fees.</p>
     </div>
 
+    {% include "_offer_banner.html" %}
     <!-- Plans grid — rendered directly from DB, not via an include partial -->
     <div class="grid md:grid-cols-{{ plans|length }} gap-6 mb-16">
       {% for plan in plans %}
@@ -41,10 +42,11 @@
             {% if plan.price_kes == 0 %}
             <span class="text-4xl font-black text-gray-900">Free</span>
             {% else %}
-            <span class="text-4xl font-black text-gray-900">KES {{ plan.price_kes }}</span>
+            {% if plan.live_offer %}<span class="block text-sm font-semibold text-gray-400 line-through">KES {{ plan.base_price }}</span>{% endif %}<span class="text-4xl font-black text-gray-900">KES {{ plan.display_price }}</span>
             <span class="text-gray-400 text-sm mb-1">/{{ plan.billing_period }}</span>
             {% endif %}
           </div>
+          {% if plan.live_offer %}<p class="mt-2 inline-block text-xs font-semibold text-amber-800 bg-amber-50 px-2.5 py-1 rounded-full">{{ plan.live_offer.public_label }}</p>{% endif %}
         </div>
 
         <ul class="space-y-3 mb-8 flex-1">
@@ -67,7 +69,7 @@
         <div x-data="{open:false}" class="relative">
           <button @click="open=!open"
                   class="w-full py-3 gradient-brand text-white font-semibold rounded-xl hover:opacity-90 transition text-sm">
-            Subscribe — KES {{ plan.price_kes }}
+            Subscribe — KES {{ plan.display_price }}
           </button>
           <div x-show="open" x-cloak @click.away="open=false"
                class="absolute bottom-full mb-2 left-0 right-0 bg-white rounded-xl border border-gray-200 shadow-2xl p-5 z-10">
@@ -79,7 +81,7 @@
                      class="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 mb-3"/>
               <button type="submit"
                       class="w-full py-2.5 gradient-brand text-white font-semibold rounded-lg text-sm hover:opacity-90 transition">
-                Pay KES {{ plan.price_kes }}
+                Pay KES {{ plan.display_price }}
               </button>
             </form>
 
@@ -168,7 +170,7 @@
       <div class="space-y-4 max-w-2xl mx-auto" x-data="{open: null}">
         {% for q, a in [
           ('How does payment work?', 'Click Subscribe and choose M-Pesa or Card. With M-Pesa, enter your Safaricom number and confirm the STK push on your phone. With Card, you\'ll be taken to a secure checkout page. Either way, your plan activates within seconds of payment.'),
-          ('Can I cancel anytime?', 'Yes. Your plan runs for 30 days from payment date. It won\'t auto-renew — you\'ll need to manually subscribe again if you want to continue.'),
+          ('Can I cancel anytime?', 'Yes. Your plan runs for the period you pay for (7 days, 30 days, or a year, depending on the plan), starting from payment. It won\'t auto-renew, so you\'ll need to subscribe again to continue.'),
           ('What\'s the difference between Free and Pro?', 'Free gives you 3 AI generations per day and access to 5 templates. Pro removes all daily limits, unlocks all 12+ templates, adds DOCX download, and enables version history.'),
           ('Is my CV data secure?', 'Yes. Your CV data is encrypted at rest and in transit. We never share your personal information with third parties or recruiters.'),
         ] %}

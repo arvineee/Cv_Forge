@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Send feedback — CVForge AI{% endblock %}
+{% block body %}
+<nav class="bg-white border-b border-gray-100">
+  <div class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+    <a href="{{ url_for('main.index') }}" class="flex items-center gap-2 font-bold text-xl text-gray-900">
+      <div class="w-8 h-8 rounded-lg gradient-brand flex items-center justify-center text-white font-black text-xs">CV</div>
+      CVForge AI
+    </a>
+    <a href="{{ url_for('main.pricing') }}" class="text-sm font-medium text-gray-600 hover:text-gray-900">Pricing</a>
+  </div>
+</nav>
+<main class="py-12 px-4">
+  <div class="max-w-2xl mx-auto mb-8">
+    <h1 class="text-3xl font-black text-gray-900">Send us feedback</h1>
+    <p class="text-gray-500 mt-2">Tell us what's working, what isn't, and what would make CVForge worth paying for.</p>
+  </div>
+  {% include "feedback/_form.html" %}
+</main>
+{% endblock %}

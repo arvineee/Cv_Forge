@@ -294,10 +294,10 @@ class Subscription(db.Model):
     updated_at = db.Column(db.DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)
     payments = db.relationship("Payment", backref="subscription", lazy="dynamic")
 
-    def activate(self, transaction_id: str = None):
+    def activate(self, transaction_id: str = None, days: int = 30):
         self.status = "active"
         self.start_date = utcnow()
-        self.end_date = self.start_date + timedelta(days=30)
+        self.end_date = self.start_date + timedelta(days=days)
         if transaction_id:
             self.lipana_transaction_id = transaction_id
 
@@ -512,3 +512,109 @@ class PageVisit(db.Model):
 
 
 
+
+
+# ── Offers (time-limited discounts overlaid on plan prices) ───────
+# Offers never mutate PricingPlan.price_kes. The effective price is
+# computed at read/checkout time (see app/services/pricing.py), so when
+# an offer expires, sells out, or is voided, the base price returns
+# automatically with nothing to undo.
+
+EAT = timezone(timedelta(hours=3))  # Africa/Nairobi, no DST
+
+
+class Offer(db.Model):
+    __tablename__ = "offers"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)            # internal label
+    public_label = db.Column(db.String(120), nullable=False)    # shown to customers
+    discount_type = db.Column(db.String(10), nullable=False, default="percent")  # percent | fixed
+    discount_value = db.Column(db.Integer, nullable=False)
+    # NULL = applies to every paid plan; otherwise a list of plan slugs.
+    plan_slugs = db.Column(db.JSON, nullable=True)
+    starts_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    ends_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    max_redemptions = db.Column(db.Integer, nullable=True)
+    # Manual kill switch. False = voided, regardless of dates.
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    created_at = db.Column(db.DateTime(timezone=True), default=utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+    redemptions = db.relationship("OfferRedemption", backref="offer", lazy="dynamic",
+                                  cascade="all, delete-orphan")
+
+    def applies_to(self, plan_slug: str) -> bool:
+        return not self.plan_slugs or plan_slug in self.plan_slugs
+
+    @property
+    def starts_at_aware(self):
+        return _make_aware(self.starts_at)
+
+    @property
+    def ends_at_aware(self):
+        return _make_aware(self.ends_at)
+
+    @staticmethod
+    def _fmt_local(dt, fmt):
+        return _make_aware(dt).astimezone(EAT).strftime(fmt) if dt else ""
+
+    @property
+    def ends_at_label(self) -> str:
+        return self._fmt_local(self.ends_at, "%d %b %Y, %H:%M EAT")
+
+    @property
+    def starts_at_input(self) -> str:
+        return self._fmt_local(self.starts_at, "%Y-%m-%dT%H:%M")
+
+    @property
+    def ends_at_input(self) -> str:
+        return self._fmt_local(self.ends_at, "%Y-%m-%dT%H:%M")
+
+    def __repr__(self):
+        return f"<Offer {self.name} {self.discount_type}={self.discount_value}>"
+
+
+class OfferRedemption(db.Model):
+    """
+    One row per checkout that used an offer. Status moves:
+      pending   -> created at checkout, holds a seat in max_redemptions
+      redeemed  -> payment confirmed by webhook
+      released  -> payment failed, seat returned
+    """
+    __tablename__ = "offer_redemptions"
+
+    id = db.Column(db.Integer, primary_key=True)
+    offer_id = db.Column(db.Integer, db.ForeignKey("offers.id"), nullable=False, index=True)
+    subscription_id = db.Column(db.Integer, db.ForeignKey("subscriptions.id"), nullable=False, unique=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    base_amount = db.Column(db.Integer, nullable=False)
+    charged_amount = db.Column(db.Integer, nullable=False)
+    status = db.Column(db.String(20), nullable=False, default="pending")
+    created_at = db.Column(db.DateTime(timezone=True), default=utcnow, nullable=False, index=True)
+
+    def __repr__(self):
+        return f"<OfferRedemption offer={self.offer_id} {self.status}>"
+
+
+# ── Feedback ──────────────────────────────────────────────────────
+
+class Feedback(db.Model):
+    __tablename__ = "feedback"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
+    email = db.Column(db.String(255), nullable=True)
+    category = db.Column(db.String(20), nullable=False, default="general")
+    rating = db.Column(db.Integer, nullable=True)            # 1-5, optional
+    message = db.Column(db.Text, nullable=False)
+    page = db.Column(db.String(255), nullable=True)
+    status = db.Column(db.String(20), nullable=False, default="new")  # new | reviewed | resolved
+    admin_note = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime(timezone=True), default=utcnow, nullable=False, index=True)
+    updated_at = db.Column(db.DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+    user = db.relationship("User", backref=db.backref("feedback_items", lazy="dynamic"))
+
+    def __repr__(self):
+        return f"<Feedback {self.category} {self.status}>"

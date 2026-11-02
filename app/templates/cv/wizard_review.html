@@ -100,7 +100,7 @@
       {% if lowest_plan %}
       <p class="text-xs text-gray-500">Plans from</p>
       <p class="text-3xl font-extrabold text-gray-900 leading-none mb-1">
-        KES {{ lowest_plan.price_kes }}<span class="text-sm font-medium text-gray-500"> / {{ lowest_plan.billing_period }}</span>
+        KES {{ lowest_plan.display_price }}<span class="text-sm font-medium text-gray-500"> / {{ lowest_plan.billing_period }}</span>
       </p>
       {% endif %}
       <p class="text-xs text-gray-500 mb-4">Pay with M-Pesa or card · takes about a minute</p>
