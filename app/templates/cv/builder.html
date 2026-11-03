@@ -48,6 +48,34 @@
         </div>
       </div>
 
+        {% if resume %}
+        <!-- Profile photo (optional; used by sidebar templates) -->
+        <div class="border-t border-gray-100 pt-4">
+          <h3 class="text-sm font-semibold text-gray-900 mb-1">Profile photo <span class="font-normal text-gray-400">(optional, for sidebar templates)</span></h3>
+          {% if (resume.personal_info or {}).photo %}
+          <div class="flex items-center gap-4 my-3">
+            <img src="{{ url_for('cv.photo_image', resume_id=resume.id) }}" alt="Your profile photo"
+                 class="w-20 h-20 rounded-full object-cover border border-gray-200"/>
+            <form method="POST" action="{{ url_for('cv.remove_photo', resume_id=resume.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+              <button type="submit" class="text-sm text-red-600 hover:underline">Remove photo</button>
+            </form>
+          </div>
+          {% endif %}
+          <form method="POST" enctype="multipart/form-data" action="{{ url_for('cv.upload_photo', resume_id=resume.id) }}" class="space-y-3">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <input type="file" name="photo" accept="image/jpeg,image/png" class="text-sm"/>
+            <label class="flex items-start gap-2 text-xs text-gray-600">
+              <input type="checkbox" name="consent" value="1" required class="mt-0.5"/>
+              <span>I agree that this photo can appear on CVs I download. I can remove it at any time, and it is deleted when I remove it or delete this CV.</span>
+            </label>
+            <button type="submit" class="px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 font-medium">Upload photo</button>
+            <p class="text-xs text-gray-400">JPEG or PNG, up to 5 MB. It is cropped to a square. Use a clear, recent head-and-shoulders photo.</p>
+          </form>
+        </div>
+        {% endif %}
+      </div>
+
       <!-- Step 2: Summary -->
       <div x-show="currentStep === 2" class="p-6 space-y-4">
         <div class="flex items-center justify-between">

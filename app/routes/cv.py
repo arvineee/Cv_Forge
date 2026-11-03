@@ -831,12 +831,12 @@ def download(resume_id, fmt):
     try:
         if fmt == "pdf":
             from app.services.pdf_service import PDFService
-            file_path = PDFService().generate(resume)
+            file_path = PDFService().generate(resume, photo_dir=_photo_dir())
             mimetype = "application/pdf"
             dl_name = f"{resume.title.replace(' ', '_')}.pdf"
         else:
             from app.services.docx_service import DOCXService
-            file_path = DOCXService().generate(resume)
+            file_path = DOCXService().generate(resume, photo_dir=_photo_dir())
             mimetype = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             dl_name = f"{resume.title.replace(' ', '_')}.docx"
 
@@ -853,11 +853,90 @@ def download(resume_id, fmt):
         return redirect(url_for("cv.wizard_step", resume_id=resume_id, step="review"))
 
 
+def _photo_dir() -> str:
+    import os
+    from app.services.storage import resolve_upload_folder
+    return os.path.join(resolve_upload_folder(), "photos")
+
+
+@cv_bp.route("/<int:resume_id>/photo", methods=["POST"])
+@login_required
+def upload_photo(resume_id):
+    """Add or replace the profile photo. Requires an explicit consent tick."""
+    from app.services.photo_service import process_photo, delete_photo, PhotoRejected
+    resume = Resume.query.filter_by(id=resume_id, user_id=current_user.id).first_or_404()
+    back = url_for("cv.builder", resume_id=resume.id)
+
+    if not request.form.get("consent"):
+        flash("Please tick the consent box before uploading a photo.", "error")
+        return redirect(back)
+
+    upload = request.files.get("photo")
+    if not upload or not upload.filename:
+        flash("Choose a photo to upload.", "error")
+        return redirect(back)
+
+    try:
+        filename = process_photo(upload.stream, _photo_dir())
+    except PhotoRejected as e:
+        flash(str(e), "error")
+        return redirect(back)
+
+    info = dict(resume.personal_info or {})
+    old = info.get("photo")
+    info["photo"] = filename
+    info["photo_consent"] = True
+    resume.personal_info = info
+    if old:
+        delete_photo(_photo_dir(), old)
+    db.session.commit()
+    flash("Photo added. It will appear on the sidebar templates.", "success")
+    return redirect(back)
+
+
+@cv_bp.route("/<int:resume_id>/photo.jpg")
+@login_required
+def photo_image(resume_id):
+    """Serve the owner's own photo to their builder page. Never public."""
+    import os
+    from flask import send_file, abort
+    resume = Resume.query.filter_by(id=resume_id, user_id=current_user.id).first_or_404()
+    filename = (resume.personal_info or {}).get("photo")
+    if not filename:
+        abort(404)
+    path = os.path.join(_photo_dir(), os.path.basename(filename))
+    if not os.path.isfile(path):
+        abort(404)
+    resp = send_file(path, mimetype="image/jpeg")
+    resp.headers["Cache-Control"] = "private, no-store"
+    return resp
+
+
+@cv_bp.route("/<int:resume_id>/photo/remove", methods=["POST"])
+@login_required
+def remove_photo(resume_id):
+    from app.services.photo_service import delete_photo
+    resume = Resume.query.filter_by(id=resume_id, user_id=current_user.id).first_or_404()
+    info = dict(resume.personal_info or {})
+    if info.get("photo"):
+        delete_photo(_photo_dir(), info["photo"])
+    info.pop("photo", None)
+    info.pop("photo_consent", None)
+    resume.personal_info = info
+    db.session.commit()
+    flash("Photo removed.", "info")
+    return redirect(url_for("cv.builder", resume_id=resume.id))
+
+
 @cv_bp.route("/<int:resume_id>/delete", methods=["POST"])
 @login_required
 def delete(resume_id):
     resume = Resume.query.filter_by(id=resume_id, user_id=current_user.id).first_or_404()
     title = resume.title
+    from app.services.photo_service import delete_photo
+    photo = (resume.personal_info or {}).get("photo")
+    if photo:
+        delete_photo(_photo_dir(), photo)
     db.session.delete(resume)
     _log("cv_delete", resume_id, {"title": title})
     db.session.commit()

@@ -339,9 +339,17 @@ def _register_cli(app: Flask):
 
     @app.cli.command("seed-templates")
     def seed_templates():
-        """Seed default CV templates into the database."""
-        if Template.query.count() > 0:
-            click.secho("Templates already exist. Use admin panel to manage them.", fg="yellow")
+        """Seed default CV templates. Adds only missing slugs, so it is safe to re-run."""
+        from app.services.template_catalog import LAYOUT_TEMPLATES
+        existing = {slug for (slug,) in db.session.query(Template.slug).all()}
+        if existing:
+            added = [Template(**t) for t in LAYOUT_TEMPLATES if t["slug"] not in existing]
+            if not added:
+                click.secho("All templates already present. Use admin panel to manage them.", fg="yellow")
+                return
+            db.session.bulk_save_objects(added)
+            db.session.commit()
+            click.secho(f"✓ Added {len(added)} new template(s).", fg="green")
             return
         templates = [
             Template(slug="classic-navy", name="Classic Navy", category="professional",
@@ -381,9 +389,26 @@ def _register_cli(app: Flask):
                      description="Two-column layout maximizes space. Ideal for senior professionals.",
                      is_premium=True, sort_order=12, accent_color="#4f46e5", font_style="modern"),
         ]
+        templates += [Template(**t) for t in LAYOUT_TEMPLATES]
         db.session.bulk_save_objects(templates)
         db.session.commit()
         click.secho(f"✓ {len(templates)} templates seeded.", fg="green")
+
+    @app.cli.command("set-thumbnails")
+    def set_thumbnails():
+        """Link each template to its gallery preview image, if one exists. Safe to re-run."""
+        import os
+        folder = os.path.join(app.root_path, "static", "templates")
+        updated = 0
+        for t in Template.query.all():
+            filename = f"{t.slug}.png"
+            if os.path.isfile(os.path.join(folder, filename)):
+                url = f"/static/templates/{filename}"
+                if t.thumbnail_url != url:
+                    t.thumbnail_url = url
+                    updated += 1
+        db.session.commit()
+        click.secho(f"✓ Preview images linked to {updated} template(s).", fg="green")
 
     @app.cli.command("db-init")
     def db_init():
@@ -397,6 +422,7 @@ def _register_cli(app: Flask):
         runner = ctx_app.test_cli_runner()
         runner.invoke(args=["seed-plans"])
         runner.invoke(args=["seed-templates"])
+        runner.invoke(args=["set-thumbnails"])
         click.secho("\n✓ Database initialized. Run 'flask create-admin' to create your admin account.", fg="green")
 
     @app.cli.command("stats")

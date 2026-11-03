@@ -240,6 +240,124 @@ def _add_page_number_field(para):
 # Main Service
 # ─────────────────────────────────────────────────────────────
 
+
+MAIN_SECTIONS_ALL = ["summary", "work", "education", "skills", "certifications", "achievements",
+                     "awards", "projects", "publications", "volunteer", "languages", "interests",
+                     "references"]
+MAIN_SECTIONS_SIDEBAR = ["summary", "work", "certifications", "achievements", "awards", "projects",
+                         "publications", "volunteer", "interests", "references"]
+
+
+def _insert_ppr_child(pPr, element, before_tags):
+    """Insert element into pPr before the first child listed in before_tags (Word's schema order)."""
+    for child in pPr:
+        if child.tag in [qn(t) for t in before_tags]:
+            child.addprevious(element)
+            return
+    pPr.append(element)
+
+
+def _shade_paragraph(p, hex_color: str):
+    pPr = p._p.get_or_add_pPr()
+    shd = OxmlElement("w:shd")
+    shd.set(qn("w:val"), "clear")
+    shd.set(qn("w:color"), "auto")
+    shd.set(qn("w:fill"), hex_color)
+    _insert_ppr_child(pPr, shd, ["w:tabs", "w:spacing", "w:ind", "w:jc", "w:rPr"])
+
+
+def _timeline_mark(container, start_index: int, hex_color: str):
+    """
+    Give one entry a coloured left rule and a dot on its first line. Blank
+    spacing paragraphs are skipped, so each entry gets its own rule.
+    Bullet paragraphs are rebuilt as plain paragraphs with a typed bullet.
+    Word's numbering doesn't reliably carry the rule and indent, so this
+    keeps the timeline consistent in every viewer.
+    """
+    paras = [p for p in container.paragraphs[start_index:] if p.text.strip()]
+    if not paras:
+        return
+    for p in paras:
+        pPr = p._p.get_or_add_pPr()
+        is_bullet = p.style is not None and p.style.name == "List Bullet"
+        if is_bullet:
+            pStyle = pPr.find(qn("w:pStyle"))
+            if pStyle is not None:
+                pPr.remove(pStyle)
+            numPr = pPr.find(qn("w:numPr"))
+            if numPr is not None:
+                pPr.remove(numPr)
+            bullet = p.add_run("•  ")
+            bullet.font.size = Pt(10)
+            _move_run_to_front(p, bullet)
+            p.paragraph_format.first_line_indent = Inches(0)
+            p.paragraph_format.left_indent = Inches(0.4)
+        else:
+            p.paragraph_format.left_indent = Inches(0.4)
+        pBdr = OxmlElement("w:pBdr")
+        left = OxmlElement("w:left")
+        left.set(qn("w:val"), "single")
+        left.set(qn("w:sz"), "18")
+        left.set(qn("w:space"), "10")
+        left.set(qn("w:color"), hex_color)
+        pBdr.append(left)
+        _insert_ppr_child(pPr, pBdr, ["w:shd", "w:tabs", "w:spacing", "w:ind", "w:jc", "w:rPr"])
+    first = paras[0]
+    if not first.text.startswith("•"):
+        dot = first.add_run("●  ")
+        dot.font.color.rgb = RGBColor.from_string(hex_color)
+        dot.font.size = Pt(8)
+        _move_run_to_front(first, dot)
+
+
+def _move_run_to_front(p, run):
+    """Move a run that was just appended to the start of its paragraph, after pPr."""
+    p._p.remove(run._r)
+    pPr = p._p.pPr
+    idx = list(p._p).index(pPr) + 1 if pPr is not None else 0
+    p._p.insert(idx, run._r)
+
+
+def _shade_cell(cell, hex_color: str):
+    tcPr = cell._tc.get_or_add_tcPr()
+    shd = OxmlElement("w:shd")
+    shd.set(qn("w:val"), "clear")
+    shd.set(qn("w:color"), "auto")
+    shd.set(qn("w:fill"), hex_color)
+    tcPr.append(shd)
+
+
+def _cell_margins(cell, top_in: float, bottom_in: float, left_in: float, right_in: float):
+    tcPr = cell._tc.get_or_add_tcPr()
+    mar = OxmlElement("w:tcMar")
+    for side, val in (("top", top_in), ("left", left_in), ("bottom", bottom_in), ("right", right_in)):
+        el = OxmlElement(f"w:{side}")
+        el.set(qn("w:w"), str(int(val * 1440)))
+        el.set(qn("w:type"), "dxa")
+        mar.append(el)
+    tcPr.append(mar)
+
+
+def _remove_empty_first_paragraph(cell):
+    if cell.paragraphs and not cell.paragraphs[0].text:
+        el = cell.paragraphs[0]._p
+        el.getparent().remove(el)
+
+
+def _add_photo(paragraph, photo_path: str, width):
+    from app.services.photo_service import circle_png
+    paragraph.add_run().add_picture(circle_png(photo_path), width=width)
+
+
+def _photo_path(personal_info, photo_dir):
+    """Consent-gated, existing-file-only path to the person's photo, or None."""
+    info = personal_info or {}
+    if not (photo_dir and info.get("photo") and info.get("photo_consent")):
+        return None
+    candidate = os.path.join(photo_dir, os.path.basename(info["photo"]))
+    return candidate if os.path.isfile(candidate) else None
+
+
 class DOCXService:
     """
     Generate a polished DOCX resume.
@@ -249,11 +367,31 @@ class DOCXService:
         path = DOCXService().generate_from_dict(data_dict)
     """
 
-    def generate(self, resume) -> str:
-        return self._build_docx(_normalize(resume))
+    def __init__(self, theme: str = "modern"):
+        from app.services.pdf_service import THEMES
+        self.theme_name = theme if theme in THEMES else "modern"
+        self.theme = dict(THEMES[self.theme_name])
+        self.accent = RGBColor.from_string(self.theme["accent"].lstrip("#").upper())
+        self.accent_hex = self.theme["accent"].lstrip("#").upper()
+        self.header_style = self.theme.get("header_style", "banner")
+        self.section_style = self.theme.get("section_style", "rule")
+        self.timeline = bool(self.theme.get("timeline"))
+
+    @classmethod
+    def for_template(cls, template) -> "DOCXService":
+        from app.services.pdf_service import SLUG_TO_THEME
+        return cls(theme=SLUG_TO_THEME.get(getattr(template, "slug", ""), "modern"))
+
+    def generate(self, resume, photo_dir: Optional[str] = None) -> str:
+        svc = DOCXService.for_template(resume.template) if getattr(resume, "template", None) else self
+        d = _normalize(resume)
+        d["photo_file"] = _photo_path(getattr(resume, "personal_info", None), photo_dir)
+        return svc._build_docx(d)
 
     def generate_from_dict(self, data: Dict[str, Any]) -> str:
-        return self._build_docx(_normalize(data))
+        d = _normalize(data)
+        d["photo_file"] = data.get("photo_file")
+        return self._build_docx(d)
 
     def _build_docx(self, d: Dict[str, Any]) -> str:
         fd, path = tempfile.mkstemp(suffix=".docx")
@@ -263,15 +401,106 @@ class DOCXService:
         self._setup_styles(doc)
         self._setup_page(doc)
 
+        if self.header_style == "sidebar":
+            self._build_sidebar_layout(doc, d)
+        else:
+            self._build_header(doc, d)
+            self._render_body(doc, d, sections=MAIN_SECTIONS_ALL)
+
+        self._add_footer(doc, d["name"])
+        doc.save(path)
+        logger.info(f"DOCX generated at: {path}")
+        return path
+
+    # ── Header variants ──────────────────────────────────────────
+
+    def _build_header(self, doc: Document, d: Dict[str, Any]):
+        if self.header_style == "band":
+            self._header_band(doc, d)
+        elif self.header_style == "plain":
+            self._header_plain(doc, d)
+        else:
+            self._header_centred(doc, d)
+
+    def _header_centred(self, doc: Document, d: Dict[str, Any]):
         self._add_name(doc, d["name"])
-
         if d["job_title"]:
-            self._add_centered_run(doc, d["job_title"], size=12, rgb=ACCENT_RGB)
-
+            self._add_centered_run(doc, d["job_title"], size=12, rgb=self.accent)
         contact_parts = [v for v in [d["email"], d["phone"], d["location"]] if v]
         if contact_parts:
             self._add_centered_run(doc, "  |  ".join(contact_parts), size=9, rgb=MUTED_RGB)
+        self._add_link_line(doc, d, centred=True)
+        doc.add_paragraph()
 
+    def _header_plain(self, doc: Document, d: Dict[str, Any]):
+        p = doc.add_paragraph()
+        p.paragraph_format.space_after = Pt(0)
+        run = p.add_run(d["name"])
+        run.bold = True
+        run.font.size = Pt(24)
+        run.font.name = "Calibri"
+        run.font.color.rgb = HEADING_RGB
+        if d["job_title"]:
+            t = doc.add_paragraph()
+            t.paragraph_format.space_after = Pt(2)
+            tr = t.add_run(d["job_title"])
+            tr.font.size = Pt(12)
+            tr.font.name = "Calibri"
+            tr.font.color.rgb = self.accent
+        contact_parts = [v for v in [d["email"], d["phone"], d["location"]] if v]
+        c = doc.add_paragraph()
+        c.paragraph_format.space_after = Pt(6)
+        if contact_parts:
+            cr = c.add_run("  ·  ".join(contact_parts))
+            cr.font.size = Pt(9)
+            cr.font.name = "Calibri"
+            cr.font.color.rgb = MUTED_RGB
+        _set_paragraph_bottom_border(c, self.accent_hex, size=12)
+        doc.add_paragraph()
+
+    def _header_band(self, doc: Document, d: Dict[str, Any]):
+        """Full-width accent band with white name, title and contact. Photo sits in the band."""
+        table = doc.add_table(rows=1, cols=2 if d.get("photo_file") else 1)
+        table.autofit = False
+        total = self._text_width_in()
+        if d.get("photo_file"):
+            photo_col, text_col = table.rows[0].cells
+            photo_col.width = Inches(1.9)
+            text_col.width = Inches(total - 1.9)
+            _shade_cell(photo_col, self.accent_hex)
+            _cell_margins(photo_col, 0.2, 0.15, 0.2, 0.1)
+            _remove_empty_first_paragraph(photo_col)
+            photo_p = photo_col.add_paragraph()
+            _add_photo(photo_p, d["photo_file"], Inches(1.45))
+        else:
+            text_col = table.rows[0].cells[0]
+            text_col.width = Inches(total)
+        _shade_cell(text_col, self.accent_hex)
+        _cell_margins(text_col, 0.22, 0.2, 0.25, 0.25)
+
+        first = text_col.paragraphs[0]
+        r = first.add_run(d["name"])
+        r.bold = True
+        r.font.size = Pt(26)
+        r.font.name = "Calibri"
+        r.font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
+        if d["job_title"]:
+            t = text_col.add_paragraph()
+            tr = t.add_run(d["job_title"])
+            tr.font.size = Pt(12.5)
+            tr.font.name = "Calibri"
+            tr.font.color.rgb = RGBColor(0xF3, 0xF4, 0xF6)
+        contact_parts = [v for v in [d["email"], d["phone"], d["location"]] if v]
+        if contact_parts:
+            c = text_col.add_paragraph()
+            c.paragraph_format.space_before = Pt(8)
+            cr = c.add_run("  ·  ".join(contact_parts))
+            cr.font.size = Pt(9)
+            cr.font.name = "Calibri"
+            cr.font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
+        doc.add_paragraph()
+
+    def _add_link_line(self, doc: Document, d: Dict[str, Any], centred: bool):
         link_items = []
         if d["linkedin"]:
             link_items.append(("LinkedIn", d["linkedin"]))
@@ -279,81 +508,177 @@ class DOCXService:
             link_items.append(("GitHub", d["github"]))
         if d["portfolio"]:
             link_items.append(("Portfolio", d["portfolio"]))
-        if link_items:
-            link_para = doc.add_paragraph()
+        if not link_items:
+            return
+        link_para = doc.add_paragraph()
+        if centred:
             link_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            for i, (label, url) in enumerate(link_items):
-                if i > 0:
-                    link_para.add_run("  ·  ").font.color.rgb = MUTED_RGB
-                url = url if url.startswith("http") else f"https://{url}"
-                _add_hyperlink(link_para, label, url, ACCENT_RGB)
+        for i, (label, url) in enumerate(link_items):
+            if i > 0:
+                link_para.add_run("  ·  ").font.color.rgb = MUTED_RGB
+            url = url if url.startswith("http") else f"https://{url}"
+            _add_hyperlink(link_para, label, url, self.accent)
 
+    # ── Sidebar layout ───────────────────────────────────────────
+
+    def _build_sidebar_layout(self, doc: Document, d: Dict[str, Any]):
+        total = self._text_width_in()
+        side_w = 2.35
+        table = doc.add_table(rows=1, cols=2)
+        table.autofit = False
+        left, right = table.rows[0].cells
+        left.width = Inches(side_w)
+        right.width = Inches(total - side_w)
+
+        _shade_cell(left, self.accent_hex)
+        _cell_margins(left, 0.25, 0.2, 0.2, 0.2)
+        _cell_margins(right, 0.05, 0.0, 0.3, 0.0)
+        _remove_empty_first_paragraph(left)
+        _remove_empty_first_paragraph(right)
+
+        if d.get("photo_file"):
+            p = left.add_paragraph()
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            _add_photo(p, d["photo_file"], Inches(1.6))
+
+        white = RGBColor(0xFF, 0xFF, 0xFF)
+        contact = [v for v in [d["email"], d["phone"], d["location"], d["linkedin"],
+                               d["github"], d["portfolio"]] if v]
+        if contact:
+            self._sb_heading(left, "Contact")
+            for c in contact:
+                self._sb_text(left, c, white)
+        if d["education"]:
+            self._sb_heading(left, "Education")
+            for e in d["education"]:
+                if e.get("degree"):
+                    self._sb_text(left, e["degree"], white, bold=True)
+                if e.get("institution"):
+                    self._sb_text(left, e["institution"], white)
+                meta = " · ".join(x for x in [e.get("year"), e.get("grade")] if x)
+                if meta:
+                    self._sb_text(left, meta, white)
+        if d["skill_groups"] or d["skills"]:
+            self._sb_heading(left, "Skills")
+            if d["skill_groups"]:
+                for g in d["skill_groups"]:
+                    gname = g.get("group") if isinstance(g, dict) else None
+                    gskills = g.get("skills", []) if isinstance(g, dict) else []
+                    if gname:
+                        self._sb_text(left, gname, white, bold=True)
+                    for x in gskills:
+                        if x:
+                            self._sb_text(left, "•  " + str(x), white)
+            else:
+                for x in d["skills"]:
+                    if x:
+                        self._sb_text(left, "•  " + str(x), white)
+        if d["languages"]:
+            self._sb_heading(left, "Languages")
+            for x in d["languages"]:
+                if x:
+                    self._sb_text(left, "•  " + str(x), white)
+
+        name_p = right.paragraphs[0] if right.paragraphs else right.add_paragraph()
+        nr = name_p.add_run(d["name"])
+        nr.bold = True
+        nr.font.size = Pt(24)
+        nr.font.name = "Calibri"
+        nr.font.color.rgb = HEADING_RGB
+        if d["job_title"]:
+            t = right.add_paragraph()
+            tr = t.add_run(d["job_title"])
+            tr.font.size = Pt(12)
+            tr.font.name = "Calibri"
+            tr.font.color.rgb = self.accent
+        _set_paragraph_bottom_border(right.add_paragraph(), self.accent_hex, size=12)
+
+        self._render_body(right, d, sections=MAIN_SECTIONS_SIDEBAR)
+        # A Word table cell must always contain at least one paragraph.
+        if not left.paragraphs:
+            left.add_paragraph()
         doc.add_paragraph()
 
-        if d["summary"]:
-            self._section_heading(doc, "PROFESSIONAL SUMMARY")
-            doc.add_paragraph(d["summary"])
+    def _sb_heading(self, cell, label: str):
+        p = cell.add_paragraph()
+        p.paragraph_format.space_before = Pt(12)
+        p.paragraph_format.space_after = Pt(3)
+        r = p.add_run(label.upper())
+        r.bold = True
+        r.font.size = Pt(9.5)
+        r.font.name = "Calibri"
+        r.font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
+        _set_paragraph_bottom_border(p, "FFFFFF", size=6)
 
-        if d["work"]:
-            self._section_heading(doc, "WORK EXPERIENCE")
-            for job in d["work"]:
-                self._add_job(doc, job)
+    def _sb_text(self, cell, text: str, color, bold: bool = False):
+        p = cell.add_paragraph()
+        p.paragraph_format.space_after = Pt(2)
+        r = p.add_run(str(text))
+        r.bold = bold
+        r.font.size = Pt(9)
+        r.font.name = "Calibri"
+        r.font.color.rgb = color
 
-        if d["education"]:
-            self._section_heading(doc, "EDUCATION")
-            for edu in d["education"]:
-                self._add_education(doc, edu)
+    # ── Body (shared by every layout) ────────────────────────────
 
-        if d["skill_groups"] or d["skills"]:
-            self._section_heading(doc, "SKILLS")
-            self._add_skills(doc, d["skill_groups"], d["skills"])
+    def _render_body(self, container, d: Dict[str, Any], sections):
+        """Write the body sections into a Document or a table cell, in order."""
+        for key in sections:
+            if key == "summary" and d["summary"]:
+                self._section_heading(container, "PROFESSIONAL SUMMARY")
+                container.add_paragraph(d["summary"])
+            elif key == "work" and d["work"]:
+                self._section_heading(container, "WORK EXPERIENCE")
+                for job in d["work"]:
+                    mark = len(container.paragraphs)
+                    self._add_job(container, job)
+                    if self.timeline:
+                        _timeline_mark(container, mark, self.accent_hex)
+            elif key == "education" and d["education"]:
+                self._section_heading(container, "EDUCATION")
+                for edu in d["education"]:
+                    mark = len(container.paragraphs)
+                    self._add_education(container, edu)
+                    if self.timeline:
+                        _timeline_mark(container, mark, self.accent_hex)
+            elif key == "skills" and (d["skill_groups"] or d["skills"]):
+                self._section_heading(container, "SKILLS")
+                self._add_skills(container, d["skill_groups"], d["skills"])
+            elif key == "certifications" and d["certifications"]:
+                self._section_heading(container, "CERTIFICATIONS")
+                self._add_bullet_list(container, d["certifications"])
+            elif key == "achievements" and d["achievements"]:
+                self._section_heading(container, "KEY ACHIEVEMENTS")
+                self._add_bullet_list(container, d["achievements"])
+            elif key == "awards" and d["awards"]:
+                self._section_heading(container, "AWARDS")
+                self._add_bullet_list(container, d["awards"])
+            elif key == "projects" and d["projects"]:
+                self._section_heading(container, "PROJECTS")
+                for proj in d["projects"]:
+                    self._add_project(container, proj)
+            elif key == "publications" and d["publications"]:
+                self._section_heading(container, "PUBLICATIONS")
+                self._add_bullet_list(container, d["publications"])
+            elif key == "volunteer" and d["volunteer"]:
+                self._section_heading(container, "VOLUNTEER EXPERIENCE")
+                container.add_paragraph(d["volunteer"])
+            elif key == "languages" and d["languages"]:
+                self._section_heading(container, "LANGUAGES")
+                p = container.add_paragraph(" · ".join(str(x) for x in d["languages"]))
+                for run in p.runs:
+                    run.font.name = "Calibri"
+            elif key == "interests" and d["interests"]:
+                self._section_heading(container, "INTERESTS")
+                p = container.add_paragraph(" · ".join(str(x) for x in d["interests"]))
+                for run in p.runs:
+                    run.font.name = "Calibri"
+            elif key == "references" and d["references"]:
+                self._section_heading(container, "REFERENCES")
+                container.add_paragraph(d["references"])
 
-        if d["certifications"]:
-            self._section_heading(doc, "CERTIFICATIONS")
-            self._add_bullet_list(doc, d["certifications"])
-
-        if d["achievements"]:
-            self._section_heading(doc, "KEY ACHIEVEMENTS")
-            self._add_bullet_list(doc, d["achievements"])
-
-        if d["awards"]:
-            self._section_heading(doc, "AWARDS")
-            self._add_bullet_list(doc, d["awards"])
-
-        if d["projects"]:
-            self._section_heading(doc, "PROJECTS")
-            for proj in d["projects"]:
-                self._add_project(doc, proj)
-
-        if d["publications"]:
-            self._section_heading(doc, "PUBLICATIONS")
-            self._add_bullet_list(doc, d["publications"])
-
-        if d["volunteer"]:
-            self._section_heading(doc, "VOLUNTEER EXPERIENCE")
-            doc.add_paragraph(d["volunteer"])
-
-        if d["languages"]:
-            self._section_heading(doc, "LANGUAGES")
-            p = doc.add_paragraph(" · ".join(str(x) for x in d["languages"]))
-            for run in p.runs:
-                run.font.name = "Calibri"
-
-        if d["interests"]:
-            self._section_heading(doc, "INTERESTS")
-            p = doc.add_paragraph(" · ".join(str(x) for x in d["interests"]))
-            for run in p.runs:
-                run.font.name = "Calibri"
-
-        if d["references"]:
-            self._section_heading(doc, "REFERENCES")
-            doc.add_paragraph(d["references"])
-
-        self._add_footer(doc, d["name"])
-
-        doc.save(path)
-        logger.info(f"DOCX generated at: {path}")
-        return path
+    def _text_width_in(self) -> float:
+        return 8.5 - 1.5  # Letter page with 0.75in side margins (see _setup_page)
 
     def _setup_page(self, doc: Document):
         section = doc.sections[0]
@@ -403,17 +728,25 @@ class DOCXService:
         run.font.color.rgb = rgb
         run.font.name = "Calibri"
 
-    def _section_heading(self, doc: Document, title: str):
+    def _section_heading(self, doc, title: str):
         p = doc.add_paragraph()
         p.paragraph_format.space_before = Pt(12)
-        p.paragraph_format.space_after  = Pt(4)
-        _set_paragraph_bottom_border(p, DIVIDER_HEX, size=6)
-
+        p.paragraph_format.space_after = Pt(4)
+        if self.section_style in ("bar", "band"):
+            _shade_paragraph(p, self.accent_hex)
+            p.paragraph_format.space_before = Pt(10)
+            run = p.add_run(f" {title}")
+            run.bold = True
+            run.font.size = Pt(10.5)
+            run.font.name = "Calibri"
+            run.font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
+            return
+        _set_paragraph_bottom_border(p, self.accent_hex if self.section_style == "rule" else DIVIDER_HEX, size=6)
         run = p.add_run(title)
         run.bold = True
         run.font.size = Pt(11)
         run.font.name = "Calibri"
-        run.font.color.rgb = ACCENT_RGB
+        run.font.color.rgb = self.accent
 
     def _add_job(self, doc: Document, job: Dict[str, Any]):
         """
@@ -546,7 +879,7 @@ class DOCXService:
         if url:
             link_p = doc.add_paragraph()
             link_p.paragraph_format.space_after = Pt(1)
-            _add_hyperlink(link_p, url, url if url.startswith("http") else f"https://{url}", ACCENT_RGB)
+            _add_hyperlink(link_p, url, url if url.startswith("http") else f"https://{url}", self.accent)
         if description:
             self._render_description(doc, description)
         doc.add_paragraph().paragraph_format.space_after = Pt(1)

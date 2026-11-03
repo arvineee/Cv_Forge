@@ -24,12 +24,17 @@
   {% for t in templates %}
   <div class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden card-hover group">
     <!-- Preview swatch showing template accent color -->
-    <div class="h-32 relative flex flex-col items-center justify-center"
+    <div class="h-32 relative flex flex-col items-center justify-center overflow-hidden"
          style="background: linear-gradient(135deg, {{ t.accent_color }}22 0%, {{ t.accent_color }}44 100%)">
+      {% if t.thumbnail_url %}
+      <img src="{{ t.thumbnail_url }}" alt="Preview of {{ t.name }}" loading="lazy"
+           class="absolute inset-0 w-full h-full object-cover object-top"/>
+      {% else %}
       <div class="w-16 h-1 rounded mb-1.5" style="background-color:{{ t.accent_color }}"></div>
       <div class="w-24 h-0.5 bg-gray-200 rounded mb-1"></div>
       <div class="w-20 h-0.5 bg-gray-200 rounded mb-1"></div>
       <div class="w-24 h-0.5 bg-gray-200 rounded"></div>
+      {% endif %}
       {% if t.is_premium %}
       <div class="absolute top-2 right-2">
         <span class="text-xs font-bold px-2 py-0.5 rounded-full"
