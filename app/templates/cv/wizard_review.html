@@ -1,5 +1,7 @@
 {% extends "cv/_wizard_base.html" %}
 {% block wizard_content %}
+{% set next_page = 'review' %}
+{% include "cv/_template_picker.html" %}
 {% if not can_download %}
 {# ================= Unpaid: professional preview + unlock pitch ================= #}
 {% set pi = resume.personal_info or {} %}

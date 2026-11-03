@@ -1,0 +1,26 @@
+{# Template switcher for an existing CV. Needs: resume, templates, next_page ('revamp' or 'review'). #}
+<div class="bg-white rounded-xl border border-gray-100 shadow-sm p-6 mb-6">
+  <h3 class="font-semibold text-gray-900 text-sm mb-1">Template</h3>
+  <p class="text-xs text-gray-500 mb-4">
+    Pick the look of your PDF. Sidebar templates use a coloured two-column layout.
+  </p>
+  <form method="POST" action="{{ url_for('cv.choose_template', resume_id=resume.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+    <input type="hidden" name="next" value="{{ next_page }}"/>
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      {% for t in templates %}
+      {% set locked = t.is_premium and not current_user.is_premium %}
+      {% set current = resume.template_id == t.id %}
+      <button type="submit" name="template_id" value="{{ t.id }}" {% if locked %}disabled{% endif %}
+              class="text-left rounded-lg border-2 overflow-hidden transition {{ 'border-blue-500' if current else 'border-gray-100 hover:border-gray-300' }} {{ 'opacity-50 cursor-not-allowed' if locked }}">
+        <img src="{{ t.thumbnail_url or url_for('static', filename='templates/' ~ t.slug ~ '.png') }}"
+             alt="" loading="lazy" class="w-full h-28 object-cover object-top bg-gray-50"
+             onerror="this.style.display='none'"/>
+        <span class="block px-2 py-1.5 text-xs font-medium text-gray-800">
+          {{ t.name }}{% if current %} ✓{% endif %}{% if locked %} 🔒{% endif %}
+        </span>
+      </button>
+      {% endfor %}
+    </div>
+  </form>
+</div>

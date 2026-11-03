@@ -172,7 +172,48 @@ def new_cv():
     user chooses 'Create a new CV' on the /cv/start hub — create_cv()
     below then uses the chosen template_id to start the builder."""
     templates = Template.query.filter_by(is_active=True).order_by(Template.sort_order).all()
-    return render_template("cv/new.html", templates=templates)
+    template_id = request.args.get("template_id", type=int)
+    return render_template("cv/new.html", templates=templates, template_id=template_id)
+
+
+def _usable_template(template_id):
+    """Return the active Template the current user may use, or None.
+    Premium templates are limited to paid users, same as the gallery."""
+    if not template_id:
+        return None
+    t = db.session.get(Template, template_id)
+    if not t or not t.is_active:
+        return None
+    if t.is_premium and not current_user.is_premium:
+        return None
+    return t
+
+
+def _active_templates():
+    return Template.query.filter_by(is_active=True).order_by(Template.sort_order).all()
+
+
+@cv_bp.route("/<int:resume_id>/template", methods=["POST"])
+@login_required
+def choose_template(resume_id):
+    """Switch an existing CV (built, uploaded or revamped) to another template."""
+    resume = Resume.query.filter_by(id=resume_id, user_id=current_user.id).first_or_404()
+    back = request.form.get("next")
+    if back == "revamp":
+        dest = url_for("cv.revamp", resume_id=resume.id)
+    else:
+        dest = url_for("cv.wizard_step", resume_id=resume.id, step="review")
+    tid = request.form.get("template_id", type=int)
+    t = _usable_template(tid)
+    if not t:
+        flash("That template isn't available on your plan.", "warning")
+        return redirect(dest)
+    resume.template_id = t.id
+    t.use_count = (t.use_count or 0) + 1
+    _log("cv_template_change", resume.id, {"template": t.slug})
+    db.session.commit()
+    flash(f"Template changed to {t.name}.", "success")
+    return redirect(dest)
 
 
 @cv_bp.route("/builder/<int:resume_id>", methods=["GET"])
@@ -211,7 +252,8 @@ def wizard_new():
     """Entry point for the guided wizard — creates a blank resume and drops
     the user straight into step 1, no theme picker required first."""
     title = request.args.get("title", "My Resume").strip() or "My Resume"
-    template_id = request.args.get("template_id", type=int)
+    chosen = _usable_template(request.args.get("template_id", type=int))
+    template_id = chosen.id if chosen else None
     resume = Resume(user_id=current_user.id, title=title,
                     template_id=template_id, status="draft", source="wizard")
     db.session.add(resume)
@@ -416,6 +458,7 @@ def wizard_step(resume_id, step):
             allow_public_link=allow_public_link, can_download=can_download,
             coach_feedback=coach_feedback, coach_error=coach_error,
             gaps=gaps, lowest_plan=lowest_plan,
+            templates=_active_templates(),
         )
 
     return render_template(f"cv/wizard_{step}.html", **context)
@@ -619,6 +662,7 @@ def upload():
             user_id=current_user.id,
             title=resume_title[:255],
             status="draft", source="upload",
+            template_id=getattr(_usable_template(request.args.get("template_id", type=int)), "id", None),
             original_filename=filename,
             original_file_path=safe_name,
             personal_info=personal,
@@ -738,7 +782,7 @@ def revamp(resume_id):
             current_app.logger.error(f"Revamp error: {e}")
             flash("AI revamp failed. Please try again.", "error")
 
-    return render_template("cv/revamp.html", resume=resume)
+    return render_template("cv/revamp.html", resume=resume, templates=_active_templates())
 
 
 @cv_bp.route("/<int:resume_id>/versions")

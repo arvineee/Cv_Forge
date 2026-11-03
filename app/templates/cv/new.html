@@ -5,13 +5,13 @@
 
 {% block content %}
 <div class="grid md:grid-cols-2 gap-6 max-w-2xl">
-  <a href="{{ url_for('cv.wizard_new') }}"
+  <a href="{{ url_for('cv.wizard_new', template_id=template_id) }}"
      class="block bg-white rounded-2xl border border-gray-100 shadow-sm card-hover p-8 text-center">
     <div class="text-4xl mb-4">✍️</div>
     <h3 class="font-bold text-gray-900 mb-2">Build from Scratch</h3>
     <p class="text-sm text-gray-500">Step-by-step CV builder with AI assistance at every section</p>
   </a>
-  <a href="{{ url_for('cv.upload') }}"
+  <a href="{{ url_for('cv.upload', template_id=template_id) }}"
      class="block bg-white rounded-2xl border border-gray-100 shadow-sm card-hover p-8 text-center">
     <div class="text-4xl mb-4">⬆️</div>
     <h3 class="font-bold text-gray-900 mb-2">Upload & Revamp</h3>
