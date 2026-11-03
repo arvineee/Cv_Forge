@@ -79,6 +79,30 @@
   .lp .chip-ok { background: var(--blue-soft); color: var(--navy); }
   .lp .chip-miss { background: var(--orange-soft); color: #8A4B00; }
 
+
+  /* Eyebrow label above section headings */
+  .lp .eyebrow { display: inline-flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--blue); margin-bottom: 14px; }
+  .lp .eyebrow::before { content: ""; width: 22px; height: 3px; border-radius: 2px; background: var(--orange); }
+
+  /* Hero collage of real CV template previews */
+  .lp .collage { position: relative; width: 100%; max-width: 540px; aspect-ratio: 1 / 1; margin: 0 auto; }
+  .lp .collage img { position: absolute; height: auto; border-radius: 12px; border: 1px solid var(--line); background: #fff;
+    box-shadow: 0 24px 48px -20px rgba(11,61,107,.35); }
+  .lp .collage .c1 { top: 0; left: 0; width: 62%; transform: rotate(-3deg); z-index: 1; }
+  .lp .collage .c2 { top: 24%; right: 0; width: 62%; transform: rotate(3deg); z-index: 2; }
+  .lp .collage .c3 { top: 43%; left: 13%; width: 74%; z-index: 3; box-shadow: 0 30px 60px -22px rgba(11,61,107,.45); }
+
+  /* Slim trust strip under the hero */
+  .lp .trust { background: var(--mist); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+  .lp .trust li { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 15px; color: var(--navy); }
+
+  /* Template showcase cards */
+  .lp .tpl-card { display: block; text-decoration: none; }
+  .lp .tpl-card img { width: 100%; height: auto; border-radius: 12px; border: 1px solid var(--line); background: #fff;
+    box-shadow: 0 10px 24px -14px rgba(11,61,107,.35); transition: transform .2s, box-shadow .2s; }
+  .lp .tpl-card:hover img { transform: translateY(-4px); box-shadow: 0 18px 32px -16px rgba(11,61,107,.45); }
+  @media (prefers-reduced-motion: reduce) { .lp .tpl-card img { transition: none; } }
+
   /* Feature cards */
   .lp .feature { background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 32px; position: relative; }
   .lp .feature::before { content: ""; position: absolute; top: 0; left: 32px; width: 36px; height: 4px; border-radius: 0 0 4px 4px; background: var(--orange); }
@@ -149,10 +173,11 @@
 <main>
 
 <!-- HERO -->
-<section style="background: var(--paper); overflow: hidden;">
-  <div class="wrap grid lg:grid-cols-[1.05fr_1fr] gap-14 items-center" style="padding-top: 64px; padding-bottom: 88px;">
+<section style="background: linear-gradient(180deg, #F4F7FA 0%, #FFFFFF 100%); overflow: hidden;">
+  <div class="wrap grid lg:grid-cols-[1.05fr_1fr] gap-12 items-center" style="padding-top: 64px; padding-bottom: 80px;">
     <div>
-      <h1 style="font-weight: 800; font-size: clamp(2.5rem, 6.2vw, 4.4rem); line-height: 1.04;">
+      <p class="eyebrow">AI CV builder for African professionals</p>
+      <h1 style="font-weight: 800; font-size: clamp(2.4rem, 5.6vw, 4.1rem); line-height: 1.05;">
         Say what you did.<br/><span class="underline-accent">We'll make it sound like it mattered.</span>
       </h1>
       <p style="font-size: 19px; line-height: 1.6; color: var(--ink-2); max-width: 30em; margin-top: 24px;">
@@ -165,8 +190,37 @@
       <p style="margin-top: 16px; font-size: 14px; color: var(--ink-2);">No card needed. Upgrade with an M-Pesa STK push when you want more.</p>
     </div>
 
-    <!-- Live before/after demo -->
-    <div class="settle" x-data="{ ai: false }">
+    <!-- Real template previews -->
+    <div class="collage settle">
+      <img class="c1" src="{{ url_for('static', filename='templates/modern-blue.png') }}" alt="" width="480" height="372"/>
+      <img class="c2" src="{{ url_for('static', filename='templates/timeline-teal.png') }}" alt="" width="480" height="372"/>
+      <img class="c3" src="{{ url_for('static', filename='templates/sidebar-navy.png') }}" alt="Example CV made with the Sidebar Navy template" width="480" height="372" fetchpriority="high"/>
+    </div>
+  </div>
+</section>
+
+<!-- TRUST STRIP -->
+<section class="trust" aria-label="Highlights">
+  <ul class="wrap grid grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-4" style="padding-top: 22px; padding-bottom: 22px; list-style: none; margin: 0 auto;">
+    <li><svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none" style="flex:none;"><circle cx="10" cy="10" r="10" fill="#FDEBD0"/><path d="M5.5 10.5l3 3 6-6.5" stroke="#0B3D6B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>ATS-friendly layouts</li>
+    <li><svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none" style="flex:none;"><circle cx="10" cy="10" r="10" fill="#FDEBD0"/><path d="M5.5 10.5l3 3 6-6.5" stroke="#0B3D6B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>PDF and Word downloads</li>
+    <li><svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none" style="flex:none;"><circle cx="10" cy="10" r="10" fill="#FDEBD0"/><path d="M5.5 10.5l3 3 6-6.5" stroke="#0B3D6B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pay with M-Pesa</li>
+    <li><svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none" style="flex:none;"><circle cx="10" cy="10" r="10" fill="#FDEBD0"/><path d="M5.5 10.5l3 3 6-6.5" stroke="#0B3D6B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Built in Kenya</li>
+  </ul>
+</section>
+
+<!-- BEFORE / AFTER -->
+<section style="padding: 96px 0;">
+  <div class="wrap grid lg:grid-cols-2 gap-14 items-center">
+    <div>
+      <p class="eyebrow">The difference</p>
+      <h2 style="font-weight: 800; font-size: clamp(2rem, 4vw, 3rem); line-height: 1.08;">Same experience, written to be read</h2>
+      <p style="font-size: 18px; line-height: 1.65; color: var(--ink-2); margin-top: 20px; max-width: 30em;">
+        Most CVs undersell good work. CVForge keeps your facts and rewrites them with the scope, numbers and results a recruiter looks for.
+      </p>
+    </div>
+
+    <div x-data="{ ai: false }">
       <div class="flex items-center justify-between flex-wrap gap-3" style="margin-bottom: 16px;">
         <span style="font-weight: 600; font-size: 15px; color: var(--navy);">Try it: one bullet, two versions</span>
         <div class="toggle" role="group" aria-label="Compare versions">
@@ -200,6 +254,7 @@
 <section style="background: var(--mist); padding: 96px 0;">
   <div class="wrap grid lg:grid-cols-2 gap-14 items-center">
     <div>
+      <p class="eyebrow">ATS check</p>
       <h2 style="font-weight: 800; font-size: clamp(2rem, 4vw, 3rem); line-height: 1.08;">Know how your CV scores before the recruiter does</h2>
       <p style="font-size: 18px; line-height: 1.65; color: var(--ink-2); margin-top: 20px; max-width: 30em;">
         Many employers filter applications with screening software. Paste the job posting and CVForge shows which keywords you already cover, which you're missing, and what to change.
@@ -231,10 +286,40 @@
   </div>
 </section>
 
-<!-- FEATURES -->
+<!-- TEMPLATES SHOWCASE -->
 <section style="padding: 96px 0;">
   <div class="wrap">
-    <h2 style="font-weight: 800; font-size: clamp(2rem, 4vw, 3rem); line-height: 1.08; max-width: 14em;">Everything between "I need a job" and "Application sent"</h2>
+    <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
+      <div style="max-width: 34em;">
+        <p class="eyebrow">Templates</p>
+        <h2 style="font-weight: 800; font-size: clamp(2rem, 4vw, 3rem); line-height: 1.08;">Layouts recruiters can read in seconds</h2>
+        <p style="font-size: 18px; line-height: 1.6; color: var(--ink-2); margin-top: 16px;">Pick a design, fill in your details, and switch templates any time without retyping.</p>
+      </div>
+      <a href="{{ url_for('templates_gallery.index') }}" class="btn btn-ghost" style="flex: none;">Browse all templates</a>
+    </div>
+
+    <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-6" style="margin-top: 48px;">
+      {% for file, name, kind in [
+        ('sidebar-navy.png', 'Sidebar Navy', 'Two-column'),
+        ('modern-blue.png', 'Modern Blue', 'Single column'),
+        ('timeline-teal.png', 'Timeline Teal', 'Single column'),
+        ('centred-classic.png', 'Centred Classic', 'Single column'),
+      ] %}
+      <a href="{{ url_for('templates_gallery.index') }}" class="tpl-card">
+        <img src="{{ url_for('static', filename='templates/' ~ file) }}" alt="{{ name }} CV template preview" width="480" height="372" loading="lazy"/>
+        <p style="font-weight: 700; font-size: 17px; color: var(--navy); margin-top: 14px;">{{ name }}</p>
+        <p style="font-size: 14px; color: var(--ink-2);">{{ kind }}</p>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section style="background: var(--mist); padding: 96px 0;">
+  <div class="wrap">
+    <p class="eyebrow">Features</p>
+      <h2 style="font-weight: 800; font-size: clamp(2rem, 4vw, 3rem); line-height: 1.08; max-width: 14em;">Everything between "I need a job" and "Application sent"</h2>
 
     <div class="grid md:grid-cols-6 gap-5" style="margin-top: 48px;">
       <div class="feature md:col-span-3">
@@ -264,9 +349,10 @@
 </section>
 
 <!-- HOW IT WORKS -->
-<section id="how" style="background: var(--mist); padding: 96px 0;">
+<section id="how" style="padding: 96px 0;">
   <div class="wrap">
-    <h2 style="font-weight: 800; font-size: clamp(2rem, 4vw, 3rem); line-height: 1.08;">From blank page to download in three steps</h2>
+    <p class="eyebrow">How it works</p>
+      <h2 style="font-weight: 800; font-size: clamp(2rem, 4vw, 3rem); line-height: 1.08;">From blank page to download in three steps</h2>
     <ol class="grid md:grid-cols-3 gap-10" style="margin-top: 52px; list-style: none; padding: 0;">
       {% for num, title, desc in [
         ('1', 'Add your details', 'Fill in the guided builder, or start from what you already have.'),
@@ -284,9 +370,10 @@
 </section>
 
 <!-- PRICING -->
-<section style="padding: 96px 0;">
+<section style="background: var(--mist); padding: 96px 0;">
   <div class="wrap">
     <div style="max-width: 36em;">
+      <p class="eyebrow">Pricing</p>
       <h2 style="font-weight: 800; font-size: clamp(2rem, 4vw, 3rem); line-height: 1.08;">Start free. Pay only if you need more.</h2>
       <p style="font-size: 18px; color: var(--ink-2); margin-top: 16px;">Every paid plan is billed through M-Pesa, and you can cancel any time.</p>
     </div>
@@ -325,9 +412,10 @@
 </section>
 
 <!-- FAQ -->
-<section style="background: var(--mist); padding: 96px 0;">
+<section style="padding: 96px 0;">
   <div class="wrap grid lg:grid-cols-[1fr_1.4fr] gap-14">
-    <h2 style="font-weight: 800; font-size: clamp(2rem, 4vw, 3rem); line-height: 1.08;">Questions before you start</h2>
+    <p class="eyebrow">FAQ</p>
+      <h2 style="font-weight: 800; font-size: clamp(2rem, 4vw, 3rem); line-height: 1.08;">Questions before you start</h2>
     <div style="border-top: 1px solid var(--line);">
       {% for q, a in [
         ('Do I need to pay to try it?', 'No. You can create an account and build a CV on the free plan. Paid plans unlock more of the AI tools.'),
