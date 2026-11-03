@@ -139,3 +139,24 @@ No database schema change.
   CI with the full requirements. They were written without Flask or SQLAlchemy
   available, so they have never been executed. Fix any failures before relying
   on them.
+
+## Progress bars for slow operations (added in this round)
+- A progress overlay appears while the server works. It covers:
+  - AI revamp, AI enhance buttons in the wizard, and builder AI assist
+  - CV upload parsing, cover-letter generation, and ATS checks
+  - Support chat answers
+  - PDF and cover-letter downloads (the bar hides itself after a few seconds)
+- The bar is estimated from elapsed time, because the server doesn't report
+  progress. It rises quickly, slows near 92%, and jumps to 100% on completion.
+  The estimates are guesses. Tune the `data-estimate` values after measuring
+  real response times.
+- Files: `app/static/js/progress.js`, `app/templates/_progress.html` (included
+  once in `base.html`), and `data-progress` / `data-estimate` attributes on the
+  triggering forms, buttons, and links.
+- Tests: `tests/test_progress_browser.py` (8 tests) runs the real overlay in
+  headless Chromium. It needs Playwright, and is skipped when that isn't
+  installed. The browser tests passed here. The Tailwind styling wasn't checked,
+  because this environment has no internet access.
+
+## Deploy
+    python -m playwright install chromium   # only if you want the browser tests to run

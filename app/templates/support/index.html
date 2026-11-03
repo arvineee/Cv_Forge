@@ -56,14 +56,14 @@ form.addEventListener('submit', async (e) => {
   askBtn.textContent = '...';
 
   try {
-    const res = await fetch("{{ url_for('support.ask') }}", {
+    const res = await CVProgress.track(fetch("{{ url_for('support.ask') }}", {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'X-CSRFToken': document.getElementById('csrf-token').value,
       },
       body: JSON.stringify({ question }),
-    });
+    }), {label: 'Finding an answer', estimate: 8});
     const data = await res.json();
     if (!res.ok) {
       errorEl.textContent = data.error || 'Something went wrong.';

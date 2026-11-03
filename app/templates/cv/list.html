@@ -50,12 +50,12 @@
          class="flex-1 text-center text-sm py-2 px-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition font-medium text-gray-700">
         Edit
       </a>
-      <a href="{{ url_for('cv.download', resume_id=resume.id, fmt='pdf') }}"
+      <a href="{{ url_for('cv.download', resume_id=resume.id, fmt='pdf') }}" data-progress="Preparing your file" data-estimate="4" data-autohide="10"
          class="flex-1 text-center text-sm py-2 px-3 rounded-lg gradient-brand text-white hover:opacity-90 transition font-medium">
         PDF
       </a>
       {% if current_user.is_premium %}
-      <a href="{{ url_for('cv.download', resume_id=resume.id, fmt='docx') }}"
+      <a href="{{ url_for('cv.download', resume_id=resume.id, fmt='docx') }}" data-progress="Preparing your file" data-estimate="4" data-autohide="10"
          class="flex-1 text-center text-sm py-2 px-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition font-medium text-gray-700">
         DOCX
       </a>

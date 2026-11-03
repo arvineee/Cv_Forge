@@ -3,7 +3,7 @@
 {% block page_title %}{{ letter.title }}{% endblock %}
 {% block page_subtitle %}{{ letter.job_title }}{% if letter.company_name %} at {{ letter.company_name }}{% endif %}{% endblock %}
 {% block page_actions %}
-  <a href="{{ url_for('cover_letter.download', letter_id=letter.id, fmt='pdf') }}"
+  <a href="{{ url_for('cover_letter.download', letter_id=letter.id, fmt='pdf') }}" data-progress="Preparing your file" data-estimate="4" data-autohide="10"
      class="inline-flex items-center gap-2 px-4 py-2 rounded-lg gradient-brand text-white text-sm font-semibold hover:opacity-90 transition">
     Download PDF
   </a>

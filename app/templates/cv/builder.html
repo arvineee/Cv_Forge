@@ -268,12 +268,12 @@
         </div>
         <div class="flex gap-3 pt-2">
           {% if resume %}
-          <a href="{{ url_for('cv.download', resume_id=resume.id, fmt='pdf') }}"
+          <a href="{{ url_for('cv.download', resume_id=resume.id, fmt='pdf') }}" data-progress="Preparing your file" data-estimate="4" data-autohide="10"
              class="flex-1 text-center py-3 gradient-brand text-white font-semibold rounded-xl hover:opacity-90 transition text-sm">
             Download PDF
           </a>
           {% if current_user.is_premium %}
-          <a href="{{ url_for('cv.download', resume_id=resume.id, fmt='docx') }}"
+          <a href="{{ url_for('cv.download', resume_id=resume.id, fmt='docx') }}" data-progress="Preparing your file" data-estimate="4" data-autohide="10"
              class="flex-1 text-center py-3 border border-gray-200 font-semibold rounded-xl hover:bg-gray-50 transition text-sm">
             Download DOCX
           </a>
@@ -401,7 +401,7 @@ function cvBuilder() {
     aiAssist(section, context) {
       if (!this.resumeId || this.aiLoading) return;
       this.aiLoading = true;
-      fetch(`/cv/builder/${this.resumeId}/ai-assist`, {
+      CVProgress.track(fetch(`/cv/builder/${this.resumeId}/ai-assist`, {
         method: 'POST',
         headers: {'Content-Type':'application/json','X-CSRFToken':'{{ csrf_token() }}'},
         body: JSON.stringify({section, context: String(context || '')})
@@ -419,7 +419,7 @@ function cvBuilder() {
             }
           } catch(e) {}
         }
-      }).finally(() => { this.aiLoading = false; });
+      }), {label: 'Improving with AI', estimate: 12}).finally(() => { this.aiLoading = false; });
     },
   };
 }

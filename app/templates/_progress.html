@@ -1,0 +1,15 @@
+{# Progress overlay. Included once in base.html. Driven by static/js/progress.js. #}
+<div id="cv-progress" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-white/85 backdrop-blur-sm p-4"
+     role="status" aria-live="polite" aria-busy="false">
+  <div class="w-full max-w-sm bg-white rounded-2xl shadow-xl border border-gray-100 p-6">
+    <p id="cv-progress-label" class="font-semibold text-gray-900">Working…</p>
+    <div class="mt-4 h-2.5 w-full rounded-full bg-gray-100 overflow-hidden">
+      <div id="cv-progress-bar" class="h-full rounded-full bg-blue-600 transition-[width] duration-200 ease-out motion-reduce:transition-none" style="width:0%"></div>
+    </div>
+    <div class="mt-2 flex justify-between gap-3 text-xs text-gray-500">
+      <span id="cv-progress-note"></span>
+      <span id="cv-progress-pct" class="font-semibold text-gray-700 shrink-0">0%</span>
+    </div>
+  </div>
+</div>
+<script src="{{ url_for('static', filename='js/progress.js') }}"></script>

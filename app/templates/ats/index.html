@@ -20,7 +20,7 @@
     </div>
 
     <!-- Saved CV form -->
-    <form id="tab-panel-saved" hx-post="{{ url_for('ats.check') }}" hx-target="#ats-result"
+    <form id="tab-panel-saved" data-progress="Checking your CV against the job" data-estimate="20" hx-post="{{ url_for('ats.check') }}" hx-target="#ats-result"
           hx-indicator="#ats-loading" class="space-y-5">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
 
@@ -57,7 +57,7 @@
     </form>
 
     <!-- Upload File form -->
-    <form id="tab-panel-upload" hx-post="{{ url_for('ats.check_upload') }}" hx-target="#ats-result"
+    <form id="tab-panel-upload" data-progress="Checking your CV against the job" data-estimate="20" hx-post="{{ url_for('ats.check_upload') }}" hx-target="#ats-result"
           hx-indicator="#ats-loading" hx-encoding="multipart/form-data" class="space-y-5 hidden">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
 

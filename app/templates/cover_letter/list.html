@@ -24,7 +24,7 @@
          class="flex-1 text-center text-xs py-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition font-medium text-gray-700">
         View & Edit
       </a>
-      <a href="{{ url_for('cover_letter.download', letter_id=letter.id, fmt='pdf') }}"
+      <a href="{{ url_for('cover_letter.download', letter_id=letter.id, fmt='pdf') }}" data-progress="Preparing your file" data-estimate="4" data-autohide="10"
          class="flex-1 text-center text-xs py-2 gradient-brand text-white rounded-lg hover:opacity-90 transition font-medium">
         PDF
       </a>

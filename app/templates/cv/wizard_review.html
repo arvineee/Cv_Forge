@@ -216,12 +216,12 @@
 <div class="border border-gray-100 rounded-lg p-4 mb-6">
   <p class="text-sm font-semibold text-gray-900 mb-3">Download</p>
   <div class="flex gap-3">
-    <a href="{{ url_for('cv.download', resume_id=resume.id, fmt='pdf') }}"
+    <a href="{{ url_for('cv.download', resume_id=resume.id, fmt='pdf') }}" data-progress="Preparing your file" data-estimate="4" data-autohide="10"
        class="px-4 py-3 sm:py-2 min-h-[44px] rounded-lg gradient-brand text-white text-sm font-semibold">
       Download PDF
     </a>
     {% if allow_docx %}
-    <a href="{{ url_for('cv.download', resume_id=resume.id, fmt='docx') }}"
+    <a href="{{ url_for('cv.download', resume_id=resume.id, fmt='docx') }}" data-progress="Preparing your file" data-estimate="4" data-autohide="10"
        class="px-4 py-3 sm:py-2 min-h-[44px] rounded-lg border border-gray-200 text-gray-700 text-sm font-semibold hover:bg-gray-50">
       Download DOCX
     </a>
