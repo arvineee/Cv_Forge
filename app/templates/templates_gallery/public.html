@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}CV Templates — CVForge AI{% endblock %}
+{% block meta_description %}Browse professional, ATS-friendly CV templates. Pick one, add your details and download as PDF or Word.{% endblock %}
+
+{% block body %}
+<style>
+  .gradient-brand { background: linear-gradient(135deg, #0B3D6B 0%, #0F5A9C 100%); }
+  .pub-btn { display:inline-flex; align-items:center; justify-content:center; min-height:44px; padding:0 20px; border-radius:999px; font-weight:600; font-size:15px; background:#0B3D6B; color:#fff; transition:background-color .15s; }
+  .pub-btn:hover { background:#082C4E; }
+</style>
+
+<header class="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-gray-200">
+  <div class="max-w-6xl mx-auto px-5 sm:px-8 flex items-center justify-between" style="min-height:72px;">
+    <a href="{{ url_for('main.index') }}" class="flex items-center" style="min-height:48px;" aria-label="CVForge home">
+      <img src="{{ url_for('static', filename='logo-nav.png') }}" alt="CVForge" width="116" height="45" style="height:45px;width:auto;"/>
+    </a>
+    <div class="flex items-center gap-2">
+      <a href="{{ url_for('auth.login') }}" class="hidden sm:inline-flex items-center px-3 font-semibold" style="min-height:44px;color:#0B3D6B;">Sign in</a>
+      <a href="{{ url_for('auth.register') }}" class="pub-btn">Start free</a>
+    </div>
+  </div>
+</header>
+
+<main class="max-w-6xl mx-auto px-5 sm:px-8 py-10 pb-24">
+  <h1 class="text-3xl font-bold" style="color:#0B3D6B;">CV Templates</h1>
+  <p class="text-gray-500 mt-1 mb-8">{{ templates|length }} professional designs. Pick one when you sign up.</p>
+  {% include "templates_gallery/_grid.html" %}
+</main>
+{% endblock %}

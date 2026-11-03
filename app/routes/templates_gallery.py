@@ -15,7 +15,9 @@ def index():
     templates = q.order_by(Template.sort_order).all()
     categories = db.session.query(Template.category).distinct().all()
     categories = [c[0] for c in categories]
-    return render_template("templates_gallery/index.html",
+    # The dashboard layout needs a signed-in user, so visitors get the public page.
+    page = "index.html" if current_user.is_authenticated else "public.html"
+    return render_template(f"templates_gallery/{page}",
                            templates=templates,
                            categories=categories,
                            active_category=category)
