@@ -8,7 +8,7 @@
       {% if is_new %}
       <div class="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/50" role="dialog" aria-modal="true" aria-labelledby="manual-title">
         <div class="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 text-center">
-          <img src="{{ url_for('static', filename='logo.png') }}" alt="CVForge AI" class="h-20 w-auto mx-auto mb-3"/>
+          <img src="{{ url_for('static', filename='favicon.ico') }}" alt="CVForge AI logo" width="80" height="80" class="h-20 w-20 rounded-2xl mx-auto mb-3"/>
           <h2 id="manual-title" class="text-xl font-extrabold text-gray-900">Welcome to CVForge AI{% if current_user.first_name %}, {{ current_user.first_name }}{% endif %}!</h2>
           <p class="text-sm text-gray-600 mt-2">Download our short user manual. It shows you how to build your CV, pick a template, check it for employers' software and download it.</p>
           <a href="{{ url_for('guide.download') }}" onclick="try{localStorage.setItem('cvf_manual_seen','1')}catch(e){}"

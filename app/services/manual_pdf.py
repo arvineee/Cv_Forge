@@ -28,7 +28,7 @@ MUTED = colors.HexColor("#5B6B7F")
 LIGHT = colors.HexColor("#EAF6F0")
 RULE = colors.HexColor("#D5DEE8")
 
-LOGO_PATH = os.path.join(os.path.dirname(__file__), "..", "static", "logo.png")
+LOGO_PATH = os.path.join(os.path.dirname(__file__), "..", "static", "favicon.ico")
 
 
 def _small_logo():
@@ -36,7 +36,7 @@ def _small_logo():
     try:
         from PIL import Image as PILImage
         im = PILImage.open(LOGO_PATH).convert("RGB")
-        im.thumbnail((700, 700))
+        im.thumbnail((512, 512))
         out = io.BytesIO()
         im.save(out, "JPEG", quality=88)
         out.seek(0)
@@ -165,8 +165,8 @@ def build_manual_pdf(site_url: str = "") -> bytes:
 
     story = [Spacer(1, 0.9 * inch)]
     if os.path.isfile(LOGO_PATH):
-        logo_w = 3.6 * inch
-        story.append(Image(_small_logo(), width=logo_w, height=logo_w * 768 / 1408, hAlign="CENTER"))
+        logo_w = 2.2 * inch
+        story.append(Image(_small_logo(), width=logo_w, height=logo_w, hAlign="CENTER"))
     story += [
         Spacer(1, 0.5 * inch),
         Paragraph(_inline(BRAND_NAME), st["cover_title"]),

@@ -43,6 +43,34 @@ class ManualAppTests(unittest.TestCase):
         self.assertEqual(r.mimetype, "application/pdf")
         self.assertIn("attachment", r.headers["Content-Disposition"])
 
+    def test_seo_markup(self):
+        import json, re
+        html = self.client.get("/guide").get_data(as_text=True)
+        self.assertEqual(html.count("<h1"), 1)
+        self.assertIn("<title>How to Use CVForge AI", html)
+        self.assertRegex(html, r'<meta name="description" content="[^"]{80,170}"')
+        self.assertIn('rel="canonical"', html)
+        self.assertIn('property="og:type" content="article"', html)
+        blobs = re.findall(r'<script type="application/ld\+json">(.*?)</script>', html, re.S)
+        graph = [json.loads(b) for b in blobs if "@graph" in b][0]["@graph"]
+        self.assertEqual([g["@type"] for g in graph], ["TechArticle", "BreadcrumbList", "FAQPage"])
+        self.assertGreaterEqual(len(graph[2]["mainEntity"]), 5)
+        self.assertIn("favicon.ico", html)
+
+    def test_sitemap_and_robots_include_guide(self):
+        self.assertIn("/guide</loc>", self.client.get("/sitemap.xml").get_data(as_text=True))
+        self.assertIn("Allow: /guide", self.client.get("/robots.txt").get_data(as_text=True))
+
+    def test_icons_are_real_and_small(self):
+        import os
+        from PIL import Image
+        st = os.path.join(os.path.dirname(__file__), "..", "app", "static")
+        ico = Image.open(os.path.join(st, "favicon.ico"))
+        self.assertIn((48, 48), ico.ico.sizes())
+        self.assertLess(os.path.getsize(os.path.join(st, "favicon.ico")), 200_000)
+        for f in ("apple-touch-icon.png", "icon-192.png", "icon-512.png", "og-default.jpg"):
+            self.assertTrue(os.path.isfile(os.path.join(st, f)), f)
+
     def test_emailing_is_once_only_and_respects_optout(self):
         from app.services.manual_mailing import send_manual_emails
         with self.app.app_context():

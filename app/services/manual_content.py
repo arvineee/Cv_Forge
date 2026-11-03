@@ -16,6 +16,7 @@ Inline **bold** is supported in text.
 
 MANUAL_TITLE = "CVForge AI User Manual"
 MANUAL_TAGLINE = "Build a job-winning CV in minutes"
+MANUAL_UPDATED = "2026-11-03"  # ISO date; bump when the content changes (used for SEO dateModified)
 
 SECTIONS = [
     {

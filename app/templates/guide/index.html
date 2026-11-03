@@ -1,11 +1,20 @@
 {% extends "base.html" %}
-{% block title %}{{ title }} — CVForge AI{% endblock %}
-{% block meta_description %}Step-by-step guide to building, revamping and downloading your CV with CVForge AI.{% endblock %}
+{% block title %}How to Use CVForge AI: User Manual and CV Guide{% endblock %}
+{% block meta_description %}Step-by-step guide to CVForge AI: build a CV with AI, upload and revamp an old one, pick a template, run the ATS checker, pay with M-Pesa and download your PDF.{% endblock %}
+{% block og_type %}article{% endblock %}
+{% block extra_head %}
+<link rel="alternate" type="application/pdf" href="{{ url_for('guide.download', _external=True) }}" title="CVForge AI User Manual (PDF)"/>
+{% endblock %}
+{% block structured_data %}
+<script type="application/ld+json">
+{{ jsonld|tojson }}
+</script>
+{% endblock %}
 {% block body %}
 <nav class="sticky top-0 z-50 bg-white/90 backdrop-blur-sm border-b border-gray-100">
   <div class="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
     <a href="{{ url_for('main.index') }}" class="flex items-center gap-2 font-bold text-lg text-gray-900">
-      <img src="{{ url_for('static', filename='logo.png') }}" alt="" class="h-9 w-auto"/>
+      <img src="{{ url_for('static', filename='favicon.ico') }}" alt="CVForge AI logo" width="36" height="36" class="h-9 w-9 rounded-lg"/>
       CVForge AI
     </a>
     <div class="flex gap-3 items-center">
@@ -21,7 +30,7 @@
 
 <main class="max-w-4xl mx-auto px-4 py-10">
   <header class="mb-8 rounded-2xl border border-gray-100 bg-white shadow-sm p-6 sm:p-8 flex flex-col sm:flex-row gap-6 sm:items-center">
-    <img src="{{ url_for('static', filename='logo.png') }}" alt="CVForge AI" class="h-24 w-auto self-start"/>
+    <img src="{{ url_for('static', filename='favicon.ico') }}" alt="CVForge AI logo" width="96" height="96" class="h-24 w-24 rounded-2xl self-start"/>
     <div class="flex-1">
       <h1 class="text-2xl sm:text-3xl font-extrabold text-gray-900">{{ title }}</h1>
       <p class="text-gray-500 mt-1">{{ tagline }}</p>

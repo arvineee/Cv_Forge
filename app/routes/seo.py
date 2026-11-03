@@ -31,6 +31,7 @@ PUBLIC_PAGES = [
     ("billing.plans", "weekly", "0.8"),
     ("templates_gallery.index", "weekly", "0.7"),
     ("support.index", "monthly", "0.4"),
+    ("guide.index", "monthly", "0.6"),
 ]
 
 # Path prefixes that must never be indexed: logged-in areas, admin, and
@@ -62,6 +63,7 @@ def robots():
         *[f"Disallow: {p}" for p in DISALLOWED_PREFIXES],
         "Allow: /billing/plans",
         "Allow: /templates/",
+        "Allow: /guide",
         "",
         f"Sitemap: {url_for('seo.sitemap', _external=True)}",
     ]
