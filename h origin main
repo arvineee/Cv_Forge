@@ -1,0 +1,62 @@
+ CHANGES_LAYOUT_TEMPLATES.md                   | 141 [32m+++++++[m
+ CHANGES_PRICING_OFFERS_FEEDBACK.md            |  69 [32m+++[m
+ app/__init__.py                               |  34 [32m+[m[31m-[m
+ app/ai_service.py                             |   2 [32m+[m[31m-[m
+ app/models.py                                 | 110 [32m++++[m[31m-[m
+ app/routes/admin.py                           | 197 [32m++++++++[m[31m-[m
+ app/routes/billing.py                         | 119 [32m+++[m[31m---[m
+ app/routes/cv.py                              |  86 [32m+++[m[31m-[m
+ app/routes/feedback.py                        |  99 [32m+++++[m
+ app/routes/main.py                            |   7 [32m+[m[31m-[m
+ app/routes/webhooks.py                        |  21 [32m+[m[31m-[m
+ app/services/docx_service.py                  | 493 [32m++++++++++++++++++[m[31m----[m
+ app/services/email_service.py                 |  29 [32m+[m[31m-[m
+ app/services/pdf_service.py                   | 486 [32m++++++++++++++++++[m[31m---[m
+ app/services/photo_service.py                 |  91 [32m++++[m
+ app/services/pricing.py                       | 181 [32m++++++++[m
+ app/services/template_catalog.py              |  34 [32m++[m
+ app/static/templates/banded-sections.png      | Bin [31m0[m -> [32m57420[m bytes
+ app/static/templates/centred-classic.png      | Bin [31m0[m -> [32m54567[m bytes
+ app/static/templates/classic-navy.png         | Bin [31m0[m -> [32m55653[m bytes
+ app/static/templates/clean-white.png          | Bin [31m0[m -> [32m55891[m bytes
+ app/static/templates/creative-teal.png        | Bin [31m0[m -> [32m55416[m bytes
+ app/static/templates/emerald-fresh.png        | Bin [31m0[m -> [32m55759[m bytes
+ app/static/templates/executive-black.png      | Bin [31m0[m -> [32m56535[m bytes
+ app/static/templates/header-band-burgundy.png | Bin [31m0[m -> [32m54506[m bytes
+ app/static/templates/header-band-forest.png   | Bin [31m0[m -> [32m55480[m bytes
+ app/static/templates/minimal-gray.png         | Bin [31m0[m -> [32m55891[m bytes
+ app/static/templates/modern-blue.png          | Bin [31m0[m -> [32m55372[m bytes
+ app/static/templates/purple-bold.png          | Bin [31m0[m -> [32m53468[m bytes
+ app/static/templates/rose-modern.png          | Bin [31m0[m -> [32m54814[m bytes
+ app/static/templates/sidebar-navy.png         | Bin [31m0[m -> [32m70363[m bytes
+ app/static/templates/sidebar-slate.png        | Bin [31m0[m -> [32m70020[m bytes
+ app/static/templates/tech-dark.png            | Bin [31m0[m -> [32m56535[m bytes
+ app/static/templates/timeline-indigo.png      | Bin [31m0[m -> [32m54798[m bytes
+ app/static/templates/timeline-teal.png        | Bin [31m0[m -> [32m55382[m bytes
+ app/static/templates/two-column-pro.png       | Bin [31m0[m -> [32m55372[m bytes
+ app/static/templates/warm-terracotta.png      | Bin [31m0[m -> [32m55688[m bytes
+ app/templates/_offer_banner.html              |   8 [32m+[m
+ app/templates/admin/feedback.html             |  55 [32m+++[m
+ app/templates/admin/index.html                |   2 [32m+[m
+ app/templates/admin/offer_form.html           |  98 [32m+++++[m
+ app/templates/admin/offers.html               |  79 [32m++++[m
+ app/templates/admin/pricing.html              |   5 [32m+[m
+ app/templates/admin/pricing_form.html         |   2 [32m+[m[31m-[m
+ app/templates/base_dashboard.html             |   1 [32m+[m
+ app/templates/billing/index.html              |   2 [32m+[m[31m-[m
+ app/templates/billing/plans.html              |   5 [32m+[m[31m-[m
+ app/templates/cv/builder.html                 |  28 [32m++[m
+ app/templates/cv/wizard_review.html           |   2 [32m+[m[31m-[m
+ app/templates/feedback/_form.html             |  59 [32m+++[m
+ app/templates/feedback/dashboard.html         |   5 [32m+[m
+ app/templates/feedback/public.html            |  20 [32m+[m
+ app/templates/landing.html                    |   2 [32m+[m[31m-[m
+ app/templates/pricing.html                    |  10 [32m+[m[31m-[m
+ app/templates/templates_gallery/index.html    |   7 [32m+[m[31m-[m
+ tests/test_docx_layouts.py                    | 148 [32m+++++++[m
+ tests/test_layout_templates.py                | 120 [32m++++++[m
+ tests/test_offers_app.py                      | 176 [32m++++++++[m
+ tests/test_offers_logic.py                    | 211 [32m+++++++++[m
+ tests/test_photo_service.py                   | 162 [32m+++++++[m
+ tools/build_thumbnails.py                     |  92 [32m++++[m
+ 61 files changed, 3250 insertions(+), 248 deletions(-)
