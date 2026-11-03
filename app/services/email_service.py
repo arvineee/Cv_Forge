@@ -290,6 +290,33 @@ def _build_nudge_email(user, content, billing_url):
     return html, text
 
 
+def send_manual_email(user):
+    """One-off email pointing a user to the CVForge AI user manual.
+    Returns True if it was handed to the mailer, False if mail is not
+    configured (so the caller does not mark the user as emailed)."""
+    Mail, Message = _get_mailer()
+    if not Mail or not current_app.config.get("MAIL_USERNAME"):
+        current_app.logger.info(f"[email stub] Manual email skipped for {user.email}")
+        return False
+
+    guide_url = url_for("guide.index", _external=True)
+    pdf_url = url_for("guide.download", _external=True)
+    body = f"""
+              <p style="margin:0 0 16px;">Hi {_first_name(user)},</p>
+              <p style="margin:0 0 16px;">We have written a short user manual for {BRAND_NAME}. It shows you, step by step, how to build your CV, pick a template, check it against employers' screening software, and download it.</p>
+              <p style="margin:0 0 16px;">Read it online, or save the PDF to your phone so you have it when you are applying for jobs.</p>
+              <p style="margin:16px 0 0;font-size:14px;color:{MUTED};">Prefer the file? <a href="{pdf_url}" style="color:{BRAND_GREEN};">Download the PDF directly</a>.</p>"""
+    html = _render_email(
+        preheader="A short guide to building and downloading your CV.",
+        body_html=body,
+        cta_label="Open the user manual",
+        cta_url=guide_url,
+        footer_note="You are receiving this because you have a CVForge AI account.",
+    )
+    _send("Your CVForge AI user manual", user.email, html)
+    return True
+
+
 def send_pro_nudge_email(user):
     """
     Occasional reminder to free-tier users about what Pro unlocks.

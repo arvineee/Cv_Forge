@@ -1,0 +1,35 @@
+{# One-time manual prompt on the dashboard. New accounts (under 14 days old) get a welcome
+   dialog; everyone else gets a slim banner. Dismissal is remembered in this browser. #}
+{% set is_new = current_user.created_at and ((now_utc - current_user.created_at.replace(tzinfo=None)).days < 14) %}
+<div x-data="{ seen: false, ready: false }"
+     x-init="try { seen = localStorage.getItem('cvf_manual_seen') === '1' } catch(e) {} ready = true">
+  <template x-if="ready && !seen">
+    <div>
+      {% if is_new %}
+      <div class="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/50" role="dialog" aria-modal="true" aria-labelledby="manual-title">
+        <div class="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 text-center">
+          <img src="{{ url_for('static', filename='logo.png') }}" alt="CVForge AI" class="h-20 w-auto mx-auto mb-3"/>
+          <h2 id="manual-title" class="text-xl font-extrabold text-gray-900">Welcome to CVForge AI{% if current_user.first_name %}, {{ current_user.first_name }}{% endif %}!</h2>
+          <p class="text-sm text-gray-600 mt-2">Download our short user manual. It shows you how to build your CV, pick a template, check it for employers' software and download it.</p>
+          <a href="{{ url_for('guide.download') }}" onclick="try{localStorage.setItem('cvf_manual_seen','1')}catch(e){}"
+             class="block mt-5 py-3 min-h-[44px] rounded-lg gradient-brand text-white font-semibold text-sm hover:opacity-90 transition">
+            Download the manual (PDF)
+          </a>
+          <a href="{{ url_for('guide.index') }}" class="block mt-3 text-sm text-gray-600 underline">Read it online instead</a>
+          <button type="button" @click="seen = true; try{localStorage.setItem('cvf_manual_seen','1')}catch(e){}"
+                  class="mt-3 text-xs text-gray-400 hover:text-gray-600 min-h-[44px]">Maybe later</button>
+        </div>
+      </div>
+      {% else %}
+      <div class="mb-6 rounded-xl border border-green-100 bg-green-50 p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+        <p class="text-sm text-green-900 flex-1"><strong>New: the CVForge AI user manual.</strong> A short guide to building, revamping and downloading your CV.</p>
+        <a href="{{ url_for('guide.download') }}" onclick="try{localStorage.setItem('cvf_manual_seen','1')}catch(e){}"
+           class="px-4 min-h-[44px] inline-flex items-center justify-center rounded-lg gradient-brand text-white text-sm font-semibold">Download PDF</a>
+        <a href="{{ url_for('guide.index') }}" class="text-sm text-green-800 underline">Read online</a>
+        <button type="button" @click="seen = true; try{localStorage.setItem('cvf_manual_seen','1')}catch(e){}"
+                class="text-xs text-green-700 min-h-[44px] px-2" aria-label="Dismiss">Dismiss</button>
+      </div>
+      {% endif %}
+    </div>
+  </template>
+</div>

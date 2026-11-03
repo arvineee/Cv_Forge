@@ -80,6 +80,8 @@ def create_app(config_object=None):
     app.register_blueprint(support_bp)
     app.register_blueprint(seo_bp)
     app.register_blueprint(feedback_bp)
+    from app.routes.guide import guide_bp
+    app.register_blueprint(guide_bp)
 
     # ── Visitor tracking ─────────────────────────────────────────
     from app.services.visitor_tracking import register_visitor_tracking

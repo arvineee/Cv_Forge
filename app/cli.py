@@ -52,7 +52,21 @@ def prune_visits():
     click.echo(f"Pruned {deleted} old page-visit rows.")
 
 
+@click.command("send-manual-email")
+@click.option("--limit", default=200, show_default=True, help="Max emails in this run.")
+@click.option("--only", "only_email", default=None, help="Send to this one user only (for a test).")
+@click.option("--dry-run", is_flag=True, help="Count who would be emailed; send nothing.")
+@with_appcontext
+def send_manual_email_cmd(limit, only_email, dry_run):
+    """Email existing users a link to the user manual (once per user)."""
+    from app.services.manual_mailing import send_manual_emails
+    r = send_manual_emails(limit=limit, only_email=only_email, dry_run=dry_run)
+    label = "Would send" if dry_run else "Manual emails"
+    click.echo(f"{label}: total={r['total']} sent={r['sent']} failed={r['failed']} skipped={r['skipped']}")
+
+
 def register_cli(app):
+    app.cli.add_command(send_manual_email_cmd)
     app.cli.add_command(send_nudges)
     app.cli.add_command(prune_visits)
 
