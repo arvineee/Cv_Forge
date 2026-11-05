@@ -312,10 +312,11 @@ def _register_cli(app: Flask):
             PricingPlan(
                 slug="free", name="Free", price_kes=0, billing_period="forever",
                 sort_order=1, is_active=True, is_popular=False,
-                features=["3 AI CV generations/day", "3 ATS checks/day", "5 templates",
-                          "PDF download", "Public CV link"],
+                features=["Build and preview CVs", "3 AI CV generations/day",
+                          "3 ATS checks/day", "5 templates"],
                 daily_cv_limit=3, daily_cover_letter_limit=3, daily_ats_limit=3,
                 allow_docx=False, allow_version_history=False, allow_career_coach=False,
+                allow_public_link=False,
             ),
             PricingPlan(
                 slug="pro", name="Pro", price_kes=799, billing_period="month",

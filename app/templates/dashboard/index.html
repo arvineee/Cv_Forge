@@ -45,8 +45,11 @@
 {% if not current_user.is_premium %}
 <div class="mb-8 p-5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4">
   <div>
-    <p class="font-semibold text-lg">Get more from CVForge with Pro</p>
-    <p class="text-blue-100 text-sm mt-1 max-w-xl">Unlimited AI generations, DOCX downloads and version history, from KES 50 a month. Pay with M-Pesa. Each subscription lasts 30 days and doesn't renew automatically.</p>
+    <p class="font-semibold text-lg">Get more from CVForge</p>
+    <p class="text-blue-100 text-sm mt-1 max-w-xl">
+      Unlock clean exports and the tools included with your plan.
+      {% if lowest_plan %}Plans start at KES {{ lowest_plan.display_price }} for {{ lowest_plan.period_days }} days. No automatic renewal.{% endif %}
+    </p>
   </div>
   <a href="{{ url_for('billing.plans') }}"
      class="flex-shrink-0 inline-flex items-center justify-center px-5 min-h-[44px] bg-white text-blue-700 font-semibold text-sm rounded-lg hover:bg-blue-50 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-blue-600">

@@ -13,6 +13,9 @@ import unittest
 from PIL import Image
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+_module_names = ("app", "app.services", "app.services.photo_service",
+                 "app.services.pdf_service")
+_original_modules = {name: sys.modules.get(name) for name in _module_names}
 
 
 def _load(name, rel):
@@ -32,6 +35,11 @@ sys.modules.setdefault("app", _pkg)
 sys.modules.setdefault("app.services", _svc)
 sys.modules["app.services.photo_service"] = photo
 pdf = _load("pdf_service", "app/services/pdf_service.py")
+for _name, _module in _original_modules.items():
+    if _module is None:
+        sys.modules.pop(_name, None)
+    else:
+        sys.modules[_name] = _module
 
 
 def _jpeg_bytes(size=(1200, 800), exif=True):

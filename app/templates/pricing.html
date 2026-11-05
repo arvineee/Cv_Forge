@@ -20,12 +20,13 @@
   <div class="max-w-5xl mx-auto">
     <div class="text-center mb-14">
       <h1 class="text-4xl font-black text-gray-900 mb-4">Simple, transparent pricing</h1>
-      <p class="text-gray-500 text-lg">Pay with M-Pesa or Card. Cancel anytime. No hidden fees.</p>
+      <p class="text-gray-500 text-lg">Build and preview free. Choose a plan when you're ready to export or unlock more tools.</p>
+      <p class="text-gray-400 text-sm mt-2">Pay with M-Pesa or card. Plans do not renew automatically.</p>
     </div>
 
     {% include "_offer_banner.html" %}
     <!-- Plans grid — rendered directly from DB, not via an include partial -->
-    <div class="grid md:grid-cols-{{ plans|length }} gap-6 mb-16">
+    <div class="grid gap-6 mb-16" style="grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));">
       {% for plan in plans %}
       <div class="bg-white rounded-2xl border
         {% if plan.is_popular %}border-blue-400 ring-2 ring-blue-100 shadow-xl{% else %}border-gray-100 shadow-sm{% endif %}
@@ -66,7 +67,8 @@
           Get Started Free
         </a>
         {% else %}
-        <div x-data="{open:false}" class="relative">
+        <div x-data="{open: {{ 'true' if selected_plan_slug == plan.slug else 'false' }}}" class="relative">
+          {% if current_user.is_authenticated %}
           <button @click="open=!open"
                   class="w-full py-3 gradient-brand text-white font-semibold rounded-xl hover:opacity-90 transition text-sm">
             Subscribe — KES {{ plan.display_price }}
@@ -103,6 +105,13 @@
               </button>
             </form>
           </div>
+          {% else %}
+          <a href="{{ url_for('billing.continue_to_plan', plan_slug=plan.slug) }}"
+             class="block w-full text-center py-3 gradient-brand text-white font-semibold rounded-xl hover:opacity-90 transition text-sm">
+            Choose {{ plan.name }}
+          </a>
+          <p class="text-xs text-gray-500 text-center mt-2">Sign in or create a free account to continue. No payment is taken yet.</p>
+          {% endif %}
         </div>
         {% endif %}
       </div>
@@ -170,7 +179,7 @@
       <div class="space-y-4 max-w-2xl mx-auto" x-data="{open: null}">
         {% for q, a in [
           ('How does payment work?', 'Click Subscribe and choose M-Pesa or Card. With M-Pesa, enter your Safaricom number and confirm the STK push on your phone. With Card, you\'ll be taken to a secure checkout page. Either way, your plan activates within seconds of payment.'),
-          ('Can I cancel anytime?', 'Yes. Your plan runs for the period you pay for (7 days, 30 days, or a year, depending on the plan), starting from payment. It won\'t auto-renew, so you\'ll need to subscribe again to continue.'),
+          ('Will my plan renew automatically?', 'No. Each plan lasts for the period shown on its card and does not renew automatically.'),
           ('What\'s the difference between Free and Pro?', 'Free gives you 3 AI generations per day and access to 5 templates. Pro removes all daily limits, unlocks all 12+ templates, adds DOCX download, and enables version history.'),
           ('Is my CV data secure?', 'Yes. Your CV data is encrypted at rest and in transit. We never share your personal information with third parties or recruiters.'),
         ] %}

@@ -69,6 +69,19 @@ class OffersOnPages(unittest.TestCase):
         self.assertIsNotNone(pro)
         self.assertIn(f"KES {pro.price_kes}", self._pricing_html())
 
+    def test_guest_paid_plan_action_uses_get_continuation(self):
+        html = self._pricing_html()
+        self.assertIn('href="/billing/continue/pro"', html)
+        self.assertNotIn('action="/billing/subscribe/pro"', html)
+
+    def test_seeded_free_plan_does_not_claim_paid_exports_or_sharing(self):
+        free = PricingPlan.query.filter_by(slug="free").first()
+        self.assertIsNotNone(free)
+        self.assertIn("Build and preview CVs", free.features)
+        self.assertNotIn("PDF download", free.features)
+        self.assertNotIn("Public CV link", free.features)
+        self.assertFalse(free.allow_public_link)
+
     def test_live_offer_shows_discounted_price_and_label(self):
         pro = self._pro()
         db.session.add(Offer(name="t", public_label="Test 30 off", discount_type="percent",

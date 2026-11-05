@@ -1,7 +1,7 @@
 """CVForge AI - Dashboard Blueprint"""
 from flask import Blueprint, render_template, request, flash, redirect, url_for
 from flask_login import login_required, current_user
-from app.models import db, Resume, CoverLetter, ATSReport, AIUsage, Profile
+from app.models import db, Resume, CoverLetter, ATSReport, AIUsage, Profile, PricingPlan
 
 dashboard_bp = Blueprint("dashboard", __name__)
 
@@ -16,6 +16,13 @@ def index():
     recent_report = (ATSReport.query.filter_by(user_id=current_user.id)
                      .order_by(ATSReport.created_at.desc()).first())
     daily_ai_used = AIUsage.get_daily_count(current_user.id)
+    from app.services.pricing import annotate_plans
+    cheapest_paid_plan = (PricingPlan.query
+                          .filter_by(is_active=True)
+                          .filter(PricingPlan.price_kes > 0)
+                          .order_by(PricingPlan.price_kes)
+                          .first())
+    lowest_plan = annotate_plans([cheapest_paid_plan])[0] if cheapest_paid_plan else None
     from app.routes.cv import _plan_allows_public_link
     from datetime import datetime
     return render_template("dashboard/index.html",
@@ -24,6 +31,7 @@ def index():
                            cover_letters=cover_letters,
                            recent_report=recent_report,
                            daily_ai_used=daily_ai_used,
+                           lowest_plan=lowest_plan,
                            allow_public_link=_plan_allows_public_link())
 
 

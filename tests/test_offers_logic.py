@@ -8,6 +8,8 @@ from datetime import datetime, timedelta, timezone
 import os
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 EAT = timezone(timedelta(hours=3))
+_module_names = ("app", "app.models", "app.services", "app.services.pricing")
+_original_modules = {name: sys.modules.get(name) for name in _module_names}
 
 # ── stub the models layer ───────────────────────────────────────
 store = {"offers": [], "plans": [], "redemptions": []}
@@ -83,6 +85,11 @@ pricing = importlib.util.module_from_spec(spec)
 sys.modules["app.services"] = types.ModuleType("app.services")
 sys.modules["app.services.pricing"] = pricing
 spec.loader.exec_module(pricing)
+for _name, _module in _original_modules.items():
+    if _module is None:
+        sys.modules.pop(_name, None)
+    else:
+        sys.modules[_name] = _module
 
 NOW = datetime(2026, 11, 20, 12, 0, tzinfo=timezone.utc)
 BEFORE = NOW - timedelta(days=1)

@@ -9,7 +9,7 @@
 {% set roles = (resume.work_experience or [])|length %}
 {% set skill_count = (resume.skills or [])|length %}
 {% set preview_v = (resume.updated_at.timestamp()|int) if resume.updated_at else 0 %}
-{% set paid_href = url_for('billing.plans') %}
+{% set paid_href = url_for('billing.plans', plan=lowest_plan.slug) if lowest_plan else url_for('billing.plans') %}
 
 <div class="mb-6 rounded-2xl border border-blue-100 bg-gradient-to-b from-blue-50/70 to-white p-4 sm:p-6"
      x-data="{ loaded: false, failed: false }">
@@ -17,7 +17,7 @@
     ✓ Your CV is built
   </p>
   <h2 class="text-xl sm:text-2xl font-bold text-gray-900 leading-tight">
-    {% if first_name %}{{ first_name }}, your{% else %}Your{% endif %} CV is ready to download
+    {% if first_name %}{{ first_name }}, your{% else %}Your{% endif %} CV is ready to preview
   </h2>
   <p class="text-sm text-gray-500 mt-1 mb-5">
     {% if roles %}{{ roles }} role{{ 's' if roles != 1 }}{% endif %}{% if roles and skill_count %} · {% endif %}{% if skill_count %}{{ skill_count }} skill{{ 's' if skill_count != 1 }}{% endif %}{% if resume.ats_score is not none %}{% if roles or skill_count %} · {% endif %}ATS score {{ resume.ats_score }}/100{% endif %}
@@ -95,7 +95,7 @@
         <li class="flex gap-2"><span class="text-green-600 font-bold">✓</span> Clean, print-ready PDF — no watermark, nothing hidden</li>
         <li class="flex gap-2"><span class="text-green-600 font-bold">✓</span> Instant download, right after payment</li>
         <li class="flex gap-2"><span class="text-green-600 font-bold">✓</span> Edit anytime and re-download while your plan is active</li>
-        <li class="flex gap-2"><span class="text-green-600 font-bold">✓</span> Shareable link to drop into WhatsApp or applications</li>
+        <li class="flex gap-2"><span class="text-green-600 font-bold">✓</span> Public sharing on eligible paid plans</li>
         <li class="flex gap-2"><span class="text-indigo-500 font-bold">★</span> Word (DOCX) and AI Coach on Pro plans</li>
       </ul>
 
@@ -105,7 +105,7 @@
         KES {{ lowest_plan.display_price }}<span class="text-sm font-medium text-gray-500"> / {{ lowest_plan.billing_period }}</span>
       </p>
       {% endif %}
-      <p class="text-xs text-gray-500 mb-4">Pay with M-Pesa or card · takes about a minute</p>
+      <p class="text-xs text-gray-500 mb-4">Pay with M-Pesa or card · no automatic renewal</p>
 
       <a href="{{ paid_href }}"
          class="block text-center px-5 py-3 min-h-[48px] rounded-lg gradient-brand text-white text-sm font-semibold shadow-md">

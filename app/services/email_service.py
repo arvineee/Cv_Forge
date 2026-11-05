@@ -3,6 +3,7 @@ CVForge AI - Email Service
 Stub that logs instead of crashing if mail is not configured.
 """
 import re
+from urllib.parse import urlparse
 from flask import current_app, url_for
 from markupsafe import escape
 
@@ -167,14 +168,17 @@ def _send(subject, recipient, html, text=None):
     mail.send(msg)
 
 
-def send_verification_email(user):
+def send_verification_email(user, next_url=None):
     Mail, Message = _get_mailer()
     if not Mail or not current_app.config.get("MAIL_USERNAME"):
         current_app.logger.info(f"[email stub] Verification email skipped for {user.email}")
         return
 
     try:
-        verify_url = url_for("auth.verify_email", token=user.verification_token, _external=True)
+        verify_args = {"token": user.verification_token, "_external": True}
+        if next_url and next_url.startswith("/") and not urlparse(next_url).netloc:
+            verify_args["next"] = next_url
+        verify_url = url_for("auth.verify_email", **verify_args)
         body = f"""
               <p style="margin:0 0 16px;">Hi {_first_name(user)},</p>
               <p style="margin:0 0 16px;">Welcome to {BRAND_NAME}. Please confirm your email address to finish setting up your account.</p>

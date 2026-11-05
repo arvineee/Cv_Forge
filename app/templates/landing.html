@@ -187,7 +187,7 @@
         <a href="{{ url_for('auth.register') }}" class="btn btn-primary">Build my CV free</a>
         <a href="{{ url_for('templates_gallery.index') }}" class="btn btn-ghost">Browse templates</a>
       </div>
-      <p style="margin-top: 16px; font-size: 14px; color: var(--ink-2);">No card needed. Upgrade with an M-Pesa STK push when you want more.</p>
+      <p style="margin-top: 16px; font-size: 14px; color: var(--ink-2);">Build and preview free. Choose a plan for export or more tools; pay by M-Pesa or card when you're ready.</p>
     </div>
 
     <!-- Real template previews -->
@@ -203,7 +203,7 @@
 <section class="trust" aria-label="Highlights">
   <ul class="wrap grid grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-4" style="padding-top: 22px; padding-bottom: 22px; list-style: none; margin: 0 auto;">
     <li><svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none" style="flex:none;"><circle cx="10" cy="10" r="10" fill="#FDEBD0"/><path d="M5.5 10.5l3 3 6-6.5" stroke="#0B3D6B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>ATS-friendly layouts</li>
-    <li><svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none" style="flex:none;"><circle cx="10" cy="10" r="10" fill="#FDEBD0"/><path d="M5.5 10.5l3 3 6-6.5" stroke="#0B3D6B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>PDF and Word downloads</li>
+    <li><svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none" style="flex:none;"><circle cx="10" cy="10" r="10" fill="#FDEBD0"/><path d="M5.5 10.5l3 3 6-6.5" stroke="#0B3D6B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>PDF export, with Word on eligible paid plans</li>
     <li><svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none" style="flex:none;"><circle cx="10" cy="10" r="10" fill="#FDEBD0"/><path d="M5.5 10.5l3 3 6-6.5" stroke="#0B3D6B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pay with M-Pesa</li>
     <li><svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none" style="flex:none;"><circle cx="10" cy="10" r="10" fill="#FDEBD0"/><path d="M5.5 10.5l3 3 6-6.5" stroke="#0B3D6B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Built in Kenya</li>
   </ul>
@@ -357,7 +357,7 @@
       {% for num, title, desc in [
         ('1', 'Add your details', 'Fill in the guided builder, or start from what you already have.'),
         ('2', 'Let the AI edit', 'It rewrites your content, compares it to the job posting and flags what a screener would miss.'),
-        ('3', 'Download and apply', 'Save as PDF to send, or DOCX to keep working on it.'),
+        ('3', 'Preview, then export', 'Build and preview free. Unlock a clean PDF, with Word on eligible plans.'),
       ] %}
       <li>
         <span class="display" style="display: grid; place-items: center; width: 52px; height: 52px; border-radius: 50%; background: var(--navy); color: #fff; font-weight: 800; font-size: 22px;">{{ num }}</span>
@@ -375,7 +375,7 @@
     <div style="max-width: 36em;">
       <p class="eyebrow">Pricing</p>
       <h2 style="font-weight: 800; font-size: clamp(2rem, 4vw, 3rem); line-height: 1.08;">Start free. Pay only if you need more.</h2>
-      <p style="font-size: 18px; color: var(--ink-2); margin-top: 16px;">Every paid plan is billed through M-Pesa, and you can cancel any time.</p>
+      <p style="font-size: 18px; color: var(--ink-2); margin-top: 16px;">Pay by M-Pesa or card for the period shown. Plans do not renew automatically.</p>
     </div>
 
     <div class="plans" style="margin-top: 48px;">
@@ -402,7 +402,7 @@
           </li>
           {% endfor %}
         </ul>
-        <a href="{{ url_for('auth.register') }}" class="btn {% if plan.is_popular %}btn-primary{% else %}btn-ghost{% endif %}" style="width: 100%;">Choose {{ plan.name }}</a>
+        <a href="{{ url_for('auth.register') if plan.price_kes == 0 else url_for('billing.continue_to_plan', plan_slug=plan.slug) }}" class="btn {% if plan.is_popular %}btn-primary{% else %}btn-ghost{% endif %}" style="width: 100%;">{% if plan.price_kes == 0 %}Start free{% else %}Choose {{ plan.name }}{% endif %}</a>
       </div>
       {% endfor %}
     </div>

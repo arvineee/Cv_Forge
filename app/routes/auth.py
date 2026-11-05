@@ -33,7 +33,9 @@ def _create_user_profile(user: User):
 
 def _safe_next(next_url):
     """Only allow relative URLs to prevent open redirect."""
-    if next_url and urlparse(next_url).netloc == "" and next_url.startswith("/"):
+    parsed = urlparse(next_url or "")
+    if (next_url and next_url.startswith("/") and not next_url.startswith("//")
+            and "\\" not in next_url and not parsed.scheme and not parsed.netloc):
         return next_url
     return None
 
@@ -75,13 +77,14 @@ def _record_attempt(action: str, user_id=None, details=None):
 
 @auth_bp.route("/register", methods=["GET", "POST"])
 def register():
+    next_url = _safe_next(request.values.get("next"))
     if current_user.is_authenticated:
-        return redirect(url_for("dashboard.index"))
+        return redirect(next_url or url_for("dashboard.index"))
 
     if request.method == "POST":
         if _rate_limited("register_attempt", limit=5, window_minutes=15):
             flash("Too many signup attempts. Please try again in a few minutes.", "error")
-            return render_template("auth/register.html")
+            return render_template("auth/register.html", next_url=next_url)
         _record_attempt("register_attempt")
 
         email = request.form.get("email", "").strip().lower()
@@ -104,7 +107,8 @@ def register():
             for e in errors:
                 flash(e, "error")
             return render_template("auth/register.html",
-                                   email=email, first_name=first_name, last_name=last_name)
+                                   email=email, first_name=first_name, last_name=last_name,
+                                   next_url=next_url)
 
         token = secrets.token_urlsafe(32)
         user = User(email=email, first_name=first_name, last_name=last_name,
@@ -120,27 +124,28 @@ def register():
 
         try:
             from app.services.email_service import send_verification_email
-            send_verification_email(user)
+            send_verification_email(user, next_url=next_url)
         except Exception as e:
             current_app.logger.warning(f"Verification email failed: {e}")
 
         # No session is created here — verify_email() is what grants the
         # first login-eligible state, not registration.
         flash("Account created! Check your email for a verification link before logging in.", "success")
-        return redirect(url_for("auth.login"))
+        return redirect(url_for("auth.login", **({"next": next_url} if next_url else {})))
 
-    return render_template("auth/register.html")
+    return render_template("auth/register.html", next_url=next_url)
 
 
 @auth_bp.route("/login", methods=["GET", "POST"])
 def login():
+    next_url = _safe_next(request.values.get("next"))
     if current_user.is_authenticated:
-        return redirect(url_for("dashboard.index"))
+        return redirect(next_url or url_for("dashboard.index"))
 
     if request.method == "POST":
         if _rate_limited("login_failed", limit=10, window_minutes=15):
             flash("Too many failed login attempts. Please try again in a few minutes.", "error")
-            return render_template("auth/login.html")
+            return render_template("auth/login.html", next_url=next_url)
 
         email = request.form.get("email", "").strip().lower()
         password = request.form.get("password", "")
@@ -152,33 +157,32 @@ def login():
             current_app.logger.warning(f"Login failed: no user found for email={email}")
             _record_attempt("login_failed")
             flash("Invalid email or password.", "error")
-            return render_template("auth/login.html", email=email)
+            return render_template("auth/login.html", email=email, next_url=next_url)
 
         if not user.check_password(password):
             current_app.logger.warning(f"Login failed: wrong password for email={email}")
             _record_attempt("login_failed", user_id=user.id)
             flash("Invalid email or password.", "error")
-            return render_template("auth/login.html", email=email)
+            return render_template("auth/login.html", email=email, next_url=next_url)
 
         if not user.is_active:
             flash("Your account has been deactivated. Please contact support.", "error")
-            return render_template("auth/login.html", email=email)
+            return render_template("auth/login.html", email=email, next_url=next_url)
 
         if not user.is_verified:
             flash("Please verify your email before logging in. "
                   "Check your inbox, or request a new link below.", "error")
-            return render_template("auth/login.html", email=email, show_resend=True)
+            return render_template("auth/login.html", email=email, show_resend=True,
+                             next_url=next_url)
 
         user.last_login_at = datetime.now(timezone.utc)
         _log_activity(user.id, "login", {"method": "email"})
         db.session.commit()
 
         login_user(user, remember=remember)
+        return redirect(next_url or url_for("dashboard.index"))
 
-        next_page = _safe_next(request.args.get("next"))
-        return redirect(next_page or url_for("dashboard.index"))
-
-    return render_template("auth/login.html")
+    return render_template("auth/login.html", next_url=next_url)
 
 
 @auth_bp.route("/logout")
@@ -193,6 +197,7 @@ def logout():
 
 @auth_bp.route("/verify/<token>")
 def verify_email(token):
+    next_url = _safe_next(request.args.get("next"))
     user = User.query.filter_by(verification_token=token).first()
     if not user:
         flash("Invalid or expired verification link.", "error")
@@ -205,14 +210,15 @@ def verify_email(token):
         expires = expires.replace(tzinfo=timezone.utc)
     if expires and expires < datetime.now(timezone.utc):
         flash("That verification link has expired. Please request a new one.", "error")
-        return redirect(url_for("auth.resend_verification"))
+        return redirect(url_for("auth.resend_verification",
+                                **({"next": next_url} if next_url else {})))
 
     user.is_verified = True
     user.verification_token = None
     user.verification_token_expires = None
     db.session.commit()
     flash("Email verified! You can now log in.", "success")
-    return redirect(url_for("auth.login"))
+    return redirect(url_for("auth.login", **({"next": next_url} if next_url else {})))
 
 
 @auth_bp.route("/resend-verification", methods=["GET", "POST"])
@@ -222,10 +228,11 @@ def resend_verification():
     Reworked to take an email address directly, the same enumeration-safe
     shape as forgot_password() below — it never reveals whether an account
     exists for a given address."""
+    next_url = _safe_next(request.values.get("next"))
     if request.method == "POST":
         if _rate_limited("resend_verification", limit=5, window_minutes=15):
             flash("Too many requests. Please try again in a few minutes.", "error")
-            return render_template("auth/resend_verification.html")
+            return render_template("auth/resend_verification.html", next_url=next_url)
         _record_attempt("resend_verification")
 
         email = request.form.get("email", "").strip().lower()
@@ -236,14 +243,14 @@ def resend_verification():
             db.session.commit()
             try:
                 from app.services.email_service import send_verification_email
-                send_verification_email(user)
+                send_verification_email(user, next_url=next_url)
             except Exception as e:
                 current_app.logger.warning(f"Verification email failed: {e}")
         flash("If an account exists with that email and isn't verified yet, "
               "a new verification link has been sent.", "info")
-        return redirect(url_for("auth.login"))
+        return redirect(url_for("auth.login", **({"next": next_url} if next_url else {})))
 
-    return render_template("auth/resend_verification.html")
+    return render_template("auth/resend_verification.html", next_url=next_url)
 
 
 @auth_bp.route("/forgot-password", methods=["GET", "POST"])
@@ -305,6 +312,7 @@ def reset_password(token):
 def google_login():
     state = secrets.token_urlsafe(16)
     session["oauth_state"] = state
+    session["oauth_next"] = _safe_next(request.args.get("next"))
     params = {
         "client_id": current_app.config["GOOGLE_CLIENT_ID"],
         "redirect_uri": current_app.config["GOOGLE_REDIRECT_URI"],
@@ -318,15 +326,16 @@ def google_login():
 
 @auth_bp.route("/google/callback")
 def google_callback():
+    next_url = _safe_next(session.pop("oauth_next", None))
     state = request.args.get("state")
     if state != session.pop("oauth_state", None):
         flash("Authentication failed. Please try again.", "error")
-        return redirect(url_for("auth.login"))
+        return redirect(url_for("auth.login", **({"next": next_url} if next_url else {})))
 
     code = request.args.get("code")
     if not code:
         flash("Google authentication was cancelled.", "warning")
-        return redirect(url_for("auth.login"))
+        return redirect(url_for("auth.login", **({"next": next_url} if next_url else {})))
 
     try:
         token_resp = http_requests.post(
@@ -348,7 +357,7 @@ def google_callback():
     except Exception as e:
         current_app.logger.error(f"Google OAuth error: {e}")
         flash("Google authentication failed. Please try again.", "error")
-        return redirect(url_for("auth.login"))
+        return redirect(url_for("auth.login", **({"next": next_url} if next_url else {})))
 
     google_id = userinfo.get("sub")
     email = userinfo.get("email", "").lower()
@@ -380,7 +389,7 @@ def google_callback():
     db.session.commit()
     login_user(user, remember=True)
     flash(f"Welcome, {user.first_name or user.email}!", "success")
-    return redirect(url_for("dashboard.index"))
+    return redirect(next_url or url_for("dashboard.index"))
 
 
 

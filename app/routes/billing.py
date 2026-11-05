@@ -73,8 +73,23 @@ def index():
 @billing_bp.route("/plans")
 def plans():
     plans = annotate_plans(_active_plans())
+    requested_plan = request.args.get("plan")
+    selected_plan_slug = next(
+        (plan.slug for plan in plans if plan.slug == requested_plan and plan.price_kes > 0),
+        None,
+    )
     return render_template("billing/plans.html", plans=plans,
-                           offer_banner=banner_offer())
+                           offer_banner=banner_offer(),
+                           selected_plan_slug=selected_plan_slug)
+
+
+@billing_bp.route("/continue/<plan_slug>")
+@login_required
+def continue_to_plan(plan_slug):
+    plan = PricingPlan.query.filter_by(slug=plan_slug, is_active=True).first_or_404()
+    if plan.price_kes <= 0:
+        return redirect(url_for("cv.start"))
+    return redirect(url_for("billing.plans", plan=plan.slug))
 
 
 @billing_bp.route("/subscribe/<plan_slug>", methods=["POST"])
