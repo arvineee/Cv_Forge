@@ -26,6 +26,10 @@ import io
 import os
 import secrets
 from datetime import datetime, timezone
+from app.services.section_intelligence import (
+    apply_section, build_revamp_payload, audit_resume, next_questions,
+    QUESTIONS, SECTIONS,
+)
 from flask import (Blueprint, render_template, redirect, url_for, flash,
                    request, jsonify, current_app, send_file, abort, after_this_request)
 from flask_login import login_required, current_user
@@ -335,11 +339,28 @@ def ai_assist(resume_id):
 
 WIZARD_STEPS = [
     "personal_info", "professional_summary", "work_experience",
-    "education", "skills", "certifications", "review",
+    "education", "skills", "certifications", "projects", "languages",
+    "awards", "references", "review",
 ]
 
 # Sections the AI can enhance inline, mapped onto assist_section()'s prompts.
 WIZARD_AI_SECTIONS = {"professional_summary", "work_experience", "skills", "certifications"}
+
+
+def _parse_projects_text(raw: str) -> list:
+    """Turn 'Name | Role | Description | URL' lines into project dicts."""
+    projects = []
+    for line in raw.splitlines():
+        parts = [x.strip() for x in line.split("|")]
+        if not parts or not parts[0]:
+            continue
+        projects.append({
+            "name": parts[0],
+            "role": parts[1] if len(parts) > 1 else "",
+            "description": parts[2] if len(parts) > 2 else "",
+            "url": parts[3] if len(parts) > 3 else "",
+        })
+    return projects[:10]
 
 
 def _wizard_next_step(step: str) -> "str | None":
@@ -572,6 +593,35 @@ def wizard_step_save(resume_id, step):
         raw = request.form.get("content", "")
         resume.certifications = [l.strip() for l in raw.splitlines() if l.strip()]
 
+    elif step == "projects":
+        # One project per line: Name | Your role | What it does | link
+        resume.projects = _parse_projects_text(request.form.get("content", ""))
+    elif step == "languages":
+        raw = request.form.get("content", "")
+        apply_section(resume, "languages", [s for s in raw.replace("\n", ",").split(",")])
+    elif step == "awards":
+        raw = request.form.get("content", "")
+        apply_section(resume, "awards", raw.splitlines())
+    elif step == "references":
+        raw = request.form.get("content", "").strip()
+        # Either "Available on request" (plain text) or one referee per line:
+        # Name | Job title | Company | Phone | Email
+        if raw and "|" in raw:
+            refs = []
+            for line in raw.splitlines():
+                parts = [x.strip() for x in line.split("|")]
+                if parts and parts[0]:
+                    refs.append({
+                        "name": parts[0],
+                        "title": parts[1] if len(parts) > 1 else "",
+                        "company": parts[2] if len(parts) > 2 else "",
+                        "phone": parts[3] if len(parts) > 3 else "",
+                        "email": parts[4] if len(parts) > 4 else "",
+                    })
+            apply_section(resume, "references", refs)
+        else:
+            apply_section(resume, "references", raw)
+
     _log("cv_wizard_step", resume.id, {"step": step})
     db.session.commit()
 
@@ -694,6 +744,9 @@ def upload():
                   "You may need to fill in details manually before revamping.", "warning")
         else:
             flash("CV uploaded successfully! You can now revamp it with AI.", "success")
+        # If anything essential is missing, ask for it before the AI revamp runs.
+        if any(g.priority == "high" for g in audit_resume(resume.to_dict())):
+            return redirect(url_for("cv.fill_gaps", resume_id=resume.id))
         return redirect(url_for("cv.revamp", resume_id=resume.id))
 
     return render_template("cv/upload.html")
@@ -748,6 +801,14 @@ def revamp(resume_id):
                 if normalized:
                     resume.work_experience = normalized
 
+            # Projects and awards are now polished too. apply_section() only
+            # writes validated, non-empty results, so a bad model reply
+            # leaves the user's originals in place.
+            if revamped.get("projects"):
+                apply_section(resume, "projects", revamped["projects"])
+            if revamped.get("awards"):
+                apply_section(resume, "awards", revamped["awards"])
+
             if revamped.get("skill_groups"):
                 custom = dict(resume.custom_sections or {})
                 custom["skill_groups"] = revamped["skill_groups"]
@@ -783,6 +844,180 @@ def revamp(resume_id):
             flash("AI revamp failed. Please try again.", "error")
 
     return render_template("cv/revamp.html", resume=resume, templates=_active_templates())
+
+
+# ---------------------------------------------------------------------------
+# Fill the gaps: after an upload, ask only for what is missing. Simple answers
+# are saved as typed. Work and education answers go through the AI, which
+# drafts only from the facts given or returns follow-up questions (max 2 rounds).
+# ---------------------------------------------------------------------------
+FILL_TEXT_KEYS = {"professional_summary", "skills", "projects", "languages",
+                  "awards", "certifications", "references"}
+FILL_DRAFT_KEYS = {"work_experience", "education"}
+FILL_MAX_ROUNDS = 2
+FILL_WIZARD_KEYS = {"projects", "languages", "awards", "certifications", "references"}
+
+
+def _parse_references_text(raw: str):
+    """'Available on request' stays text; 'Name | Title | Company | Phone | Email' lines become dicts."""
+    raw = (raw or "").strip()
+    if not raw:
+        return None
+    if "|" not in raw:
+        return raw[:300]
+    refs = []
+    for line in raw.splitlines():
+        parts = [x.strip() for x in line.split("|")] + ["", "", "", "", ""]
+        if parts[0]:
+            refs.append({"name": parts[0], "title": parts[1], "company": parts[2],
+                         "phone": parts[3], "email": parts[4]})
+    return refs[:4] or None
+
+
+def _apply_text_answer(resume, key: str, text: str) -> None:
+    if key == "skills":
+        resume.skills = [s.strip() for s in text.replace("\n", ",").split(",") if s.strip()][:60]
+    elif key == "professional_summary":
+        resume.professional_summary = text[:1200]
+    elif key == "projects":
+        apply_section(resume, "projects", _parse_projects_text(text))
+    elif key == "languages":
+        apply_section(resume, "languages", text.replace("\n", ",").split(","))
+    elif key == "references":
+        apply_section(resume, "references", _parse_references_text(text))
+    else:  # awards, certifications
+        apply_section(resume, key, text.splitlines())
+
+
+def _merge_drafted(resume, key: str, items) -> None:
+    """Add drafted jobs or education. Matching entries are updated, never duplicated."""
+    if not isinstance(items, list):
+        return
+    if key == "work_experience":
+        current = list(resume.work_experience or [])
+        for it in items:
+            if not isinstance(it, dict):
+                continue
+            title = str(it.get("job_title") or it.get("title") or "").strip()[:150]
+            company = str(it.get("company") or "").strip()[:150]
+            if not (title or company):
+                continue
+            bullets = [str(b).strip()[:300] for b in (it.get("achievements") or []) if str(b).strip()][:8]
+            match = next((j for j in current
+                          if str(j.get("job_title", "")).lower() == title.lower()
+                          and str(j.get("company", "")).lower() == company.lower()), None)
+            if match:
+                if bullets:
+                    match["achievements"] = bullets
+            else:
+                current.append({
+                    "job_title": title, "company": company,
+                    "location": str(it.get("location") or "").strip()[:120],
+                    "start_date": str(it.get("start_date") or "").strip()[:30],
+                    "end_date": str(it.get("end_date") or "").strip()[:30] or "Present",
+                    "description": "", "achievements": bullets,
+                })
+        resume.work_experience = current
+    elif key == "education":
+        current = list(resume.education or [])
+        for it in items:
+            if not isinstance(it, dict):
+                continue
+            degree = str(it.get("degree") or "").strip()[:200]
+            institution = str(it.get("institution") or "").strip()[:200]
+            if not degree:
+                continue
+            year = str(it.get("year") or "").strip()[:30]
+            grade = str(it.get("grade") or "").strip()[:60]
+            match = next((e for e in current
+                          if str(e.get("degree", "")).lower() == degree.lower()
+                          and str(e.get("institution", "")).lower() == institution.lower()), None)
+            if match:
+                match["year"] = year or match.get("year", "")
+                match["grade"] = grade or match.get("grade", "")
+            else:
+                current.append({"degree": degree, "institution": institution,
+                                "year": year, "grade": grade})
+        resume.education = current
+
+
+def _page_questions(resume, extra_keys=()) -> list:
+    """Current high and medium gaps, plus any keys the AI asked follow-ups for."""
+    data = resume.to_dict()
+    qs = next_questions(audit_resume(data), limit=5)
+    have = {q["key"] for q in qs}
+    for key in extra_keys:
+        if key not in have and key in QUESTIONS:
+            qs.append({"key": key, "label": SECTIONS[key]["label"],
+                       "question": QUESTIONS[key], "why": ""})
+    return qs
+
+
+@cv_bp.route("/<int:resume_id>/fill-gaps", methods=["GET", "POST"])
+@login_required
+def fill_gaps(resume_id):
+    resume = Resume.query.filter_by(id=resume_id, user_id=current_user.id).first_or_404()
+
+    if request.method == "GET":
+        return render_template(
+            "cv/fill_gaps.html", resume=resume,
+            questions=_page_questions(resume), followups={}, answers={}, round=1,
+            optional=[g for g in audit_resume(resume.to_dict())
+                      if g.priority == "low" and g.key in FILL_WIZARD_KEYS],
+        )
+
+    rnd = request.form.get("round", type=int, default=1)
+    answers, followups = {}, {}
+
+    # 1. Save every simple answer straight away.
+    for key in SECTIONS:
+        text = request.form.get(f"answer_{key}", "").strip()
+        if not text:
+            continue
+        answers[key] = text
+        if key in FILL_TEXT_KEYS:
+            _apply_text_answer(resume, key, text)
+
+    # 2. Work and education go through the AI, which may ask follow-ups.
+    draft_keys = [k for k in answers if k in FILL_DRAFT_KEYS]
+    if draft_keys:
+        can_use, err = _check_ai_limit("cv_revamp")
+        if not can_use:
+            flash(err, "warning")
+        else:
+            try:
+                ai = get_ai_service()
+                for key in draft_keys:
+                    result = ai.draft_section(key, resume.to_dict(), answers[key], user_id=current_user.id)
+                    if result["status"] == "needs_input":
+                        followups[key] = result["questions"]
+                    else:
+                        _merge_drafted(resume, key, result.get("items"))
+                _log("cv_fill_gaps", resume.id, {"round": rnd})
+            except RevampError as e:
+                current_app.logger.warning(f"Fill-gaps draft rejected: {e}")
+                flash("We couldn't draft one of those sections. Try adding a little more detail.", "warning")
+            except Exception as e:
+                current_app.logger.error(f"Fill-gaps error: {e}")
+                flash("The AI is unavailable right now. Your other answers were saved.", "error")
+
+    db.session.commit()
+
+    # 3. Ask again if the AI needs more, up to the round limit.
+    if followups and rnd < FILL_MAX_ROUNDS:
+        flash("A few more details would help. Answer below, or skip to continue.", "info")
+        return render_template(
+            "cv/fill_gaps.html", resume=resume,
+            questions=_page_questions(resume, extra_keys=followups.keys()),
+            followups=followups, answers=answers, round=rnd + 1,
+            optional=[],
+        )
+
+    if followups:
+        flash("We'll leave the parts we couldn't draft for you to add in the wizard.", "info")
+    else:
+        flash("Thanks. Your CV now has the details it needed.", "success")
+    return redirect(url_for("cv.revamp", resume_id=resume.id))
 
 
 @cv_bp.route("/<int:resume_id>/versions")

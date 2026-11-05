@@ -90,6 +90,37 @@
           </div>
         </section>
         {% endif %}
+
+        {% if resume.projects %}
+        <section class="mt-6">
+          <h2 class="text-sm font-bold text-gray-400 uppercase tracking-widest mb-3">Projects</h2>
+          {% for p in resume.projects %}
+          <div class="mb-3">
+            <p class="font-semibold text-gray-900 text-sm">{{ p.name }}{% if p.role %} <span class="font-normal text-gray-500">· {{ p.role }}</span>{% endif %}</p>
+            {% if p.description %}<p class="text-sm text-gray-600">{{ p.description }}</p>{% endif %}
+            {% if p.url and (p.url | lower).startswith(('http://', 'https://')) %}
+            <a href="{{ p.url }}" target="_blank" rel="noopener nofollow" class="text-xs text-blue-600 break-all">{{ p.url }}</a>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </section>
+        {% endif %}
+
+        {% if resume.languages %}
+        <section class="mt-6">
+          <h2 class="text-sm font-bold text-gray-400 uppercase tracking-widest mb-3">Languages</h2>
+          <p class="text-sm text-gray-700">{{ resume.languages | join(' · ') }}</p>
+        </section>
+        {% endif %}
+
+        {% if resume.awards %}
+        <section class="mt-6">
+          <h2 class="text-sm font-bold text-gray-400 uppercase tracking-widest mb-3">Awards</h2>
+          <ul class="list-disc pl-5 text-sm text-gray-700 space-y-1">
+            {% for a in resume.awards %}<li>{{ a }}</li>{% endfor %}
+          </ul>
+        </section>
+        {% endif %}
       </div>
 
       <div class="px-8 py-6 gradient-brand text-center">

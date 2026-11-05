@@ -1,0 +1,25 @@
+{% extends "cv/_wizard_base.html" %}
+{% block wizard_content %}
+<h2 class="text-lg font-semibold text-gray-900 mb-1">Projects</h2>
+<p class="text-sm text-gray-500 mb-6">One per line: Name | Your role | What it does | Link. Side projects, freelance work, school or community projects all count.</p>
+
+<form method="POST" action="{{ url_for('cv.wizard_step_save', resume_id=resume.id, step=step) }}" class="space-y-4">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <textarea name="content" rows="6" placeholder="e.g. Fintech dashboard | Lead developer | Tracked M-Pesa payments for 3 SACCOs | https://example.com"
+            class="w-full rounded-lg border border-gray-200 px-3 py-2.5 min-h-[44px] text-base sm:text-sm">{% for p in (resume.projects or []) %}{{ p.name }} | {{ p.role or '' }} | {{ p.description or '' }} | {{ p.url or '' }}
+{% endfor %}</textarea>
+
+  <div class="flex justify-between items-center pt-2">
+    <a href="{{ url_for('cv.wizard_step', resume_id=resume.id, step='review') }}"
+       class="px-4 py-3 sm:py-2 min-h-[44px] rounded-lg text-gray-500 text-sm font-medium hover:bg-gray-50">Skip to review</a>
+    <div class="flex gap-2">
+      <a href="{{ url_for('cv.wizard_step', resume_id=resume.id, step=prev_step) }}"
+         class="px-4 py-3 sm:py-2 min-h-[44px] rounded-lg text-gray-500 text-sm font-medium hover:bg-gray-50">← Back</a>
+      <button type="submit" name="action" value="next"
+              class="px-5 py-3 sm:py-2 min-h-[44px] rounded-lg gradient-brand text-white text-sm font-semibold">
+        Next →
+      </button>
+    </div>
+  </div>
+</form>
+{% endblock %}

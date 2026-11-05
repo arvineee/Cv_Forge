@@ -128,6 +128,30 @@ def _validate_revamp(out, source: dict) -> dict:
         })
     clean["work_experience"] = merged_jobs
 
+    # Projects: keep the user's name, role and link; only the description may change.
+    src_projects = [p for p in (source.get("projects") or []) if isinstance(p, dict)]
+    new_projects = out.get("projects") if isinstance(out.get("projects"), list) else []
+    merged_projects = []
+    for i, src in enumerate(src_projects):
+        new = new_projects[i] if i < len(new_projects) and isinstance(new_projects[i], dict) else {}
+        new_desc = str(new.get("description") or "").strip()
+        merged_projects.append({
+            "name": src.get("name") or "",
+            "role": src.get("role") or "",
+            "url": src.get("url") or "",
+            "description": new_desc[:600] if new_desc else (src.get("description") or ""),
+        })
+    if merged_projects:
+        clean["projects"] = merged_projects
+
+    # Awards: accept the model's rewording only when the count survives.
+    src_awards = _as_str_list(source.get("awards"))
+    new_awards = _as_str_list(out.get("awards"))
+    if src_awards and len(new_awards) == len(src_awards):
+        clean["awards"] = new_awards
+    elif src_awards:
+        clean["awards"] = src_awards
+
     if source.get("skill_groups") and isinstance(out.get("skill_groups"), list):
         groups = []
         for g in out["skill_groups"]:
@@ -246,22 +270,24 @@ class AIService:
         Rewrite a resume's summary, bullets and skills. Returns a cleaned dict with
         the keys the route is allowed to write back. Raises RevampError on failure.
         """
+        # Imported here, not at module top, because tests/_load.py loads this
+        # file standalone without the app package on the import path.
+        from app.services.section_intelligence import build_revamp_payload
+
         source = resume.to_dict()
         # Only the fields the model needs. Keeps prompts small and avoids sending
         # internal ids, versions or other data the model has no reason to see.
-        payload = {
-            "professional_summary": source.get("professional_summary") or "",
-            "work_experience": source.get("work_experience") or [],
-            "skills": source.get("skills") or [],
-            "skill_groups": (source.get("custom_sections") or {}).get("skill_groups") or [],
-        }
+        payload = build_revamp_payload(source)
         prompt = (
             "Revamp the resume data below and return JSON with exactly these keys:\n"
             '{"professional_summary": string, "work_experience": [same jobs, same order, '
             'each with "job_title" and "achievements" (array of strings)], '
+            '"projects": [same projects, same order, each with "description" (string)] or omit, '
+            '"awards": [strings] or omit, '
             '"skills": [strings] or omit, "skill_groups": [{"group": string, "skills": [strings]}] '
             'or omit, "revamp_notes": short string describing the changes}.\n'
-            "If skill_groups is non-empty, return skill_groups and omit skills. Otherwise return skills.\n\n"
+            "If skill_groups is non-empty, return skill_groups and omit skills. Otherwise return skills.\n"
+            "Never change project names, links, or award facts; only rewrite wording.\n\n"
             "<resume_data>\n"
             + json.dumps(payload, indent=2, ensure_ascii=False)
             + "\n</resume_data>"
@@ -276,6 +302,34 @@ class AIService:
                 last_error = e
                 current_app.logger.warning(f"Revamp attempt {attempt} rejected: {e}")
         raise RevampError(str(last_error) if last_error else "Revamp failed.")
+
+    def draft_section(self, section_key: str, data: dict, user_answer: str,
+                      user_id: int = None) -> dict:
+        """Draft one CV section from the user's answer, or return follow-up questions.
+
+        Returns {"status": "ready", "items": [...], "notes": str} or
+        {"status": "needs_input", "questions": [...]}. Raises RevampError on failure.
+        """
+        from app.services.section_intelligence import draft_prompt, parse_draft, DRAFT_SYSTEM
+
+        base_prompt = draft_prompt(section_key, data, user_answer)
+        last_error = None
+        for attempt in (1, 2):
+            prompt = base_prompt
+            if attempt > 1:
+                # Varies the prompt so the response cache cannot return the same bad answer.
+                prompt += "\n\n(Regeneration attempt 2. Follow every rule exactly.)"
+            try:
+                raw = self._call(
+                    prompt, "cv_revamp", user_id=user_id,
+                    system_instruction=DRAFT_SYSTEM,
+                    config={"response_mime_type": "application/json", "temperature": 0.4},
+                )
+                return parse_draft(raw)
+            except ValueError as e:          # includes json.JSONDecodeError
+                last_error = e
+                current_app.logger.warning(f"Draft attempt {attempt} rejected: {e}")
+        raise RevampError(str(last_error) if last_error else "Draft failed.")
 
     def generate_cover_letter(self, job_title: str, company_name: str,
                                job_description: str, tone: str = "professional",
