@@ -42,7 +42,7 @@
   {% endfor %}
 </div>
 
-{% if not current_user.is_premium %}
+{% if not current_user.has_paid_plan %}
 <div class="mb-8 p-5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4">
   <div>
     <p class="font-semibold text-lg">Get more from CVForge</p>

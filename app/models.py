@@ -84,6 +84,19 @@ class User(db.Model, UserMixin):
         return False
 
     @property
+    def has_paid_plan(self) -> bool:
+        """Any active paid tier (basic, pro or premium), unexpired.
+
+        Matches the download gate in routes/cv.py. Use this for upsell prompts.
+        is_premium stays as-is because it gates Pro-only features.
+        """
+        if self.plan not in ("basic", "pro", "premium"):
+            return False
+        if not self.plan_expires_at:
+            return False
+        return _make_aware(self.plan_expires_at) > datetime.now(timezone.utc)
+
+    @property
     def full_name(self) -> str:
         parts = filter(None, [self.first_name, self.last_name])
         return " ".join(parts) or self.email.split("@")[0]
