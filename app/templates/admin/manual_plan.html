@@ -1,12 +1,9 @@
 {% extends "base_dashboard.html" %}
 {% block title %}Manual Plan Activation{% endblock %}
-{% block admin_content %}
-<div class="max-w-2xl mx-auto py-8 px-4">
-  <h1 class="text-2xl font-bold text-gray-900 mb-1">Manual Plan Activation</h1>
-  <p class="text-sm text-gray-500 mb-6">
-    Set a user's plan directly — for approved payment claims, goodwill extensions,
-    or support fixes. Also sends the user an in-app notification and email.
-  </p>
+{% block page_title %}Manual Plan Activation{% endblock %}
+{% block page_subtitle %}Set a user's plan directly for approved claims, goodwill extensions or support fixes. The user is notified in-app and by email.{% endblock %}
+{% block content %}
+<div class="max-w-2xl">
 
   <form method="GET" class="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-6 flex gap-2">
     <input type="email" name="email" required value="{{ email }}"

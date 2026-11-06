@@ -1,12 +1,9 @@
 {% extends "base_dashboard.html" %}
 {% block title %}Broadcast Email{% endblock %}
-{% block admin_content %}
-<div class="max-w-3xl mx-auto py-8 px-4">
-  <h1 class="text-2xl font-bold text-gray-900 mb-1">Broadcast Email</h1>
-  <p class="text-sm text-gray-500 mb-6">
-    Send a plain-text announcement to a filtered set of users. A preview
-    with the exact recipient count is shown before anything is sent.
-  </p>
+{% block page_title %}Broadcast Email{% endblock %}
+{% block page_subtitle %}Send a plain-text announcement to a filtered set of users. A preview with the exact recipient count is shown before anything is sent.{% endblock %}
+{% block content %}
+<div class="max-w-3xl">
 
   <form method="POST" class="bg-white rounded-xl border border-gray-100 shadow-sm p-6 space-y-4 mb-6">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>

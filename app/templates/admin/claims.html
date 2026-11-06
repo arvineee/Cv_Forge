@@ -1,12 +1,9 @@
 {% extends "base_dashboard.html" %}
 {% block title %}Payment Claims{% endblock %}
-{% block admin_content %}
-<div class="max-w-5xl mx-auto py-8 px-4">
-  <h1 class="text-2xl font-bold text-gray-900 mb-1">Manual Payment Claims</h1>
-  <p class="text-sm text-gray-500 mb-6">
-    Users who pasted an M-Pesa/bank confirmation because a webhook didn't arrive.
-    Approving a claim activates their plan through the normal payment flow.
-  </p>
+{% block page_title %}Manual Payment Claims{% endblock %}
+{% block page_subtitle %}Users who pasted an M-Pesa/bank confirmation because a webhook didn't arrive. Approving activates their plan through the normal payment flow.{% endblock %}
+{% block content %}
+<div class="max-w-5xl">
 
   <div class="flex gap-2 mb-6">
     {% for s in ['pending', 'approved', 'rejected', 'all'] %}

@@ -564,8 +564,12 @@ def manual_plan():
         plan_slug = request.form.get("plan", "free")
         try:
             days = int(request.form.get("days", 30))
-        except ValueError:
+        except (TypeError, ValueError):
             days = 30
+        # Server-side bounds: the form's min/max is client-only, and a zero or
+        # negative value would set an already-expired plan while telling the
+        # user it was activated.
+        days = max(1, min(days, 3650))
         note = (request.form.get("note") or "").strip()
 
         user = User.query.filter_by(email=email).first()
@@ -573,7 +577,8 @@ def manual_plan():
             flash(f"No user found with email '{email}'.", "error")
             return redirect(url_for("admin.manual_plan"))
 
-        if plan_slug not in ("free", "basic", "pro", "premium"):
+        allowed_plans = {"free", "basic", "pro", "premium"} | {p.slug for p in plans}
+        if plan_slug not in allowed_plans:
             flash("Invalid plan.", "error")
             return redirect(url_for("admin.manual_plan", email=email))
 
@@ -633,8 +638,11 @@ def claims():
 @admin_required
 def claim_approve(claim_id):
     claim = db.session.get(ManualPaymentClaim, claim_id)
-    if not claim or claim.status != "pending":
+    if not claim:
         abort(404)
+    if claim.status != "pending":
+        flash(f"That claim was already {claim.status}.", "info")
+        return redirect(url_for("admin.claims"))
 
     note = (request.form.get("admin_note") or "").strip()
 
@@ -644,11 +652,16 @@ def claim_approve(claim_id):
     # normal payment flow.
     from app.routes.webhooks import _handle_payment_success
 
+    # Fall back to the linked subscription's reference if the claim row's own
+    # reference is empty, so a valid claim isn't left unactivated.
+    reference = claim.reference or (
+        claim.subscription.payment_reference if claim.subscription else None
+    )
     activated = False
-    if claim.reference:
+    if reference:
         activated = _handle_payment_success({
-            "reference": claim.reference,
-            "checkout_request_id": claim.reference,
+            "reference": reference,
+            "checkout_request_id": reference,
             "transaction_id": f"MANUAL-{claim.id}",
         })
 
@@ -660,24 +673,29 @@ def claim_approve(claim_id):
         user_id=current_user.id, action="admin_claim_approve",
         resource_type="manual_payment_claim", resource_id=claim.id,
         ip_address=request.remote_addr,
-        details={"reference": claim.reference, "activated": bool(activated)},
+        details={"reference": reference, "activated": bool(activated)},
     ))
-    db.session.add(Notification(
-        user_id=claim.user_id,
-        title="Payment confirmed",
-        message="We verified your payment and activated your plan."
-                + (f" {note}" if note else ""),
-        type="success", action_url="/billing/",
-    ))
+    # Only tell the user their plan is active if it actually is. When nothing
+    # matched, the admin finishes via Manual Plan, which notifies the user
+    # itself — so we don't send a false "activated" message here.
+    if activated:
+        db.session.add(Notification(
+            user_id=claim.user_id,
+            title="Payment confirmed",
+            message="We verified your payment and activated your plan."
+                    + (f" {note}" if note else ""),
+            type="success", action_url="/billing/",
+        ))
     db.session.commit()
 
-    try:
-        from app.services.email_service import send_claim_approved_email
-        user = db.session.get(User, claim.user_id)
-        if user:
-            send_claim_approved_email(user, claim, note)
-    except Exception as e:
-        current_app.logger.warning(f"Claim-approved email failed for claim {claim.id}: {e}")
+    if activated:
+        try:
+            from app.services.email_service import send_claim_approved_email
+            user = db.session.get(User, claim.user_id)
+            if user:
+                send_claim_approved_email(user, claim, note)
+        except Exception as e:
+            current_app.logger.warning(f"Claim-approved email failed for claim {claim.id}: {e}")
 
     if activated:
         flash("Claim approved and plan activated.", "success")
@@ -692,8 +710,11 @@ def claim_approve(claim_id):
 @admin_required
 def claim_reject(claim_id):
     claim = db.session.get(ManualPaymentClaim, claim_id)
-    if not claim or claim.status != "pending":
+    if not claim:
         abort(404)
+    if claim.status != "pending":
+        flash(f"That claim was already {claim.status}.", "info")
+        return redirect(url_for("admin.claims"))
 
     note = (request.form.get("admin_note") or "").strip()
 
