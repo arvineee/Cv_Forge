@@ -65,13 +65,13 @@ def _handle_payment_success(data: dict):
                      .with_for_update()
                      .first())
     if not subscription:
-        current_app.logger.warning(f"No subscription found for reference={reference}")
-        return
+        current_app.logger.error(f"No subscription found for reference={reference}")
+        return False  # caller decides: IntaSend should retry, not silently drop
 
     if subscription.status == "active":
         current_app.logger.info(f"Subscription {subscription.id} already active, skipping duplicate webhook")
         db.session.rollback()  # release the row lock, nothing to write
-        return
+        return True
 
     # Duration comes from the plan (weekly / monthly / yearly), not a hardcoded 30.
     from datetime import timedelta, timezone as _tz
@@ -99,6 +99,7 @@ def _handle_payment_success(data: dict):
 
     db.session.commit()
     current_app.logger.info(f"Payment success: user={subscription.user_id} plan={subscription.plan}")
+    return True
 
 
 def _handle_payment_failed(data: dict):
@@ -149,11 +150,19 @@ def intasend_webhook():
     current_app.logger.info(f"IntaSend webhook state={state} ref={reference} invoice={invoice_id}")
 
     if state == "COMPLETE":
-        _handle_payment_success({
+        handled = _handle_payment_success({
             "reference": reference,
             "checkout_request_id": reference,
             "transaction_id": invoice_id,
         })
+        if handled is False:
+            # Usually means the checkout row isn't committed yet, or the
+            # reference doesn't match. A 503 makes IntaSend redeliver, so the
+            # payment isn't lost. Raw payload is logged for manual recovery.
+            current_app.logger.error(
+                f"IntaSend COMPLETE could not be matched: ref={reference} invoice={invoice_id} payload={data}"
+            )
+            return jsonify({"error": "Subscription not found, retry later"}), 503
     elif state == "FAILED":
         _handle_payment_failed({
             "reference": reference,

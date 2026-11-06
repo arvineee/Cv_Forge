@@ -1,29 +1,74 @@
 {% extends "base_dashboard.html" %}
 {% block title %}Payment Pending{% endblock %}
 {% block page_title %}Payment in Progress{% endblock %}
-{% block page_subtitle %}Waiting for M-Pesa confirmation{% endblock %}
-
+{% block page_subtitle %}Waiting for payment confirmation{% endblock %}
 {% block content %}
-<div class="max-w-md mx-auto text-center py-8" x-data="{checking: false}"
-     x-init="setInterval(() => {
-       fetch('{{ url_for('billing.payment_status', reference=subscription.payment_reference) }}')
-         .then(r => r.json())
-         .then(d => { if(d.redirect) window.location = d.redirect; });
-     }, 5000)">
+<div class="max-w-md mx-auto text-center py-8"
+     x-data="{
+       state: 'pending', tries: 0, timer: null,
+       check() {
+         this.tries++;
+         fetch('{{ url_for('billing.payment_status', reference=subscription.payment_reference) }}', {credentials: 'same-origin'})
+           .then(r => r.json())
+           .then(d => {
+             if (d.redirect) { clearInterval(this.timer); window.location = d.redirect; return; }
+             if (['failed', 'timeout', 'not_found'].includes(d.status)) {
+               clearInterval(this.timer); this.state = d.status; return;
+             }
+             if (this.tries >= 120) { clearInterval(this.timer); this.state = 'timeout'; }
+           })
+           .catch(() => { /* network blip: keep trying until the limit */ });
+       }
+     }"
+     x-init="timer = setInterval(() => check(), 5000)">
 
   <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 mb-6">
-    <div class="w-16 h-16 rounded-full bg-yellow-100 flex items-center justify-center mx-auto mb-4">
-      <svg class="w-8 h-8 text-yellow-500 animate-spin" fill="none" viewBox="0 0 24 24">
-        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-      </svg>
+
+    <div x-show="state === 'pending'">
+      <div class="w-16 h-16 rounded-full bg-yellow-100 flex items-center justify-center mx-auto mb-4">
+        <svg class="w-8 h-8 text-yellow-500 animate-spin" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+        </svg>
+      </div>
+      <h2 class="text-xl font-bold text-gray-900 mb-2">Waiting for Payment</h2>
+      <p class="text-gray-500 text-sm mb-4">
+        Complete the payment on your phone. Enter your M-Pesa PIN, or finish the card checkout.
+      </p>
     </div>
-    <h2 class="text-xl font-bold text-gray-900 mb-2">Waiting for Payment</h2>
-    <p class="text-gray-500 text-sm mb-4">
-      An M-Pesa prompt has been sent to your phone.<br/>
-      Enter your PIN to complete the payment.
-    </p>
-    <div class="bg-gray-50 rounded-xl p-4 text-left text-sm space-y-2">
+
+    <div x-show="state === 'failed'" x-cloak>
+      <div class="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
+        <span class="text-red-600 text-2xl">✕</span>
+      </div>
+      <h2 class="text-xl font-bold text-gray-900 mb-2">Payment didn't go through</h2>
+      <p class="text-gray-500 text-sm mb-4">
+        No money was taken for this attempt. You can try again.
+      </p>
+      <a href="{{ url_for('billing.plans') }}"
+         class="inline-block px-5 py-3 rounded-lg gradient-brand text-white text-sm font-semibold">Try again</a>
+    </div>
+
+    <div x-show="state === 'timeout'" x-cloak>
+      <div class="w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center mx-auto mb-4">
+        <span class="text-amber-600 text-2xl">!</span>
+      </div>
+      <h2 class="text-xl font-bold text-gray-900 mb-2">We haven't received confirmation yet</h2>
+      <p class="text-gray-500 text-sm mb-4">
+        If money left your account, your plan will be activated shortly. If it isn't,
+        contact support with the reference below.
+      </p>
+      <p class="font-mono text-xs bg-gray-50 rounded p-2 mb-4">{{ subscription.payment_reference }}</p>
+      <a href="{{ url_for('billing.index') }}" class="text-blue-600 text-sm hover:underline">Back to billing</a>
+    </div>
+
+    <div x-show="state === 'not_found'" x-cloak>
+      <h2 class="text-xl font-bold text-gray-900 mb-2">Payment not found</h2>
+      <p class="text-gray-500 text-sm mb-4">This payment link is no longer valid.</p>
+      <a href="{{ url_for('billing.plans') }}" class="text-blue-600 text-sm hover:underline">View plans</a>
+    </div>
+
+    <div class="bg-gray-50 rounded-xl p-4 text-left text-sm space-y-2 mt-6">
       <div class="flex justify-between">
         <span class="text-gray-500">Plan</span>
         <span class="font-semibold capitalize">{{ subscription.plan }}</span>
@@ -39,10 +84,6 @@
     </div>
   </div>
 
-  <p class="text-xs text-gray-400">This page will update automatically when payment is confirmed.</p>
-  <p class="text-xs text-gray-400 mt-1">
-    Having trouble?
-    <a href="{{ url_for('billing.plans') }}" class="text-blue-600 hover:underline">Try again</a>
-  </p>
+  <p class="text-xs text-gray-400" x-show="state === 'pending'">This page updates automatically when payment is confirmed.</p>
 </div>
 {% endblock %}

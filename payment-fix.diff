@@ -1,0 +1,285 @@
+diff -ruN -x __pycache__ -x .env -x '*.db' -x '*.swp' -x .git -x instance upload_orig/cvforge/app/routes/billing.py new/cvforge/app/routes/billing.py
+--- upload_orig/cvforge/app/routes/billing.py	2026-11-05 01:42:45.000000000 +0000
++++ new/cvforge/app/routes/billing.py	2026-11-06 15:54:09.606445867 +0000
+@@ -4,6 +4,7 @@
+ by app/services/pricing.py. The client never sends an amount.
+ """
+ import secrets
++from datetime import datetime, timezone
+ from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, current_app
+ from flask_login import login_required, current_user
+ from app.models import db, PricingPlan, Subscription, Payment
+@@ -19,6 +20,74 @@
+             .order_by(PricingPlan.sort_order).all())
+ 
+ 
++# How long before the status poll asks IntaSend directly, and when we give up.
++RECONCILE_AFTER_SECONDS = 45
++PENDING_TIMEOUT_SECONDS = 600
++
++
++def _remember_invoice(reference: str, invoice_id) -> None:
++    """Store the IntaSend invoice id so the status poll can check it later."""
++    if not invoice_id:
++        return
++    payment = Payment.query.filter_by(lipana_checkout_request_id=reference).first()
++    if payment:
++        payment.raw_webhook = {"invoice_id": str(invoice_id)}
++        db.session.commit()
++
++
++def _invoice_id_from(resp: dict):
++    """IntaSend nests the invoice differently for STK push and checkout."""
++    if not isinstance(resp, dict):
++        return None
++    if resp.get("invoice_id"):
++        return resp["invoice_id"]
++    raw = resp.get("raw") or {}
++    invoice = raw.get("invoice") if isinstance(raw, dict) else None
++    if isinstance(invoice, dict) and invoice.get("invoice_id"):
++        return invoice["invoice_id"]
++    return raw.get("invoice_id") if isinstance(raw, dict) else None
++
++
++def _reconcile_with_intasend(subscription, reference: str) -> None:
++    """If a payment has been pending a while, ask IntaSend directly.
++
++    Covers missed or failed webhook deliveries. Reuses the webhook handlers,
++    which are idempotent, so calling this repeatedly is safe.
++    """
++    from app.routes.webhooks import _handle_payment_success, _handle_payment_failed
++
++    created = subscription.created_at
++    if created.tzinfo is None:
++        created = created.replace(tzinfo=timezone.utc)
++    if (datetime.now(timezone.utc) - created).total_seconds() < RECONCILE_AFTER_SECONDS:
++        return
++
++    payment = Payment.query.filter_by(lipana_checkout_request_id=reference).first()
++    invoice_id = (payment.raw_webhook or {}).get("invoice_id") if payment and isinstance(payment.raw_webhook, dict) else None
++    if not invoice_id:
++        return  # nothing to check against; the webhook is the only route
++
++    try:
++        from app.services.intasend_service import IntaSendService
++        result = IntaSendService().check_status(invoice_id=invoice_id)
++    except Exception as e:
++        current_app.logger.warning(f"Reconcile skipped for ref={reference}: {e}")
++        return
++    if not result.get("success"):
++        return
++
++    invoice = result.get("invoice") if isinstance(result.get("invoice"), dict) else result
++    state = invoice.get("state")
++    current_app.logger.info(f"Reconcile ref={reference} invoice={invoice_id} state={state}")
++
++    if state == "COMPLETE":
++        _handle_payment_success({"reference": reference, "checkout_request_id": reference,
++                                 "transaction_id": invoice_id})
++    elif state == "FAILED":
++        _handle_payment_failed({"reference": reference, "checkout_request_id": reference,
++                                "failed_reason": invoice.get("failed_reason")})
++
++
+ def _create_pending(plan, method, phone=None):
+     """Create a pending Subscription + Payment at the server-computed price."""
+     charged, offer, _saving = checkout_price(plan)
+@@ -119,6 +188,7 @@
+             email=current_user.email,
+         )
+         if resp.get("success"):
++            _remember_invoice(reference, resp.get("invoice_id"))
+             flash("M-Pesa payment request sent! Check your phone.", "success")
+             return redirect(url_for("billing.payment_pending", reference=reference))
+         else:
+@@ -160,6 +230,7 @@
+             comment=f"CVForge {plan.name} Plan",
+         )
+         if resp.get("success"):
++            _remember_invoice(reference, _invoice_id_from(resp))
+             return redirect(resp["checkout_url"])
+         else:
+             flash(f"Card payment could not be started: {resp.get('message', 'Unknown error')}", "error")
+@@ -193,8 +264,21 @@
+     ).first()
+     if not subscription:
+         return jsonify({"status": "not_found"})
++
++    status = subscription.status
++    if status == "pending":
++        _reconcile_with_intasend(subscription, reference)
++        status = subscription.status
++    if status == "pending":
++        created = subscription.created_at
++        if created.tzinfo is None:
++            created = created.replace(tzinfo=timezone.utc)
++        if (datetime.now(timezone.utc) - created).total_seconds() > PENDING_TIMEOUT_SECONDS:
++            status = "timeout"
++
+     return jsonify({
+-        "status": subscription.status,
++        "status": status,
+         "plan": subscription.plan,
+-        "redirect": url_for("billing.success") if subscription.status == "active" else None,
++        "reference": reference,
++        "redirect": url_for("billing.success") if status == "active" else None,
+     })
+diff -ruN -x __pycache__ -x .env -x '*.db' -x '*.swp' -x .git -x instance upload_orig/cvforge/app/routes/webhooks.py new/cvforge/app/routes/webhooks.py
+--- upload_orig/cvforge/app/routes/webhooks.py	2026-11-03 06:56:56.000000000 +0000
++++ new/cvforge/app/routes/webhooks.py	2026-11-06 15:54:09.605883864 +0000
+@@ -65,13 +65,13 @@
+                      .with_for_update()
+                      .first())
+     if not subscription:
+-        current_app.logger.warning(f"No subscription found for reference={reference}")
+-        return
++        current_app.logger.error(f"No subscription found for reference={reference}")
++        return False  # caller decides: IntaSend should retry, not silently drop
+ 
+     if subscription.status == "active":
+         current_app.logger.info(f"Subscription {subscription.id} already active, skipping duplicate webhook")
+         db.session.rollback()  # release the row lock, nothing to write
+-        return
++        return True
+ 
+     # Duration comes from the plan (weekly / monthly / yearly), not a hardcoded 30.
+     from datetime import timedelta, timezone as _tz
+@@ -99,6 +99,7 @@
+ 
+     db.session.commit()
+     current_app.logger.info(f"Payment success: user={subscription.user_id} plan={subscription.plan}")
++    return True
+ 
+ 
+ def _handle_payment_failed(data: dict):
+@@ -149,11 +150,19 @@
+     current_app.logger.info(f"IntaSend webhook state={state} ref={reference} invoice={invoice_id}")
+ 
+     if state == "COMPLETE":
+-        _handle_payment_success({
++        handled = _handle_payment_success({
+             "reference": reference,
+             "checkout_request_id": reference,
+             "transaction_id": invoice_id,
+         })
++        if handled is False:
++            # Usually means the checkout row isn't committed yet, or the
++            # reference doesn't match. A 503 makes IntaSend redeliver, so the
++            # payment isn't lost. Raw payload is logged for manual recovery.
++            current_app.logger.error(
++                f"IntaSend COMPLETE could not be matched: ref={reference} invoice={invoice_id} payload={data}"
++            )
++            return jsonify({"error": "Subscription not found, retry later"}), 503
+     elif state == "FAILED":
+         _handle_payment_failed({
+             "reference": reference,
+diff -ruN -x __pycache__ -x .env -x '*.db' -x '*.swp' -x .git -x instance upload_orig/cvforge/app/templates/billing/payments.html new/cvforge/app/templates/billing/payments.html
+--- upload_orig/cvforge/app/templates/billing/payments.html	2026-06-13 04:36:27.000000000 +0000
++++ new/cvforge/app/templates/billing/payments.html	2026-11-06 15:54:09.606813789 +0000
+@@ -1,29 +1,74 @@
+ {% extends "base_dashboard.html" %}
+ {% block title %}Payment Pending{% endblock %}
+ {% block page_title %}Payment in Progress{% endblock %}
+-{% block page_subtitle %}Waiting for M-Pesa confirmation{% endblock %}
+-
++{% block page_subtitle %}Waiting for payment confirmation{% endblock %}
+ {% block content %}
+-<div class="max-w-md mx-auto text-center py-8" x-data="{checking: false}"
+-     x-init="setInterval(() => {
+-       fetch('{{ url_for('billing.payment_status', reference=subscription.payment_reference) }}')
+-         .then(r => r.json())
+-         .then(d => { if(d.redirect) window.location = d.redirect; });
+-     }, 5000)">
++<div class="max-w-md mx-auto text-center py-8"
++     x-data="{
++       state: 'pending', tries: 0, timer: null,
++       check() {
++         this.tries++;
++         fetch('{{ url_for('billing.payment_status', reference=subscription.payment_reference) }}', {credentials: 'same-origin'})
++           .then(r => r.json())
++           .then(d => {
++             if (d.redirect) { clearInterval(this.timer); window.location = d.redirect; return; }
++             if (['failed', 'timeout', 'not_found'].includes(d.status)) {
++               clearInterval(this.timer); this.state = d.status; return;
++             }
++             if (this.tries >= 120) { clearInterval(this.timer); this.state = 'timeout'; }
++           })
++           .catch(() => { /* network blip: keep trying until the limit */ });
++       }
++     }"
++     x-init="timer = setInterval(() => check(), 5000)">
+ 
+   <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 mb-6">
+-    <div class="w-16 h-16 rounded-full bg-yellow-100 flex items-center justify-center mx-auto mb-4">
+-      <svg class="w-8 h-8 text-yellow-500 animate-spin" fill="none" viewBox="0 0 24 24">
+-        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+-        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+-      </svg>
++
++    <div x-show="state === 'pending'">
++      <div class="w-16 h-16 rounded-full bg-yellow-100 flex items-center justify-center mx-auto mb-4">
++        <svg class="w-8 h-8 text-yellow-500 animate-spin" fill="none" viewBox="0 0 24 24">
++          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
++          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
++        </svg>
++      </div>
++      <h2 class="text-xl font-bold text-gray-900 mb-2">Waiting for Payment</h2>
++      <p class="text-gray-500 text-sm mb-4">
++        Complete the payment on your phone. Enter your M-Pesa PIN, or finish the card checkout.
++      </p>
++    </div>
++
++    <div x-show="state === 'failed'" x-cloak>
++      <div class="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
++        <span class="text-red-600 text-2xl">✕</span>
++      </div>
++      <h2 class="text-xl font-bold text-gray-900 mb-2">Payment didn't go through</h2>
++      <p class="text-gray-500 text-sm mb-4">
++        No money was taken for this attempt. You can try again.
++      </p>
++      <a href="{{ url_for('billing.plans') }}"
++         class="inline-block px-5 py-3 rounded-lg gradient-brand text-white text-sm font-semibold">Try again</a>
+     </div>
+-    <h2 class="text-xl font-bold text-gray-900 mb-2">Waiting for Payment</h2>
+-    <p class="text-gray-500 text-sm mb-4">
+-      An M-Pesa prompt has been sent to your phone.<br/>
+-      Enter your PIN to complete the payment.
+-    </p>
+-    <div class="bg-gray-50 rounded-xl p-4 text-left text-sm space-y-2">
++
++    <div x-show="state === 'timeout'" x-cloak>
++      <div class="w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center mx-auto mb-4">
++        <span class="text-amber-600 text-2xl">!</span>
++      </div>
++      <h2 class="text-xl font-bold text-gray-900 mb-2">We haven't received confirmation yet</h2>
++      <p class="text-gray-500 text-sm mb-4">
++        If money left your account, your plan will be activated shortly. If it isn't,
++        contact support with the reference below.
++      </p>
++      <p class="font-mono text-xs bg-gray-50 rounded p-2 mb-4">{{ subscription.payment_reference }}</p>
++      <a href="{{ url_for('billing.index') }}" class="text-blue-600 text-sm hover:underline">Back to billing</a>
++    </div>
++
++    <div x-show="state === 'not_found'" x-cloak>
++      <h2 class="text-xl font-bold text-gray-900 mb-2">Payment not found</h2>
++      <p class="text-gray-500 text-sm mb-4">This payment link is no longer valid.</p>
++      <a href="{{ url_for('billing.plans') }}" class="text-blue-600 text-sm hover:underline">View plans</a>
++    </div>
++
++    <div class="bg-gray-50 rounded-xl p-4 text-left text-sm space-y-2 mt-6">
+       <div class="flex justify-between">
+         <span class="text-gray-500">Plan</span>
+         <span class="font-semibold capitalize">{{ subscription.plan }}</span>
+@@ -39,10 +84,6 @@
+     </div>
+   </div>
+ 
+-  <p class="text-xs text-gray-400">This page will update automatically when payment is confirmed.</p>
+-  <p class="text-xs text-gray-400 mt-1">
+-    Having trouble?
+-    <a href="{{ url_for('billing.plans') }}" class="text-blue-600 hover:underline">Try again</a>
+-  </p>
++  <p class="text-xs text-gray-400" x-show="state === 'pending'">This page updates automatically when payment is confirmed.</p>
+ </div>
+ {% endblock %}
+

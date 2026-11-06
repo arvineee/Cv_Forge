@@ -4,6 +4,7 @@ Prices come from PricingPlan plus any live Offer, resolved on the server
 by app/services/pricing.py. The client never sends an amount.
 """
 import secrets
+from datetime import datetime, timezone
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, current_app
 from flask_login import login_required, current_user
 from app.models import db, PricingPlan, Subscription, Payment
@@ -17,6 +18,74 @@ billing_bp = Blueprint("billing", __name__)
 def _active_plans():
     return (PricingPlan.query.filter_by(is_active=True)
             .order_by(PricingPlan.sort_order).all())
+
+
+# How long before the status poll asks IntaSend directly, and when we give up.
+RECONCILE_AFTER_SECONDS = 45
+PENDING_TIMEOUT_SECONDS = 600
+
+
+def _remember_invoice(reference: str, invoice_id) -> None:
+    """Store the IntaSend invoice id so the status poll can check it later."""
+    if not invoice_id:
+        return
+    payment = Payment.query.filter_by(lipana_checkout_request_id=reference).first()
+    if payment:
+        payment.raw_webhook = {"invoice_id": str(invoice_id)}
+        db.session.commit()
+
+
+def _invoice_id_from(resp: dict):
+    """IntaSend nests the invoice differently for STK push and checkout."""
+    if not isinstance(resp, dict):
+        return None
+    if resp.get("invoice_id"):
+        return resp["invoice_id"]
+    raw = resp.get("raw") or {}
+    invoice = raw.get("invoice") if isinstance(raw, dict) else None
+    if isinstance(invoice, dict) and invoice.get("invoice_id"):
+        return invoice["invoice_id"]
+    return raw.get("invoice_id") if isinstance(raw, dict) else None
+
+
+def _reconcile_with_intasend(subscription, reference: str) -> None:
+    """If a payment has been pending a while, ask IntaSend directly.
+
+    Covers missed or failed webhook deliveries. Reuses the webhook handlers,
+    which are idempotent, so calling this repeatedly is safe.
+    """
+    from app.routes.webhooks import _handle_payment_success, _handle_payment_failed
+
+    created = subscription.created_at
+    if created.tzinfo is None:
+        created = created.replace(tzinfo=timezone.utc)
+    if (datetime.now(timezone.utc) - created).total_seconds() < RECONCILE_AFTER_SECONDS:
+        return
+
+    payment = Payment.query.filter_by(lipana_checkout_request_id=reference).first()
+    invoice_id = (payment.raw_webhook or {}).get("invoice_id") if payment and isinstance(payment.raw_webhook, dict) else None
+    if not invoice_id:
+        return  # nothing to check against; the webhook is the only route
+
+    try:
+        from app.services.intasend_service import IntaSendService
+        result = IntaSendService().check_status(invoice_id=invoice_id)
+    except Exception as e:
+        current_app.logger.warning(f"Reconcile skipped for ref={reference}: {e}")
+        return
+    if not result.get("success"):
+        return
+
+    invoice = result.get("invoice") if isinstance(result.get("invoice"), dict) else result
+    state = invoice.get("state")
+    current_app.logger.info(f"Reconcile ref={reference} invoice={invoice_id} state={state}")
+
+    if state == "COMPLETE":
+        _handle_payment_success({"reference": reference, "checkout_request_id": reference,
+                                 "transaction_id": invoice_id})
+    elif state == "FAILED":
+        _handle_payment_failed({"reference": reference, "checkout_request_id": reference,
+                                "failed_reason": invoice.get("failed_reason")})
 
 
 def _create_pending(plan, method, phone=None):
@@ -119,6 +188,7 @@ def subscribe(plan_slug):
             email=current_user.email,
         )
         if resp.get("success"):
+            _remember_invoice(reference, resp.get("invoice_id"))
             flash("M-Pesa payment request sent! Check your phone.", "success")
             return redirect(url_for("billing.payment_pending", reference=reference))
         else:
@@ -160,6 +230,7 @@ def subscribe_card(plan_slug):
             comment=f"CVForge {plan.name} Plan",
         )
         if resp.get("success"):
+            _remember_invoice(reference, _invoice_id_from(resp))
             return redirect(resp["checkout_url"])
         else:
             flash(f"Card payment could not be started: {resp.get('message', 'Unknown error')}", "error")
@@ -193,8 +264,21 @@ def payment_status(reference):
     ).first()
     if not subscription:
         return jsonify({"status": "not_found"})
+
+    status = subscription.status
+    if status == "pending":
+        _reconcile_with_intasend(subscription, reference)
+        status = subscription.status
+    if status == "pending":
+        created = subscription.created_at
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=timezone.utc)
+        if (datetime.now(timezone.utc) - created).total_seconds() > PENDING_TIMEOUT_SECONDS:
+            status = "timeout"
+
     return jsonify({
-        "status": subscription.status,
+        "status": status,
         "plan": subscription.plan,
-        "redirect": url_for("billing.success") if subscription.status == "active" else None,
+        "reference": reference,
+        "redirect": url_for("billing.success") if status == "active" else None,
     })
