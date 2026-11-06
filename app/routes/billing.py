@@ -2,12 +2,16 @@
 CVForge AI - Billing Blueprint
 Prices come from PricingPlan plus any live Offer, resolved on the server
 by app/services/pricing.py. The client never sends an amount.
+
+Adds: /claim-payment/<reference> so a user whose webhook was missed can
+paste their M-Pesa confirmation message and have an admin verify it.
 """
 import secrets
 from datetime import datetime, timezone
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, current_app
 from flask_login import login_required, current_user
-from app.models import db, PricingPlan, Subscription, Payment
+from app.models import (db, PricingPlan, Subscription, Payment,
+                        ManualPaymentClaim, Notification)
 from app.services.pricing import (
     annotate_plans, checkout_price, reserve_redemption, banner_offer,
 )
@@ -282,3 +286,54 @@ def payment_status(reference):
         "reference": reference,
         "redirect": url_for("billing.success") if status == "active" else None,
     })
+
+
+@billing_bp.route("/claim-payment/<reference>", methods=["POST"])
+@login_required
+def claim_payment(reference):
+    """User pastes their M-Pesa / bank confirmation message so an admin
+    can manually verify and activate the plan when a webhook is missed."""
+    subscription = Subscription.query.filter_by(
+        payment_reference=reference, user_id=current_user.id
+    ).first_or_404()
+
+    if subscription.status == "active":
+        flash("This payment is already active — no claim needed.", "info")
+        return redirect(url_for("billing.payment_pending", reference=reference))
+
+    message = (request.form.get("pasted_message") or "").strip()
+    phone = (request.form.get("contact_phone") or "").strip()
+
+    if len(message) < 20:
+        flash("Please paste the full confirmation message you received from M-Pesa or your bank.", "error")
+        return redirect(url_for("billing.payment_pending", reference=reference))
+
+    existing = ManualPaymentClaim.query.filter_by(
+        subscription_id=subscription.id, status="pending"
+    ).first()
+    if existing:
+        flash("You already submitted a claim for this payment. Our team is reviewing it.", "info")
+        return redirect(url_for("billing.payment_pending", reference=reference))
+
+    claim = ManualPaymentClaim(
+        user_id=current_user.id,
+        subscription_id=subscription.id,
+        reference=reference,
+        pasted_message=message[:2000],
+        contact_phone=phone or None,
+    )
+    db.session.add(claim)
+    db.session.add(Notification(
+        user_id=current_user.id,
+        title="Payment claim received",
+        message="We received your payment confirmation. Our team will verify it and activate your plan shortly.",
+        type="info",
+        action_url="/billing/",
+    ))
+    db.session.commit()
+
+    current_app.logger.info(
+        f"Manual payment claim submitted: user={current_user.id} ref={reference}"
+    )
+    flash("Thanks — your claim is in. We'll activate your plan once we verify the payment.", "success")
+    return redirect(url_for("billing.payment_pending", reference=reference))

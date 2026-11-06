@@ -18,6 +18,28 @@
   {% endfor %}
 </div>
 
+{# ── Alert bar: only shown when something actually needs attention ── #}
+{% if pending_claims %}
+<div class="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 flex items-start gap-3">
+  <div class="w-9 h-9 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+    <span class="text-amber-700 text-lg">!</span>
+  </div>
+  <div class="flex-1">
+    <p class="font-semibold text-amber-900 text-sm">
+      {{ pending_claims }} manual payment claim{{ 's' if pending_claims != 1 else '' }} waiting for review
+    </p>
+    <p class="text-xs text-amber-800 mt-0.5">
+      These are users whose payment didn't reach us via webhook and pasted their M-Pesa confirmation instead.
+      Review them to either activate the plan or reject with a reason.
+    </p>
+  </div>
+  <a href="{{ url_for('admin.claims') }}"
+     class="flex-shrink-0 px-3 py-1.5 rounded-lg bg-amber-600 text-white text-xs font-semibold hover:bg-amber-700 self-center">
+    Review
+  </a>
+</div>
+{% endif %}
+
 <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
   <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
     <h2 class="font-semibold mb-4">AI Usage Today</h2>
@@ -38,8 +60,20 @@
   </div>
 
   <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="font-semibold">Payment Claims</h2>
+      {% if pending_claims %}
+      <span class="text-xs font-semibold px-2 py-1 rounded-full bg-amber-100 text-amber-700">{{ pending_claims }} pending</span>
+      {% endif %}
+    </div>
+    <p class="text-4xl font-bold {{ 'text-amber-600' if pending_claims else 'text-gray-300' }}">{{ pending_claims }}</p>
+    <p class="text-sm text-gray-400 mt-1 mb-3">Manual claims awaiting review</p>
+    <a href="{{ url_for('admin.claims') }}" class="text-sm text-blue-600 hover:underline font-medium">Open claims →</a>
+  </div>
+
+  <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-6 md:col-span-2 lg:col-span-3">
     <h2 class="font-semibold mb-4">Quick Links</h2>
-    <div class="space-y-2">
+    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2">
       {% for label, endpoint in [
         ('Manage Users', 'admin.users'),
         ('Pricing Plans', 'admin.pricing'),
@@ -49,6 +83,9 @@
         ('Payments', 'admin.payments'),
         ('Visitors', 'admin.visitors'),
         ('Pro-Upgrade Nudges', 'admin.nudges'),
+        ('Payment Claims', 'admin.claims'),
+        ('Manual Plan Activation', 'admin.manual_plan'),
+        ('Broadcast Email', 'admin.broadcast'),
       ] %}
       <a href="{{ url_for(endpoint) }}"
          class="block text-sm text-blue-600 hover:underline py-1">{{ label }} →</a>
@@ -57,5 +94,3 @@
   </div>
 </div>
 {% endblock %}
-
-

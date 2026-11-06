@@ -1,6 +1,11 @@
 """
 CVForge AI - Email Service
 Stub that logs instead of crashing if mail is not configured.
+
+Adds: send_broadcast_email, send_claim_approved_email,
+send_claim_rejected_email, send_plan_changed_email — all called from the
+admin routes (broadcast, claim review, manual plan) so state changes
+reach users both via in-app Notification AND email.
 """
 import re
 from urllib.parse import urlparse
@@ -13,6 +18,7 @@ BRAND_GREEN_SOFT = "#DDF4E8"
 INK = "#0E1A2B"
 MUTED = "#5B6B7F"
 FONT = "Arial,Helvetica,sans-serif"
+
 
 def nudge_price_note() -> str:
     """
@@ -34,6 +40,7 @@ def nudge_price_note() -> str:
     except Exception:
         pass
     return "Pay with M-Pesa or card. Each payment lasts for its plan period and does not renew automatically."
+
 
 # What Pro includes (matches AIService.SUPPORT_KNOWLEDGE).
 PRO_BENEFITS = [
@@ -324,15 +331,8 @@ def send_manual_email(user):
 def send_pro_nudge_email(user):
     """
     Occasional reminder to free-tier users about what Pro unlocks.
-    Called from cli.py's `flask send-nudges` command — never called
-    directly from a request, so cadence/opt-out is enforced by the
-    caller, not here.
-
-    The personal paragraphs are written by Gemini (AIService.generate_nudge_email).
-    If AI generation is unavailable, fails, or returns something unusable,
-    this falls back to the static copy — the send is never blocked on the
-    AI call succeeding. The log line says which copy was used, so you can
-    tell from the logs whether the AI path is working.
+    Called from nudge_service — never from a request, so cadence/opt-out
+    is enforced by the caller, not here.
     """
     Mail, Message = _get_mailer()
     if not Mail or not current_app.config.get("MAIL_USERNAME"):
@@ -361,3 +361,116 @@ def send_pro_nudge_email(user):
         current_app.logger.info(f"Pro nudge sent to user {user.id} using {source} copy")
     except Exception as e:
         current_app.logger.warning(f"Pro nudge email failed: {e}")
+
+
+# ── Admin-triggered transactional emails ─────────────────────────
+
+def _render_plain_body(user, body):
+    """Turn a plain-text body (double-newline paragraphs) into HTML
+    paragraphs, HTML-escaped. First-name greeting is prepended."""
+    paragraphs = []
+    for p in body.split("\n\n"):
+        p = p.strip()
+        if p:
+            escaped = escape(p).replace("\n", "<br>")
+            paragraphs.append(f'<p style="margin:0 0 16px;">{escaped}</p>')
+    return f'<p style="margin:0 0 16px;">Hi {_first_name(user)},</p>' + "".join(paragraphs)
+
+
+def send_broadcast_email(user, subject, body):
+    """Plain-text announcement email. Returns True if handed to the
+    mailer, False if mail isn't configured (so the admin broadcast
+    route can report an accurate 'failed' count in dev)."""
+    Mail, Message = _get_mailer()
+    if not Mail or not current_app.config.get("MAIL_USERNAME"):
+        current_app.logger.info(f"[email stub] Broadcast '{subject}' skipped for {user.email}")
+        return False
+
+    html = _render_email(
+        preheader=subject,
+        body_html=_render_plain_body(user, body),
+        footer_note="You're receiving this because you have a CVForge AI account.",
+    )
+    _send(subject, user.email, html)
+    return True
+
+
+def send_claim_approved_email(user, claim, admin_note=""):
+    Mail, _ = _get_mailer()
+    if not Mail or not current_app.config.get("MAIL_USERNAME"):
+        current_app.logger.info(f"[email stub] Claim approved email skipped for {user.email}")
+        return
+
+    amount_txt = ""
+    if claim.subscription and claim.subscription.amount is not None:
+        amount_txt = f" of KES {claim.subscription.amount}"
+
+    note_html = f'<p style="margin:0 0 16px;color:{MUTED};">{escape(admin_note)}</p>' if admin_note else ""
+    body = f"""
+              <p style="margin:0 0 16px;">Hi {_first_name(user)},</p>
+              <p style="margin:0 0 16px;">We verified your payment{amount_txt}
+              (reference <strong>{escape(claim.reference or '')}</strong>) and your plan is now active.</p>
+              {note_html}
+              <p style="margin:16px 0 0;font-size:14px;color:{MUTED};">You can now download your CV and use all the features included in your plan.</p>"""
+    html = _render_email(
+        preheader="Your payment is confirmed and your plan is active.",
+        body_html=body,
+        cta_label="Go to my account",
+        cta_url=url_for("billing.index", _external=True),
+    )
+    try:
+        _send("Your CVForge AI plan is active", user.email, html)
+    except Exception as e:
+        current_app.logger.warning(f"Claim approved email send failed: {e}")
+
+
+def send_claim_rejected_email(user, claim, admin_note=""):
+    Mail, _ = _get_mailer()
+    if not Mail or not current_app.config.get("MAIL_USERNAME"):
+        current_app.logger.info(f"[email stub] Claim rejected email skipped for {user.email}")
+        return
+
+    reason = admin_note or ("We couldn't verify a matching payment for this reference. "
+                            "Please reply with your M-Pesa confirmation message so we can look again.")
+    body = f"""
+              <p style="margin:0 0 16px;">Hi {_first_name(user)},</p>
+              <p style="margin:0 0 16px;">We looked into your payment claim for reference
+              <strong>{escape(claim.reference or '')}</strong>, but we couldn't match it to a successful payment on our side.</p>
+              <p style="margin:0 0 16px;">{escape(reason)}</p>
+              <p style="margin:16px 0 0;font-size:14px;color:{MUTED};">If money left your account, reply to this email with the M-Pesa or bank message and we'll sort it out.</p>"""
+    html = _render_email(
+        preheader="We couldn't verify your payment claim yet.",
+        body_html=body,
+        cta_label="Open my billing page",
+        cta_url=url_for("billing.index", _external=True),
+    )
+    try:
+        _send("About your CVForge AI payment claim", user.email, html)
+    except Exception as e:
+        current_app.logger.warning(f"Claim rejected email send failed: {e}")
+
+
+def send_plan_changed_email(user, plan_slug, days, admin_note=""):
+    """Fired when an admin changes a user's plan manually."""
+    Mail, _ = _get_mailer()
+    if not Mail or not current_app.config.get("MAIL_USERNAME"):
+        current_app.logger.info(f"[email stub] Plan-changed email skipped for {user.email}")
+        return
+
+    note_html = f'<p style="margin:0 0 16px;color:{MUTED};">{escape(admin_note)}</p>' if admin_note else ""
+    body = f"""
+              <p style="margin:0 0 16px;">Hi {_first_name(user)},</p>
+              <p style="margin:0 0 16px;">An administrator has updated your plan to <strong>{escape(plan_slug)}</strong>
+              for {days} day(s).</p>
+              {note_html}
+              <p style="margin:16px 0 0;font-size:14px;color:{MUTED};">You can review your plan and payment history in your billing page.</p>"""
+    html = _render_email(
+        preheader="Your CVForge AI plan has been updated.",
+        body_html=body,
+        cta_label="Open billing",
+        cta_url=url_for("billing.index", _external=True),
+    )
+    try:
+        _send("Your CVForge AI plan has been updated", user.email, html)
+    except Exception as e:
+        current_app.logger.warning(f"Plan-changed email send failed: {e}")

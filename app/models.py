@@ -3,6 +3,9 @@ CVForge AI - Database Models
 Fixed: timezone-aware datetimes, clean AIUsage.log_usage classmethod,
 PricingPlan model, removed monkey-patch, fixed relationship order_by,
 Template gets accent_color field.
+
+Adds: ManualPaymentClaim (webhook-missed payment verification) and
+BroadcastEmail (audit log of admin announcements).
 """
 from datetime import datetime, timezone, timedelta
 from flask_sqlalchemy import SQLAlchemy
@@ -512,7 +515,7 @@ class PageVisit(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
-    path = db.Column(db.String(255), nullable=False, index=True,default='/')
+    path = db.Column(db.String(255), nullable=False, index=True, default='/')
     method = db.Column(db.String(10), nullable=False, default="GET")
     ip_truncated = db.Column(db.String(45), nullable=True)
     user_agent = db.Column(db.String(300), nullable=True)
@@ -522,9 +525,6 @@ class PageVisit(db.Model):
 
     def __repr__(self):
         return f"<PageVisit {self.path} user={self.user_id}>"
-
-
-
 
 
 # ── Offers (time-limited discounts overlaid on plan prices) ───────
@@ -631,3 +631,58 @@ class Feedback(db.Model):
 
     def __repr__(self):
         return f"<Feedback {self.category} {self.status}>"
+
+
+# ── Manual payment claims ────────────────────────────────────────
+# When a webhook is missed (network, provider retry exhausted, or a
+# real payment that never reached us), the user pastes their M-Pesa
+# confirmation message here and an admin verifies it manually.
+# Approving a claim reuses the exact same _handle_payment_success()
+# path as a real webhook, so subscription/plan/payment/offer rows stay
+# consistent regardless of how the payment was verified.
+
+class ManualPaymentClaim(db.Model):
+    __tablename__ = "manual_payment_claims"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    subscription_id = db.Column(db.Integer, db.ForeignKey("subscriptions.id"), nullable=True)
+    reference = db.Column(db.String(255), nullable=True, index=True)
+    pasted_message = db.Column(db.Text, nullable=False)
+    contact_phone = db.Column(db.String(30), nullable=True)
+
+    status = db.Column(db.String(20), nullable=False, default="pending")  # pending | approved | rejected
+    admin_note = db.Column(db.Text, nullable=True)
+    reviewed_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    reviewed_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    created_at = db.Column(db.DateTime(timezone=True), default=utcnow, nullable=False, index=True)
+
+    user = db.relationship("User", foreign_keys=[user_id])
+    reviewer = db.relationship("User", foreign_keys=[reviewed_by])
+    subscription = db.relationship("Subscription")
+
+    def __repr__(self):
+        return f"<ManualPaymentClaim user={self.user_id} {self.status}>"
+
+
+# ── Admin broadcast emails ────────────────────────────────────────
+# Kept as a small log so admins can see what they sent, to whom, and
+# how many succeeded. Body is stored as plain text; the email template
+# escapes it. Not meant to be a full campaign system.
+
+class BroadcastEmail(db.Model):
+    __tablename__ = "broadcast_emails"
+
+    id = db.Column(db.Integer, primary_key=True)
+    subject = db.Column(db.String(255), nullable=False)
+    body = db.Column(db.Text, nullable=False)
+    audience = db.Column(db.String(20), nullable=False, default="all")
+    recipient_count = db.Column(db.Integer, default=0)
+    failed_count = db.Column(db.Integer, default=0)
+    sent_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    created_at = db.Column(db.DateTime(timezone=True), default=utcnow, nullable=False)
+
+    sender = db.relationship("User", foreign_keys=[sent_by])
+
+    def __repr__(self):
+        return f"<BroadcastEmail '{self.subject}' to {self.recipient_count}>"

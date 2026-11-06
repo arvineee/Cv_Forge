@@ -35,6 +35,14 @@
       <p class="text-gray-500 text-sm mb-4">
         Complete the payment on your phone. Enter your M-Pesa PIN, or finish the card checkout.
       </p>
+
+      <div class="bg-amber-50 border border-amber-200 rounded-xl p-3 text-left mt-4">
+        <p class="text-xs text-amber-900">
+          <strong>Don't close this page.</strong> It will update automatically as soon as payment is confirmed.
+          If you do close it, you can check your status anytime in
+          <a href="{{ url_for('billing.index') }}" class="underline font-semibold">Billing</a>.
+        </p>
+      </div>
     </div>
 
     <div x-show="state === 'failed'" x-cloak>
@@ -56,7 +64,7 @@
       <h2 class="text-xl font-bold text-gray-900 mb-2">We haven't received confirmation yet</h2>
       <p class="text-gray-500 text-sm mb-4">
         If money left your account, your plan will be activated shortly. If it isn't,
-        contact support with the reference below.
+        contact support with the reference below, or submit a claim using the form under this card.
       </p>
       <p class="font-mono text-xs bg-gray-50 rounded p-2 mb-4">{{ subscription.payment_reference }}</p>
       <a href="{{ url_for('billing.index') }}" class="text-blue-600 text-sm hover:underline">Back to billing</a>
@@ -82,6 +90,40 @@
         <span class="font-mono text-xs">{{ subscription.payment_reference }}</span>
       </div>
     </div>
+
+    {# ── "Already paid?" claim form ── #}
+    {% if subscription.status != 'active' %}
+    <div x-data="{ showClaim: false }" class="mt-6 pt-4 border-t border-gray-100 text-left">
+      <button type="button" @click="showClaim = !showClaim"
+              class="text-xs font-semibold text-blue-600 hover:underline">
+        Already paid? Paste your confirmation message here →
+      </button>
+      <div x-show="showClaim" x-cloak class="mt-3">
+        <p class="text-xs text-gray-500 mb-2">
+          If money left your account but this page still shows pending, paste the M-Pesa (or bank)
+          confirmation message you received. Our team will verify it and activate your plan.
+        </p>
+        <form method="POST" action="{{ url_for('billing.claim_payment', reference=subscription.payment_reference) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+          <label class="block text-xs font-medium text-gray-700 mb-1">
+            Confirmation message
+          </label>
+          <textarea name="pasted_message" rows="4" required minlength="20" maxlength="2000"
+                    placeholder="e.g. QGH7XYZ12 Confirmed. Ksh799.00 sent to CVFORGE AI. on 3/11/26 at 9:14 AM."
+                    class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+          <label class="block text-xs font-medium text-gray-700 mb-1">
+            Phone you paid from (optional)
+          </label>
+          <input type="tel" name="contact_phone" placeholder="07XXXXXXXX"
+                 class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+          <button type="submit"
+                  class="w-full py-2.5 gradient-brand text-white font-semibold rounded-lg text-sm hover:opacity-90 transition">
+            Submit payment claim
+          </button>
+        </form>
+      </div>
+    </div>
+    {% endif %}
   </div>
 
   <p class="text-xs text-gray-400" x-show="state === 'pending'">This page updates automatically when payment is confirmed.</p>

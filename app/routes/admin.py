@@ -1,13 +1,20 @@
 """
 CVForge AI - Admin Blueprint
-Fixed: impersonate uses POST+CSRF, uses db.session.get(),
-added pricing plan management, template management
+
+Includes:
+- Impersonate (POST+CSRF, audit logged)
+- Pricing plan & template management
+- Manual plan activation for approved payment claims or goodwill extensions
+- Manual payment claims review (approve runs the same _handle_payment_success
+  path as a real webhook, so state never drifts)
+- Broadcast email to filtered users with a two-step preview/confirm
 """
 from flask import Blueprint, render_template, request, flash, redirect, url_for, current_app, abort
 from flask_login import login_required, current_user
 from functools import wraps
 from app.models import (db, User, Payment, Subscription, ActivityLog, AIUsage, Template,
-                        PricingPlan, Offer, OfferRedemption, Feedback)
+                        PricingPlan, Offer, OfferRedemption, Feedback,
+                        ManualPaymentClaim, BroadcastEmail, Notification, utcnow)
 
 admin_bp = Blueprint("admin", __name__)
 
@@ -37,6 +44,7 @@ def index():
 
     from app.services.nudge_service import get_nudge_candidates
     nudge_due_count = len(get_nudge_candidates())
+    pending_claims = ManualPaymentClaim.query.filter_by(status="pending").count()
 
     return render_template("admin/index.html",
                            total_users=total_users,
@@ -44,7 +52,8 @@ def index():
                            premium_users=premium_users,
                            total_revenue=total_revenue,
                            daily_ai_usage=daily_ai_usage,
-                           nudge_due_count=nudge_due_count)
+                           nudge_due_count=nudge_due_count,
+                           pending_claims=pending_claims)
 
 
 # ── Users ─────────────────────────────────────────────────────────
@@ -271,11 +280,6 @@ def template_toggle(template_id):
 
 
 # ── Pro-upgrade nudges ───────────────────────────────────────────
-# Reminds free-tier users to upgrade. Runs automatically once a day if
-# ENABLE_NUDGE_SCHEDULER is on (see app/__init__.py), and can also be
-# triggered on demand from here — useful for testing, or as the only
-# trigger if you'd rather not run a background scheduler on PA's free
-# tier and just click the button after checking the candidate list.
 
 @admin_bp.route("/nudges", methods=["GET", "POST"])
 @login_required
@@ -315,7 +319,7 @@ def nudges():
 @admin_required
 def visitors():
     from datetime import timedelta
-    from app.models import PageVisit, utcnow
+    from app.models import PageVisit
     from sqlalchemy import func
 
     days = request.args.get("days", 7, type=int)
@@ -336,7 +340,6 @@ def visitors():
                  .order_by(func.count(PageVisit.id).desc())
                  .limit(15).all())
 
-    # Visits per day for a simple sparkline/table
     daily = (db.session.query(func.date(PageVisit.created_at).label("day"),
                                func.count(PageVisit.id).label("views"))
              .filter(PageVisit.created_at >= cutoff)
@@ -349,9 +352,6 @@ def visitors():
                            unique_visitors=unique_visitors,
                            logged_in_visits=logged_in_visits,
                            top_pages=top_pages, daily=daily, days=days)
-
-
-
 
 
 # ── Offers (time-limited discounts) ───────────────────────────────
@@ -544,3 +544,278 @@ def feedback_update(item_id):
     db.session.commit()
     flash("Feedback updated.", "success")
     return redirect(request.referrer or url_for("admin.feedback"))
+
+
+# ── Manual plan activation ───────────────────────────────────────
+
+@admin_bp.route("/manual-plan", methods=["GET", "POST"])
+@login_required
+@admin_required
+def manual_plan():
+    """Give an admin a single place to find a user and set their plan
+    directly, e.g. after approving a manual payment claim or granting
+    a goodwill extension."""
+    email = (request.args.get("email") or "").strip().lower()
+    user = User.query.filter_by(email=email).first() if email else None
+    plans = PricingPlan.query.order_by(PricingPlan.sort_order).all()
+
+    if request.method == "POST":
+        email = (request.form.get("email") or "").strip().lower()
+        plan_slug = request.form.get("plan", "free")
+        try:
+            days = int(request.form.get("days", 30))
+        except ValueError:
+            days = 30
+        note = (request.form.get("note") or "").strip()
+
+        user = User.query.filter_by(email=email).first()
+        if not user:
+            flash(f"No user found with email '{email}'.", "error")
+            return redirect(url_for("admin.manual_plan"))
+
+        if plan_slug not in ("free", "basic", "pro", "premium"):
+            flash("Invalid plan.", "error")
+            return redirect(url_for("admin.manual_plan", email=email))
+
+        from datetime import datetime, timezone, timedelta
+        user.plan = plan_slug
+        if plan_slug == "free":
+            user.plan_expires_at = None
+        else:
+            user.plan_expires_at = datetime.now(timezone.utc) + timedelta(days=days)
+
+        db.session.add(ActivityLog(
+            user_id=current_user.id, action="admin_manual_set_plan",
+            resource_type="user", resource_id=user.id,
+            ip_address=request.remote_addr,
+            details={"plan": plan_slug, "days": days, "note": note},
+        ))
+        db.session.add(Notification(
+            user_id=user.id,
+            title="Your plan has been updated",
+            message=f"An administrator set your plan to '{plan_slug}'."
+                    + (f" Note: {note}" if note else ""),
+            type="success", action_url="/billing/",
+        ))
+        db.session.commit()
+
+        from app.services.email_service import send_plan_changed_email
+        try:
+            send_plan_changed_email(user, plan_slug, days, note)
+        except Exception as e:
+            current_app.logger.warning(f"Plan-changed email failed for user {user.id}: {e}")
+
+        flash(f"{user.email} set to '{plan_slug}' for {days} day(s).", "success")
+        return redirect(url_for("admin.manual_plan", email=user.email))
+
+    return render_template("admin/manual_plan.html", user=user, plans=plans, email=email)
+
+
+# ── Manual payment claims ────────────────────────────────────────
+
+@admin_bp.route("/claims")
+@login_required
+@admin_required
+def claims():
+    status = request.args.get("status", "pending")
+    q = ManualPaymentClaim.query
+    if status != "all":
+        q = q.filter_by(status=status)
+    items = q.order_by(ManualPaymentClaim.created_at.desc()).limit(200).all()
+    counts = dict(db.session.query(
+        ManualPaymentClaim.status, db.func.count(ManualPaymentClaim.id)
+    ).group_by(ManualPaymentClaim.status).all())
+    return render_template("admin/claims.html", items=items, status=status, counts=counts)
+
+
+@admin_bp.route("/claims/<int:claim_id>/approve", methods=["POST"])
+@login_required
+@admin_required
+def claim_approve(claim_id):
+    claim = db.session.get(ManualPaymentClaim, claim_id)
+    if not claim or claim.status != "pending":
+        abort(404)
+
+    note = (request.form.get("admin_note") or "").strip()
+
+    # Reuse the exact same activation path as a real webhook, so the
+    # subscription, user plan, payment row and offer redemption are all
+    # kept consistent — no risk of a manual approval drifting from the
+    # normal payment flow.
+    from app.routes.webhooks import _handle_payment_success
+
+    activated = False
+    if claim.reference:
+        activated = _handle_payment_success({
+            "reference": claim.reference,
+            "checkout_request_id": claim.reference,
+            "transaction_id": f"MANUAL-{claim.id}",
+        })
+
+    claim.status = "approved"
+    claim.admin_note = note or None
+    claim.reviewed_by = current_user.id
+    claim.reviewed_at = utcnow()
+    db.session.add(ActivityLog(
+        user_id=current_user.id, action="admin_claim_approve",
+        resource_type="manual_payment_claim", resource_id=claim.id,
+        ip_address=request.remote_addr,
+        details={"reference": claim.reference, "activated": bool(activated)},
+    ))
+    db.session.add(Notification(
+        user_id=claim.user_id,
+        title="Payment confirmed",
+        message="We verified your payment and activated your plan."
+                + (f" {note}" if note else ""),
+        type="success", action_url="/billing/",
+    ))
+    db.session.commit()
+
+    try:
+        from app.services.email_service import send_claim_approved_email
+        user = db.session.get(User, claim.user_id)
+        if user:
+            send_claim_approved_email(user, claim, note)
+    except Exception as e:
+        current_app.logger.warning(f"Claim-approved email failed for claim {claim.id}: {e}")
+
+    if activated:
+        flash("Claim approved and plan activated.", "success")
+    else:
+        flash("Claim marked approved, but no pending subscription matched the reference. "
+              "You may need to set the plan manually via Manual Plan.", "warning")
+    return redirect(url_for("admin.claims"))
+
+
+@admin_bp.route("/claims/<int:claim_id>/reject", methods=["POST"])
+@login_required
+@admin_required
+def claim_reject(claim_id):
+    claim = db.session.get(ManualPaymentClaim, claim_id)
+    if not claim or claim.status != "pending":
+        abort(404)
+
+    note = (request.form.get("admin_note") or "").strip()
+
+    claim.status = "rejected"
+    claim.admin_note = note or None
+    claim.reviewed_by = current_user.id
+    claim.reviewed_at = utcnow()
+    db.session.add(ActivityLog(
+        user_id=current_user.id, action="admin_claim_reject",
+        resource_type="manual_payment_claim", resource_id=claim.id,
+        ip_address=request.remote_addr,
+        details={"reference": claim.reference, "note": note},
+    ))
+    db.session.add(Notification(
+        user_id=claim.user_id,
+        title="We couldn't verify your payment",
+        message=note or "Please contact support with your M-Pesa confirmation message.",
+        type="warning", action_url="/support",
+    ))
+    db.session.commit()
+
+    try:
+        from app.services.email_service import send_claim_rejected_email
+        user = db.session.get(User, claim.user_id)
+        if user:
+            send_claim_rejected_email(user, claim, note)
+    except Exception as e:
+        current_app.logger.warning(f"Claim-rejected email failed for claim {claim.id}: {e}")
+
+    flash("Claim rejected. The user has been notified.", "info")
+    return redirect(url_for("admin.claims"))
+
+
+# ── Broadcast email to users ─────────────────────────────────────
+
+@admin_bp.route("/broadcast", methods=["GET", "POST"])
+@login_required
+@admin_required
+def broadcast():
+    """Send a plain-text announcement to a filtered set of users.
+    Two-step: POST with preview_only=1 renders a preview + recipient
+    count; then confirm sends. Audience filter is stored so it's clear
+    who received each message."""
+    if request.method == "POST":
+        subject = (request.form.get("subject") or "").strip()
+        body = (request.form.get("body") or "").strip()
+        audience = request.form.get("audience", "all")
+        preview_only = bool(request.form.get("preview_only"))
+
+        if not subject or not body:
+            flash("Subject and message are required.", "error")
+            return redirect(url_for("admin.broadcast"))
+
+        if audience not in ("all", "free", "paid", "verified", "newsletter"):
+            audience = "all"
+
+        q = User.query.filter(User.is_active.is_(True))
+        if audience == "free":
+            q = q.filter(User.plan == "free")
+        elif audience == "paid":
+            q = q.filter(User.plan.in_(["basic", "pro", "premium"]))
+        elif audience == "verified":
+            q = q.filter(User.is_verified.is_(True))
+        elif audience == "newsletter":
+            from app.models import UserSettings
+            q = q.join(UserSettings, UserSettings.user_id == User.id).filter(
+                UserSettings.email_newsletter.is_(True)
+            )
+
+        recipients = q.order_by(User.created_at.asc()).all()
+
+        if preview_only:
+            return render_template("admin/broadcast.html",
+                                   recent=BroadcastEmail.query
+                                            .order_by(BroadcastEmail.created_at.desc())
+                                            .limit(20).all(),
+                                   preview_subject=subject,
+                                   preview_body=body,
+                                   preview_count=len(recipients),
+                                   subject=subject, body=body, audience=audience)
+
+        from app.services.email_service import send_broadcast_email
+
+        row = BroadcastEmail(
+            subject=subject, body=body, audience=audience,
+            sent_by=current_user.id,
+        )
+        db.session.add(row)
+        db.session.flush()
+
+        sent = 0
+        failed = 0
+        for user in recipients:
+            try:
+                ok = send_broadcast_email(user, subject, body)
+                if ok:
+                    sent += 1
+                else:
+                    failed += 1
+            except Exception as e:
+                current_app.logger.warning(f"Broadcast failed for user {user.id}: {e}")
+                failed += 1
+
+        row.recipient_count = sent
+        row.failed_count = failed
+        db.session.add(ActivityLog(
+            user_id=current_user.id, action="admin_broadcast",
+            resource_type="broadcast_email", resource_id=row.id,
+            ip_address=request.remote_addr,
+            details={"audience": audience, "sent": sent, "failed": failed},
+        ))
+        db.session.commit()
+
+        msg = f"Broadcast sent to {sent} user(s)."
+        if failed:
+            msg += f" {failed} failed — check logs."
+        flash(msg, "success" if not failed else "warning")
+        return redirect(url_for("admin.broadcast"))
+
+    return render_template("admin/broadcast.html",
+                           recent=BroadcastEmail.query
+                                    .order_by(BroadcastEmail.created_at.desc())
+                                    .limit(20).all(),
+                           preview_subject=None, preview_body=None,
+                           preview_count=None, subject="", body="", audience="all")

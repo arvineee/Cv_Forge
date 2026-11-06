@@ -1,0 +1,75 @@
+{% extends "base_admin.html" %}
+{% block title %}Payment Claims{% endblock %}
+{% block admin_content %}
+<div class="max-w-5xl mx-auto py-8 px-4">
+  <h1 class="text-2xl font-bold text-gray-900 mb-1">Manual Payment Claims</h1>
+  <p class="text-sm text-gray-500 mb-6">
+    Users who pasted an M-Pesa/bank confirmation because a webhook didn't arrive.
+    Approving a claim activates their plan through the normal payment flow.
+  </p>
+
+  <div class="flex gap-2 mb-6">
+    {% for s in ['pending', 'approved', 'rejected', 'all'] %}
+    <a href="{{ url_for('admin.claims', status=s) }}"
+       class="px-3 py-1.5 rounded-lg text-xs font-semibold border
+       {% if status == s %}bg-blue-600 text-white border-blue-600{% else %}bg-white text-gray-600 border-gray-200 hover:bg-gray-50{% endif %}">
+      {{ s|capitalize }}{% if counts.get(s) %} ({{ counts[s] }}){% endif %}
+    </a>
+    {% endfor %}
+  </div>
+
+  {% if items %}
+  <div class="space-y-3">
+    {% for c in items %}
+    <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+      <div class="flex justify-between items-start mb-2">
+        <div>
+          <p class="font-semibold text-gray-900">{{ c.user.email if c.user else 'Deleted user' }}</p>
+          <p class="text-xs text-gray-500">
+            Ref <span class="font-mono">{{ c.reference or '—' }}</span>
+            · Submitted {{ c.created_at.strftime('%d %b %Y %H:%M') }}
+            {% if c.contact_phone %}· Phone {{ c.contact_phone }}{% endif %}
+          </p>
+        </div>
+        <span class="text-xs font-semibold px-2 py-0.5 rounded-full
+          {% if c.status == 'pending' %}bg-yellow-100 text-yellow-700
+          {% elif c.status == 'approved' %}bg-green-100 text-green-700
+          {% else %}bg-red-100 text-red-700{% endif %}">{{ c.status }}</span>
+      </div>
+
+      <div class="bg-gray-50 rounded-lg p-3 text-xs text-gray-700 font-mono whitespace-pre-wrap mb-3">{{ c.pasted_message }}</div>
+
+      {% if c.status == 'pending' %}
+      <div class="grid sm:grid-cols-2 gap-3">
+        <form method="POST" action="{{ url_for('admin.claim_approve', claim_id=c.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+          <textarea name="admin_note" rows="2" placeholder="Optional note to user"
+                    class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs mb-2"></textarea>
+          <button class="w-full py-2 rounded-lg bg-green-600 text-white text-xs font-semibold hover:bg-green-700">
+            Approve & activate
+          </button>
+        </form>
+        <form method="POST" action="{{ url_for('admin.claim_reject', claim_id=c.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+          <textarea name="admin_note" rows="2" placeholder="Reason (shown to user)"
+                    class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs mb-2"></textarea>
+          <button class="w-full py-2 rounded-lg bg-red-600 text-white text-xs font-semibold hover:bg-red-700">
+            Reject
+          </button>
+        </form>
+      </div>
+      {% else %}
+      <p class="text-xs text-gray-500">
+        Reviewed {{ c.reviewed_at.strftime('%d %b %Y') if c.reviewed_at else '—' }}
+        {% if c.reviewer %}by {{ c.reviewer.email }}{% endif %}
+        {% if c.admin_note %}· "{{ c.admin_note }}"{% endif %}
+      </p>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="text-center py-12 text-gray-400 text-sm">No claims in this category.</div>
+  {% endif %}
+</div>
+{% endblock %}

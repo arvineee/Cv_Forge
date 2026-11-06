@@ -1,0 +1,83 @@
+{% extends "base_admin.html" %}
+{% block title %}Broadcast Email{% endblock %}
+{% block admin_content %}
+<div class="max-w-3xl mx-auto py-8 px-4">
+  <h1 class="text-2xl font-bold text-gray-900 mb-1">Broadcast Email</h1>
+  <p class="text-sm text-gray-500 mb-6">
+    Send a plain-text announcement to a filtered set of users. A preview
+    with the exact recipient count is shown before anything is sent.
+  </p>
+
+  <form method="POST" class="bg-white rounded-xl border border-gray-100 shadow-sm p-6 space-y-4 mb-6">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Audience</label>
+      <select name="audience" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
+        <option value="all" {% if audience == 'all' %}selected{% endif %}>All active users</option>
+        <option value="free" {% if audience == 'free' %}selected{% endif %}>Free plan only</option>
+        <option value="paid" {% if audience == 'paid' %}selected{% endif %}>Any paid plan</option>
+        <option value="verified" {% if audience == 'verified' %}selected{% endif %}>Verified emails only</option>
+        <option value="newsletter" {% if audience == 'newsletter' %}selected{% endif %}>Newsletter subscribers only</option>
+      </select>
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Subject</label>
+      <input type="text" name="subject" required maxlength="255" value="{{ subject }}"
+             class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"/>
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">
+        Message (plain text — blank line separates paragraphs)
+      </label>
+      <textarea name="body" rows="8" required
+                class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono">{{ body }}</textarea>
+    </div>
+
+    <div class="flex gap-2">
+      <button type="submit" name="preview_only" value="1"
+              class="flex-1 py-2.5 rounded-lg border-2 border-blue-600 text-blue-600 text-sm font-semibold hover:bg-blue-50">
+        Preview & count recipients
+      </button>
+      {% if preview_count is not none %}
+      <button type="submit"
+              class="flex-1 py-2.5 rounded-lg gradient-brand text-white text-sm font-semibold">
+        Confirm & send to {{ preview_count }} user(s)
+      </button>
+      {% endif %}
+    </div>
+  </form>
+
+  {% if preview_count is not none %}
+  <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 text-sm">
+    <p class="font-semibold text-blue-900 mb-2">Preview ({{ preview_count }} recipient(s))</p>
+    <p class="text-blue-900 mb-1"><strong>Subject:</strong> {{ preview_subject }}</p>
+    <div class="text-blue-900 whitespace-pre-wrap">{{ preview_body }}</div>
+  </div>
+  {% endif %}
+
+  <h2 class="text-lg font-bold text-gray-900 mb-3">Recent broadcasts</h2>
+  {% if recent %}
+  <div class="bg-white rounded-xl border border-gray-100 shadow-sm divide-y divide-gray-50">
+    {% for b in recent %}
+    <div class="p-4">
+      <div class="flex justify-between items-start">
+        <div>
+          <p class="font-semibold text-gray-900">{{ b.subject }}</p>
+          <p class="text-xs text-gray-500">
+            To: {{ b.audience }} · {{ b.recipient_count }} sent
+            {% if b.failed_count %} · {{ b.failed_count }} failed{% endif %}
+            · {{ b.created_at.strftime('%d %b %Y %H:%M') }}
+          </p>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="text-center py-8 text-gray-400 text-sm">No broadcasts yet.</div>
+  {% endif %}
+</div>
+{% endblock %}
