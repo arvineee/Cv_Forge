@@ -20,6 +20,7 @@ Fixes applied in this pass:
 """
 import hashlib
 import json
+import re
 from flask import current_app, g
 
 
@@ -85,6 +86,26 @@ def _as_str_list(value) -> list:
     return [str(v).strip() for v in value if isinstance(v, (str, int, float)) and str(v).strip()]
 
 
+_LEADING_BULLET_RE = re.compile(r"^\s*(?:[-*\u2022\u25cf\u25aa\u2013\u2014]|\d+[.)])\s*")
+
+
+def _job_bullets(job: dict) -> tuple:
+    """Return (bullets, from_description) for a source job.
+
+    Uploaded CVs often carry their bullets only in the free-text description
+    (achievements empty). Treat those lines as the bullets so a revamp has
+    something to rewrite; the caller then clears the description so it isn't
+    rendered twice.
+    """
+    bullets = _as_str_list(job.get("achievements"))
+    if bullets:
+        return bullets, False
+    desc = str(job.get("description") or "")
+    lines = [_LEADING_BULLET_RE.sub("", l).strip() for l in desc.splitlines()]
+    lines = [l for l in lines if l]
+    return lines, bool(lines)
+
+
 def _validate_revamp(out, source: dict) -> dict:
     """
     Check the model's JSON against the source resume and return a cleaned copy.
@@ -112,7 +133,7 @@ def _validate_revamp(out, source: dict) -> dict:
         if not isinstance(src, dict):
             continue
         new = new_jobs[i] if i < len(new_jobs) and isinstance(new_jobs[i], dict) else {}
-        src_bullets = _as_str_list(src.get("achievements"))
+        src_bullets, from_desc = _job_bullets(src)
         new_bullets = _as_str_list(new.get("achievements"))
         # Keep the model's bullets only when the count and content survive;
         # otherwise keep the user's original bullets for this job.
@@ -123,7 +144,7 @@ def _validate_revamp(out, source: dict) -> dict:
             "location": src.get("location") or "",
             "start_date": src.get("start_date") or "",
             "end_date": src.get("end_date") or "Present",
-            "description": src.get("description") or "",
+            "description": "" if from_desc else (src.get("description") or ""),
             "achievements": bullets,
         })
     clean["work_experience"] = merged_jobs
@@ -278,6 +299,17 @@ class AIService:
         # Only the fields the model needs. Keeps prompts small and avoids sending
         # internal ids, versions or other data the model has no reason to see.
         payload = build_revamp_payload(source)
+        # Give the model the bullets even when an uploaded CV stored them only
+        # in the free-text description, otherwise it has nothing to rewrite.
+        payload_jobs = []
+        for job in payload.get("work_experience") or []:
+            if isinstance(job, dict):
+                bullets, from_desc = _job_bullets(job)
+                job = dict(job, achievements=bullets)
+                if from_desc:
+                    job["description"] = ""
+            payload_jobs.append(job)
+        payload["work_experience"] = payload_jobs
         prompt = (
             "Revamp the resume data below and return JSON with exactly these keys:\n"
             '{"professional_summary": string, "work_experience": [same jobs, same order, '

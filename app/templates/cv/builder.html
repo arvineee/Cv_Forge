@@ -354,6 +354,17 @@ function cvBuilder() {
     },
 
     init() {
+      // Jobs from an uploaded/revamped CV keep their bullets in `achievements`,
+      // but this form edits `description`. Fold the bullets into the textarea
+      // (and clear the array) so they show up here and aren't saved twice.
+      this.data.work_experience = (this.data.work_experience || []).map(job => {
+        const ach = Array.isArray(job.achievements) ? job.achievements.filter(a => a && String(a).trim()) : [];
+        if (!ach.length) return job;
+        const existing = (job.description || '').trim();
+        const lines = existing ? existing.split('\n') : [];
+        ach.forEach(a => { if (!lines.some(l => l.replace(/^\s*[•\-*]\s*/, '').trim() === String(a).trim())) lines.push('• ' + String(a).trim()); });
+        return Object.assign({}, job, {description: lines.join('\n'), achievements: []});
+      });
       if (!this.resumeId) {
         fetch('{{ url_for("cv.create_cv") }}', {
           method: 'POST',
@@ -370,7 +381,7 @@ function cvBuilder() {
     prevStep() { if (this.currentStep > 1) this.currentStep--; },
 
     addExperience() {
-      this.data.work_experience.push({job_title:'',company:'',start_date:'',end_date:'Present',description:''});
+      this.data.work_experience.push({job_title:'',company:'',start_date:'',end_date:'Present',description:'',achievements:[]});
     },
     addEducation() {
       this.data.education.push({degree:'',institution:'',year:'',grade:''});
@@ -398,7 +409,7 @@ function cvBuilder() {
       }).catch(() => {});
     },
 
-    aiAssist(section, context) {
+    aiAssist(section, context, index) {
       if (!this.resumeId || this.aiLoading) return;
       this.aiLoading = true;
       CVProgress.track(fetch(`/cv/builder/${this.resumeId}/ai-assist`, {
@@ -410,6 +421,12 @@ function cvBuilder() {
         if (section === 'professional_summary') {
           this.data.professional_summary = d.result;
           this.autosave('professional_summary', d.result);
+        } else if (section === 'work_experience' && index !== undefined && this.data.work_experience[index]) {
+          // Write the result into the job that was clicked, not any other.
+          const lines = String(d.result || '').split('\n').map(l => l.replace(/^\s*[•\-*]\s*/, '').trim()).filter(Boolean);
+          this.data.work_experience[index].description = lines.map(l => '• ' + l).join('\n');
+          this.data.work_experience[index].achievements = [];
+          this.autosave('work_experience', this.data.work_experience);
         } else if (section === 'skills') {
           try {
             const skills = JSON.parse(d.result);

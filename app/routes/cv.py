@@ -363,6 +363,30 @@ def _parse_projects_text(raw: str) -> list:
     return projects[:10]
 
 
+def _parse_jobs_from_form(form) -> list:
+    """One job per submitted block; achievements as one bullet per line."""
+    titles = form.getlist("job_title")
+    companies = form.getlist("company")
+    locations = form.getlist("location")
+    starts = form.getlist("start_date")
+    ends = form.getlist("end_date")
+    achievements_raw = form.getlist("achievements")
+    jobs = []
+    for i, title in enumerate(titles):
+        if not title.strip():
+            continue
+        jobs.append({
+            "job_title": title.strip(),
+            "company": companies[i].strip() if i < len(companies) else "",
+            "location": locations[i].strip() if i < len(locations) else "",
+            "start_date": starts[i].strip() if i < len(starts) else "",
+            "end_date": ends[i].strip() if i < len(ends) else "",
+            "achievements": [l.strip() for l in achievements_raw[i].splitlines() if l.strip()]
+                            if i < len(achievements_raw) else [],
+        })
+    return jobs
+
+
 def _wizard_next_step(step: str) -> "str | None":
     i = WIZARD_STEPS.index(step)
     return WIZARD_STEPS[i + 1] if i + 1 < len(WIZARD_STEPS) else None
@@ -492,6 +516,13 @@ def wizard_step_save(resume_id, step):
         abort(404)
     resume = Resume.query.filter_by(id=resume_id, user_id=current_user.id).first_or_404()
     action = request.form.get("action", "next")
+    enhance_index = None
+    if action.startswith("enhance:"):
+        try:
+            enhance_index = int(action.split(":", 1)[1])
+        except ValueError:
+            enhance_index = 0
+        action = "enhance"
 
     # -- Enhance with AI: run assist_section(), show the suggestion back on
     # the same step for the user to accept/edit before saving. Nothing is
@@ -502,6 +533,33 @@ def wizard_step_save(resume_id, step):
             flash(err, "warning")
             return redirect(url_for("cv.wizard_step", resume_id=resume_id, step=step))
         raw_input = request.form.get("draft", "")
+        ai_role = None
+        if step == "work_experience":
+            # Enhance the specific role whose button was clicked, using what is
+            # currently typed in the form. Save the form first so unsaved
+            # edits (and newly added roles) are not lost on re-render.
+            form_jobs = _parse_jobs_from_form(request.form)
+            if form_jobs:
+                resume.work_experience = form_jobs
+                db.session.commit()
+            idx = enhance_index if enhance_index is not None else 0
+            # Indexes refer to form blocks; blank-title blocks are skipped when
+            # saving, so map the block index onto the saved job list.
+            titles = request.form.getlist("job_title")
+            saved_idx = sum(1 for t in titles[:idx] if t.strip())
+            jobs_now = resume.work_experience or []
+            if idx < len(titles) and titles[idx].strip() and saved_idx < len(jobs_now):
+                job = jobs_now[saved_idx]
+                raw_input = "\n".join(job.get("achievements") or [])
+                ai_role = job.get("job_title") or None
+                if ai_role and job.get("company"):
+                    ai_role = f"{ai_role} at {job['company']}"
+                if job.get("job_title"):
+                    raw_input = (f"Role: {job.get('job_title')}"
+                                 f"{' at ' + job['company'] if job.get('company') else ''}\n{raw_input}")
+            else:
+                flash("Add a job title for this role before enhancing it with AI.", "warning")
+                return redirect(url_for("cv.wizard_step", resume_id=resume_id, step=step))
         try:
             ai = get_ai_service()
             suggestion = ai.assist_section(section=step, context=raw_input,
@@ -527,7 +585,7 @@ def wizard_step_save(resume_id, step):
             steps=WIZARD_STEPS, step_index=WIZARD_STEPS.index(step) + 1,
             total_steps=len(WIZARD_STEPS),
             prev_step=_wizard_prev_step(step), next_step=_wizard_next_step(step),
-            ai_enabled=True, ai_suggestion=suggestion, draft=raw_input,
+            ai_enabled=True, ai_suggestion=suggestion, draft=raw_input, ai_role=ai_role,
         )
 
     # -- Save this step's answer (skip is allowed everywhere except
@@ -545,26 +603,7 @@ def wizard_step_save(resume_id, step):
     elif step == "professional_summary":
         resume.professional_summary = request.form.get("content", "").strip() or None
     elif step == "work_experience":
-        # One job per submitted block; achievements as one bullet per line.
-        titles = request.form.getlist("job_title")
-        companies = request.form.getlist("company")
-        locations = request.form.getlist("location")
-        starts = request.form.getlist("start_date")
-        ends = request.form.getlist("end_date")
-        achievements_raw = request.form.getlist("achievements")
-        jobs = []
-        for i, title in enumerate(titles):
-            if not title.strip():
-                continue
-            jobs.append({
-                "job_title": title.strip(),
-                "company": companies[i].strip() if i < len(companies) else "",
-                "location": locations[i].strip() if i < len(locations) else "",
-                "start_date": starts[i].strip() if i < len(starts) else "",
-                "end_date": ends[i].strip() if i < len(ends) else "",
-                "achievements": [l.strip() for l in achievements_raw[i].splitlines() if l.strip()]
-                                if i < len(achievements_raw) else [],
-            })
+        jobs = _parse_jobs_from_form(request.form)
         if jobs:
             resume.work_experience = jobs
     elif step == "education":

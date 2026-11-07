@@ -77,3 +77,16 @@ class RevampValidationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RevampDescriptionOnlyTests(unittest.TestCase):
+    def test_uses_description_when_no_achievements(self):
+        """Uploaded CVs often keep bullets only in `description`; revamp must still enhance them."""
+        source = {"work_experience": [{"job_title": "Nurse", "company": "KNH",
+                                       "description": "\u2022 Cared for patients\n\u2022 Kept records",
+                                       "achievements": []}]}
+        out = {"professional_summary": "Summary.",
+               "work_experience": [{"achievements": ["Delivered care to patients.", "Maintained accurate records."]}]}
+        job = ai._validate_revamp(out, source)["work_experience"][0]
+        self.assertEqual(job["achievements"], ["Delivered care to patients.", "Maintained accurate records."])
+        self.assertEqual(job["description"], "")
