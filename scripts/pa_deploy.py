@@ -17,8 +17,10 @@ Environment:
 Usage: python scripts/pa_deploy.py [--dry-run]
 """
 import os
+import re
 import subprocess
 import sys
+import time
 
 import requests
 
@@ -41,6 +43,29 @@ def should_upload(path: str) -> bool:
 def tracked_files():
     out = subprocess.run(["git", "ls-files"], check=True, capture_output=True, text=True).stdout
     return [p for p in out.splitlines() if p and should_upload(p) and os.path.isfile(p)]
+
+
+def post_with_retry(session, url, path=None, max_tries=12):
+    """POST (optionally uploading `path`), waiting out PythonAnywhere's 429 throttling."""
+    r = None
+    for attempt in range(1, max_tries + 1):
+        try:
+            if path:
+                with open(path, "rb") as fh:
+                    r = session.post(url, files={"content": fh}, timeout=60)
+            else:
+                r = session.post(url, timeout=60)
+        except requests.RequestException as e:
+            print(f"  network error ({e}); retrying in 5s [{attempt}/{max_tries}]")
+            time.sleep(5)
+            continue
+        if r.status_code != 429:
+            return r
+        m = re.search(r"available in (\d+) second", r.text)
+        wait = int(m.group(1)) + 2 if m else 30
+        print(f"  throttled (429); waiting {wait}s [{attempt}/{max_tries}]", flush=True)
+        time.sleep(wait)
+    return r
 
 
 def main():
@@ -81,16 +106,15 @@ def main():
     print("Preflight OK")
 
     for i, path in enumerate(files, 1):
-        with open(path, "rb") as fh:
-            r = session.post(f"{api}/files/path{remote}/{path}", files={"content": fh}, timeout=60)
-        if r.status_code not in (200, 201):
-            sys.exit(f"Upload failed for {path}: HTTP {r.status_code} {r.text[:200]}")
+        r = post_with_retry(session, f"{api}/files/path{remote}/{path}", path=path)
+        if r is None or r.status_code not in (200, 201):
+            sys.exit(f"Upload failed for {path}: HTTP {getattr(r, 'status_code', 'n/a')} {getattr(r, 'text', '')[:200]}")
         if i % 25 == 0 or i == len(files):
             print(f"Uploaded {i}/{len(files)}")
 
-    r = session.post(f"{api}/webapps/{domain}/reload/", timeout=60)
-    if r.status_code != 200:
-        sys.exit(f"Reload failed: HTTP {r.status_code} {r.text[:200]}")
+    r = post_with_retry(session, f"{api}/webapps/{domain}/reload/")
+    if r is None or r.status_code != 200:
+        sys.exit(f"Reload failed: HTTP {getattr(r, 'status_code', 'n/a')} {getattr(r, 'text', '')[:200]}")
     print(f"Reloaded {domain}")
     return 0
 
