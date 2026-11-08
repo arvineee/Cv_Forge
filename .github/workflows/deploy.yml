@@ -1,84 +1,46 @@
-"""Upload the git-tracked project files to PythonAnywhere and reload the web app.
+name: Test and deploy to PythonAnywhere
 
-Used by .github/workflows/deploy.yml. Uses only the PythonAnywhere HTTP API,
-so it works on every plan (no SSH needed).
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
 
-Safety: only files tracked by git are uploaded, and secrets, databases,
-uploads and caches are always skipped, so production data and the server's
-own .env are never overwritten.
+concurrency:
+  group: deploy
+  cancel-in-progress: false
 
-Environment:
-  PA_USERNAME     PythonAnywhere username
-  PA_API_TOKEN    API token (Account > API token)
-  PA_PROJECT_DIR  Remote project folder, e.g. /home/cvforge/cvforge
-  PA_DOMAIN       Web app domain, e.g. cvforge.pythonanywhere.com
-  PA_HOST         Optional. www.pythonanywhere.com (default) or eu.pythonanywhere.com
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+      - run: pip install -r requirements-dev.txt
+      - name: Run tests
+        env:
+          SECRET_KEY: ci-test-secret
+          DATABASE_URL: sqlite://
+          SESSION_COOKIE_SECURE: "false"
+        run: python -m pytest -q
 
-Usage: python scripts/pa_deploy.py [--dry-run]
-"""
-import os
-import subprocess
-import sys
-
-import requests
-
-SKIP_PREFIXES = (".git", ".github/", "tests/", "tools/", "scripts/", "instance/", "uploads/",
-                 "__pycache__/", ".pytest_cache/")
-SKIP_PARTS = ("__pycache__",)
-SKIP_NAMES = {".env", ".gitignore", ".mannual.diff.swp", "requirements-dev.txt"}
-SKIP_SUFFIXES = (".pyc", ".db", ".sqlite", ".sqlite3", ".swp", ".log")
-
-
-def should_upload(path: str) -> bool:
-    name = os.path.basename(path)
-    if name in SKIP_NAMES or name.startswith(".env"):
-        return False
-    if path.startswith(SKIP_PREFIXES) or any(p in path.split("/") for p in SKIP_PARTS):
-        return False
-    return not path.endswith(SKIP_SUFFIXES)
-
-
-def tracked_files():
-    out = subprocess.run(["git", "ls-files"], check=True, capture_output=True, text=True).stdout
-    return [p for p in out.splitlines() if p and should_upload(p) and os.path.isfile(p)]
-
-
-def main():
-    dry = "--dry-run" in sys.argv
-    files = tracked_files()
-    if dry:
-        print(f"Would upload {len(files)} files:")
-        for f in files:
-            print("  ", f)
-        return 0
-
-    env = {k: os.environ.get(k, "").strip() for k in
-           ("PA_USERNAME", "PA_API_TOKEN", "PA_PROJECT_DIR", "PA_DOMAIN")}
-    missing = [k for k, v in env.items() if not v]
-    if missing:
-        sys.exit(f"Missing or empty: {', '.join(missing)}")
-    user, token = env["PA_USERNAME"], env["PA_API_TOKEN"]
-    remote, domain = env["PA_PROJECT_DIR"].rstrip("/"), env["PA_DOMAIN"]
-    host = os.environ.get("PA_HOST") or "www.pythonanywhere.com"
-    api = f"https://{host}/api/v0/user/{user}"
-    session = requests.Session()
-    session.headers["Authorization"] = f"Token {token}"
-
-    for i, path in enumerate(files, 1):
-        with open(path, "rb") as fh:
-            r = session.post(f"{api}/files/path{remote}/{path}", files={"content": fh}, timeout=60)
-        if r.status_code not in (200, 201):
-            sys.exit(f"Upload failed for {path}: HTTP {r.status_code} {r.text[:200]}")
-        if i % 25 == 0 or i == len(files):
-            print(f"Uploaded {i}/{len(files)}")
-
-    r = session.post(f"{api}/webapps/{domain}/reload/", timeout=60)
-    if r.status_code != 200:
-        sys.exit(f"Reload failed: HTTP {r.status_code} {r.text[:200]}")
-    print(f"Reloaded {domain}")
-    return 0
-
-
-if __name__ == "__main__":
-    sys.exit(main())
-
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install requests
+      - name: Upload files and reload web app
+        env:
+          PA_USERNAME: ${{ secrets.PA_USERNAME }}
+          PA_API_TOKEN: ${{ secrets.PA_API_TOKEN }}
+          PA_PROJECT_DIR: ${{ vars.PA_PROJECT_DIR }}
+          PA_DOMAIN: ${{ vars.PA_DOMAIN }}
+          PA_HOST: ${{ vars.PA_HOST }}
+        run: python scripts/pa_deploy.py
