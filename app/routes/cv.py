@@ -88,7 +88,7 @@ def _has_active_paid_plan() -> bool:
     is the actual download gate now, so a Basic subscriber who's paid
     should not be treated the same as someone who never paid at all.
     """
-    if current_user.plan not in ("basic", "pro", "premium"):
+    if not current_user.plan or current_user.plan == "free":
         return False
     if not current_user.plan_expires_at:
         return False
@@ -228,14 +228,14 @@ def builder(resume_id=None):
     if resume_id:
         resume = Resume.query.filter_by(id=resume_id, user_id=current_user.id).first_or_404()
     templates = Template.query.filter_by(is_active=True).order_by(Template.sort_order).all()
-    step = int(request.args.get("step", 1))
+    step = request.args.get("step", 1, type=int) or 1
     return render_template("cv/builder.html", resume=resume, templates=templates, step=step)
 
 
 @cv_bp.route("/builder/create", methods=["POST"])
 @login_required
 def create_cv():
-    title = request.form.get("title", "My Resume").strip() or "My Resume"
+    title = (request.form.get("title", "My Resume").strip() or "My Resume")[:255]
     template_id = request.form.get("template_id", type=int)
     resume = Resume(user_id=current_user.id, title=title,
                     template_id=template_id, status="draft", source="builder")
@@ -255,7 +255,7 @@ def create_cv():
 def wizard_new():
     """Entry point for the guided wizard — creates a blank resume and drops
     the user straight into step 1, no theme picker required first."""
-    title = request.args.get("title", "My Resume").strip() or "My Resume"
+    title = (request.args.get("title", "My Resume").strip() or "My Resume")[:255]
     chosen = _usable_template(request.args.get("template_id", type=int))
     template_id = chosen.id if chosen else None
     resume = Resume(user_id=current_user.id, title=title,
@@ -306,7 +306,7 @@ def ai_assist(resume_id):
 
     data = request.get_json(silent=True) or {}
     section = data.get("section", "")
-    context = data.get("context", "")
+    context = str(data.get("context", ""))[:6000]  # cap prompt size
 
     try:
         ai = get_ai_service()
@@ -1087,7 +1087,7 @@ def restore_version(resume_id, version_id):
     restorable = [
         "personal_info", "professional_summary", "work_experience",
         "education", "skills", "certifications", "projects", "references",
-        "languages", "awards",
+        "languages", "awards", "custom_sections",
     ]
     for field in restorable:
         if field in snap:
@@ -1255,6 +1255,15 @@ def delete(resume_id):
     photo = (resume.personal_info or {}).get("photo")
     if photo:
         delete_photo(_photo_dir(), photo)
+    # Uploaded originals hold the person's full CV; don't leave them on disk.
+    if resume.original_file_path:
+        try:
+            from app.services.storage import resolve_upload_folder
+            orig = os.path.join(resolve_upload_folder(), os.path.basename(resume.original_file_path))
+            if os.path.isfile(orig):
+                os.remove(orig)
+        except Exception as e:
+            current_app.logger.warning(f"Could not remove uploaded original: {e}")
     db.session.delete(resume)
     _log("cv_delete", resume_id, {"title": title})
     db.session.commit()

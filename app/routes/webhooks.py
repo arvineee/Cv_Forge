@@ -23,7 +23,12 @@ def lipana_webhook():
     sig = request.headers.get("X-Lipana-Signature", "")
     secret = current_app.config.get("LIPANA_WEBHOOK_SECRET", "")
 
-    if secret and not _verify_lipana_signature(payload, sig, secret):
+    # Fail closed: with no secret configured this endpoint would accept anyone's
+    # "payment.success" and hand out paid plans for free.
+    if not secret:
+        current_app.logger.error("Lipana webhook rejected: LIPANA_WEBHOOK_SECRET is not set")
+        return jsonify({"error": "Webhook not configured"}), 503
+    if not _verify_lipana_signature(payload, sig, secret):
         current_app.logger.warning("Lipana webhook: invalid signature")
         return jsonify({"error": "Invalid signature"}), 401
 
@@ -51,6 +56,10 @@ def lipana_webhook():
 def _handle_payment_success(data: dict):
     reference = data.get("reference") or data.get("checkout_request_id")
     transaction_id = data.get("transaction_id") or data.get("mpesa_receipt_number")
+    if not reference:
+        # filter_by(payment_reference=None) would match rows with a NULL reference.
+        current_app.logger.error("Payment success webhook without a reference")
+        return False
 
     # FIX: Lipana (like most webhook providers) delivers "at least once" —
     # the same event can arrive twice (retry after a slow 200, network
@@ -85,9 +94,13 @@ def _handle_payment_success(data: dict):
     # Use db.session.get() — not User.query.get() which is deprecated in SQLAlchemy 2.x
     user = db.session.get(User, subscription.user_id)
     if user:
-        user.plan = subscription.plan
+        from app.services.pricing import resolve_plan_change
+        new_plan, expires_at, kind = resolve_plan_change(user, subscription.plan, days)
+        user.plan = new_plan
         # plan_expires_at is DateTime(timezone=True); keep it aware here.
-        user.plan_expires_at = datetime.now(_tz.utc) + timedelta(days=days)
+        user.plan_expires_at = expires_at
+        subscription.end_date = expires_at  # so the receipt matches what the user got
+        current_app.logger.info(f"Plan change user={user.id} kind={kind} plan={new_plan}")
 
     payment = Payment.query.filter_by(
         lipana_checkout_request_id=reference
@@ -104,7 +117,13 @@ def _handle_payment_success(data: dict):
 
 def _handle_payment_failed(data: dict):
     reference = data.get("reference") or data.get("checkout_request_id")
+    if not reference:
+        return
     subscription = Subscription.query.filter_by(payment_reference=reference).first()
+    if subscription and subscription.status == "active":
+        # A late/duplicate FAILED must never undo a payment that already succeeded.
+        current_app.logger.warning(f"Ignoring FAILED for already-active subscription ref={reference}")
+        return
     if subscription:
         subscription.status = "failed"
         from app.services.pricing import release_redemption

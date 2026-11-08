@@ -93,7 +93,9 @@ class User(db.Model, UserMixin):
         Matches the download gate in routes/cv.py. Use this for upsell prompts.
         is_premium stays as-is because it gates Pro-only features.
         """
-        if self.plan not in ("basic", "pro", "premium"):
+        # Any non-free slug counts, so plans an admin creates later (e.g. a weekly
+        # pass) are treated as paid instead of silently failing the download gate.
+        if not self.plan or self.plan == "free":
             return False
         if not self.plan_expires_at:
             return False
@@ -223,6 +225,8 @@ class Resume(db.Model):
             "projects": self.projects,
             "references": self.references,
             "languages": self.languages,
+            "awards": self.awards,
+            "custom_sections": self.custom_sections,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
 

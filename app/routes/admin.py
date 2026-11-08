@@ -9,7 +9,9 @@ Includes:
   path as a real webhook, so state never drifts)
 - Broadcast email to filtered users with a two-step preview/confirm
 """
-from flask import Blueprint, render_template, request, flash, redirect, url_for, current_app, abort
+import re
+from datetime import timedelta
+from flask import Blueprint, render_template, request, flash, redirect, url_for, current_app, abort, jsonify
 from flask_login import login_required, current_user
 from functools import wraps
 from app.models import (db, User, Payment, Subscription, ActivityLog, AIUsage, Template,
@@ -79,10 +81,17 @@ def users():
 @login_required
 @admin_required
 def impersonate(user_id):
+    from flask import session
     from flask_login import login_user
     user = db.session.get(User, user_id)
     if not user:
         abort(404)
+    if user.id == current_user.id:
+        flash("You are already signed in as that user.", "info")
+        return redirect(url_for("admin.users"))
+    if not user.is_active:
+        flash("That account is deactivated, so it can't be impersonated.", "warning")
+        return redirect(url_for("admin.users"))
     # FIX: impersonation previously left no audit trail at all — no record
     # of which admin did it, or who they became. Log it before switching
     # sessions, while current_user is still the admin.
@@ -93,9 +102,39 @@ def impersonate(user_id):
         details={"admin_email": current_user.email, "target_email": user.email},
     ))
     db.session.commit()
+    admin_id = current_user.id
     login_user(user)
-    flash(f"Impersonating {user.email}.", "warning")
+    # Remember who to go back to. login_user() keeps the session, so this key
+    # survives the switch; stop_impersonation() reads and clears it.
+    session["impersonator_id"] = admin_id
+    flash(f"Impersonating {user.email}. Use 'Stop impersonating' in the banner to return.", "warning")
     return redirect(url_for("dashboard.index"))
+
+
+@admin_bp.route("/stop-impersonation", methods=["POST"])
+@login_required
+def stop_impersonation():
+    """Return to the admin who started impersonating. Deliberately NOT behind
+    admin_required: while impersonating, current_user is the target user."""
+    from flask import session
+    from flask_login import login_user
+    admin_id = session.pop("impersonator_id", None)
+    admin = db.session.get(User, admin_id) if admin_id else None
+    if not admin or not admin.is_admin or not admin.is_active:
+        flash("There is no impersonation to stop.", "info")
+        return redirect(url_for("dashboard.index"))
+
+    target_email = current_user.email
+    db.session.add(ActivityLog(
+        user_id=admin.id, action="admin_impersonate_stop",
+        resource_type="user", resource_id=current_user.id,
+        ip_address=request.remote_addr,
+        details={"admin_email": admin.email, "target_email": target_email},
+    ))
+    db.session.commit()
+    login_user(admin)
+    flash(f"Stopped impersonating {target_email}.", "success")
+    return redirect(url_for("admin.users"))
 
 
 @admin_bp.route("/users/<int:user_id>/toggle-active", methods=["POST"])
@@ -131,35 +170,108 @@ def pricing():
     return render_template("admin/pricing.html", plans=plans)
 
 
+PLAN_PERIODS = ("week", "month", "year", "forever")
+PLAN_SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{1,19}$")
+PROTECTED_SLUGS = {"free"}          # code treats this slug specially
+
+
+def _int_field(form, name, default, lo, hi, label, errors):
+    raw = (form.get(name) or "").strip()
+    if raw == "":
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        errors.append(f"{label} must be a whole number.")
+        return default
+    if not lo <= value <= hi:
+        errors.append(f"{label} must be between {lo} and {hi}.")
+        return default
+    return value
+
+
+def _plan_in_use(slug: str) -> bool:
+    """True if anything refers to this slug: subscriptions, users or offers."""
+    if Subscription.query.filter_by(plan=slug).first() or User.query.filter_by(plan=slug).first():
+        return True
+    return any(slug in (o.plan_slugs or []) for o in Offer.query.all())
+
+
+def _plan_form_values(form, existing=None):
+    """Validate the pricing form. Returns (data, errors); nothing is written."""
+    errors = []
+    name = (form.get("name") or "").strip()
+    if not name:
+        errors.append("Plan name is required.")
+    elif len(name) > 50:
+        errors.append("Plan name must be 50 characters or fewer.")
+
+    slug = (form.get("slug") or "").strip().lower()
+    if existing is not None and slug != existing.slug and _plan_in_use(existing.slug):
+        # Subscriptions, users and offers store the slug as text, so renaming a
+        # plan that has been used would orphan them.
+        errors.append(f"The slug '{existing.slug}' is already used by subscriptions, users or "
+                      "offers and can't be renamed. Create a new plan and deactivate this one instead.")
+        slug = existing.slug
+    elif existing is not None and existing.slug in PROTECTED_SLUGS and slug != existing.slug:
+        errors.append(f"The '{existing.slug}' slug can't be changed.")
+        slug = existing.slug
+    elif not PLAN_SLUG_RE.match(slug):
+        errors.append("Slug must be 2-20 characters: lowercase letters, numbers, '-' or '_'.")
+    else:
+        clash = PricingPlan.query.filter_by(slug=slug).first()
+        if clash and (existing is None or clash.id != existing.id):
+            errors.append(f"A plan with the slug '{slug}' already exists.")
+
+    price = _int_field(form, "price_kes", 0, 0, 1_000_000, "Price", errors)
+    period = form.get("billing_period") or "month"
+    if period not in PLAN_PERIODS:
+        errors.append("Choose a valid billing period.")
+        period = "month"
+    if price > 0 and period == "forever":
+        errors.append("A paid plan needs a weekly, monthly or yearly period, not 'Free (no payment)'.")
+    if price == 0 and period != "forever" and slug != "free":
+        errors.append("A plan with price 0 should use the 'Free (no payment)' period.")
+
+    data = dict(
+        slug=slug, name=name, price_kes=price, billing_period=period,
+        is_active=bool(form.get("is_active")), is_popular=bool(form.get("is_popular")),
+        sort_order=_int_field(form, "sort_order", 0, -1000, 1000, "Sort order", errors),
+        features=[f.strip()[:200] for f in (form.get("features") or "").splitlines() if f.strip()][:30],
+        daily_cv_limit=_int_field(form, "daily_cv_limit", 3, 0, 100000, "Daily CV limit", errors),
+        daily_cover_letter_limit=_int_field(form, "daily_cover_letter_limit", 3, 0, 100000,
+                                            "Daily cover letter limit", errors),
+        daily_ats_limit=_int_field(form, "daily_ats_limit", 5, 0, 100000, "Daily ATS limit", errors),
+        allow_docx=bool(form.get("allow_docx")),
+        allow_version_history=bool(form.get("allow_version_history")),
+        allow_career_coach=bool(form.get("allow_career_coach")),
+        allow_public_link=bool(form.get("allow_public_link")),
+    )
+    return data, errors
+
+
+def _render_plan_form(plan, data):
+    """Re-show the form with what the admin typed, so a validation error doesn't wipe it."""
+    from types import SimpleNamespace
+    return render_template("admin/pricing_form.html", plan=plan, draft=SimpleNamespace(**data)), 400
+
+
 @admin_bp.route("/pricing/new", methods=["GET", "POST"])
 @login_required
 @admin_required
 def pricing_new():
     if request.method == "POST":
-        features_raw = request.form.get("features", "")
-        features_list = [f.strip() for f in features_raw.splitlines() if f.strip()]
-        plan = PricingPlan(
-            slug=request.form.get("slug", "").lower().strip(),
-            name=request.form.get("name", "").strip(),
-            price_kes=int(request.form.get("price_kes", 0)),
-            billing_period=request.form.get("billing_period", "month") if request.form.get("billing_period") in ("week", "month", "year", "forever") else "month",
-            is_active=bool(request.form.get("is_active")),
-            is_popular=bool(request.form.get("is_popular")),
-            sort_order=int(request.form.get("sort_order", 0)),
-            features=features_list,
-            daily_cv_limit=int(request.form.get("daily_cv_limit", 3)),
-            daily_cover_letter_limit=int(request.form.get("daily_cover_letter_limit", 3)),
-            daily_ats_limit=int(request.form.get("daily_ats_limit", 5)),
-            allow_docx=bool(request.form.get("allow_docx")),
-            allow_version_history=bool(request.form.get("allow_version_history")),
-            allow_career_coach=bool(request.form.get("allow_career_coach")),
-            allow_public_link=bool(request.form.get("allow_public_link")),
-        )
+        data, errors = _plan_form_values(request.form)
+        if errors:
+            for e in errors:
+                flash(e, "error")
+            return _render_plan_form(None, data)
+        plan = PricingPlan(**data)
         db.session.add(plan)
         db.session.commit()
         flash(f"Plan '{plan.name}' created.", "success")
         return redirect(url_for("admin.pricing"))
-    return render_template("admin/pricing_form.html", plan=None)
+    return render_template("admin/pricing_form.html", plan=None, draft=None)
 
 
 @admin_bp.route("/pricing/<int:plan_id>/edit", methods=["GET", "POST"])
@@ -171,28 +283,18 @@ def pricing_edit(plan_id):
         abort(404)
 
     if request.method == "POST":
-        features_raw = request.form.get("features", "")
-        features_list = [f.strip() for f in features_raw.splitlines() if f.strip()]
-        plan.slug = request.form.get("slug", plan.slug).lower().strip()
-        plan.name = request.form.get("name", plan.name).strip()
-        plan.price_kes = int(request.form.get("price_kes", plan.price_kes))
-        plan.billing_period = request.form.get("billing_period", plan.billing_period)
-        plan.is_active = bool(request.form.get("is_active"))
-        plan.is_popular = bool(request.form.get("is_popular"))
-        plan.sort_order = int(request.form.get("sort_order", plan.sort_order))
-        plan.features = features_list
-        plan.daily_cv_limit = int(request.form.get("daily_cv_limit", plan.daily_cv_limit))
-        plan.daily_cover_letter_limit = int(request.form.get("daily_cover_letter_limit", plan.daily_cover_letter_limit))
-        plan.daily_ats_limit = int(request.form.get("daily_ats_limit", plan.daily_ats_limit))
-        plan.allow_docx = bool(request.form.get("allow_docx"))
-        plan.allow_version_history = bool(request.form.get("allow_version_history"))
-        plan.allow_career_coach = bool(request.form.get("allow_career_coach"))
-        plan.allow_public_link = bool(request.form.get("allow_public_link"))
+        data, errors = _plan_form_values(request.form, existing=plan)
+        if errors:
+            for e in errors:
+                flash(e, "error")
+            return _render_plan_form(plan, data)
+        for key, value in data.items():
+            setattr(plan, key, value)
         db.session.commit()
         flash(f"Plan '{plan.name}' updated.", "success")
         return redirect(url_for("admin.pricing"))
 
-    return render_template("admin/pricing_form.html", plan=plan)
+    return render_template("admin/pricing_form.html", plan=plan, draft=None)
 
 
 @admin_bp.route("/pricing/<int:plan_id>/delete", methods=["POST"])
@@ -202,9 +304,19 @@ def pricing_delete(plan_id):
     plan = db.session.get(PricingPlan, plan_id)
     if not plan:
         abort(404)
-    db.session.delete(plan)
-    db.session.commit()
-    flash("Plan deleted.", "info")
+    if plan.slug in PROTECTED_SLUGS:
+        flash(f"The '{plan.slug}' plan can't be deleted.", "error")
+    elif _plan_in_use(plan.slug):
+        # Deleting would leave paying users and past payments pointing at a plan
+        # that no longer exists. Hiding it keeps history intact.
+        plan.is_active = False
+        db.session.commit()
+        flash(f"'{plan.name}' has subscribers or payment history, so it was deactivated "
+              "instead of deleted. It no longer appears to customers.", "warning")
+    else:
+        db.session.delete(plan)
+        db.session.commit()
+        flash("Plan deleted.", "info")
     return redirect(url_for("admin.pricing"))
 
 
@@ -750,6 +862,106 @@ def claim_reject(claim_id):
 
 # ── Broadcast email to users ─────────────────────────────────────
 
+# ── Broadcast sending (background) ────────────────────────────────
+
+BROADCAST_STALE_AFTER = timedelta(minutes=30)
+BROADCAST_PROGRESS_EVERY = 10
+
+
+def _broadcast_state(row):
+    """('sending'|'done'|'interrupted', total) for a BroadcastEmail row, derived
+    from its activity-log markers."""
+    started = (ActivityLog.query
+               .filter_by(action="admin_broadcast_started", resource_type="broadcast_email",
+                          resource_id=row.id).first())
+    finished = (ActivityLog.query
+                .filter_by(action="admin_broadcast", resource_type="broadcast_email",
+                           resource_id=row.id).first())
+    total = (started.details or {}).get("total") if started else None
+    if finished or not started:
+        return "done", total
+    age = utcnow() - _naive(started.created_at)
+    return ("interrupted" if age > BROADCAST_STALE_AFTER else "sending"), total
+
+
+def _naive(dt):
+    return dt.replace(tzinfo=None) if dt is not None and dt.tzinfo else dt
+
+
+def _recent_broadcasts():
+    return BroadcastEmail.query.order_by(BroadcastEmail.created_at.desc()).limit(20).all()
+
+
+def _broadcast_in_progress() -> bool:
+    cutoff = utcnow() - BROADCAST_STALE_AFTER
+    recent = (ActivityLog.query
+              .filter(ActivityLog.action == "admin_broadcast_started",
+                      ActivityLog.created_at >= cutoff).all())
+    for entry in recent:
+        done = (ActivityLog.query
+                .filter_by(action="admin_broadcast", resource_type="broadcast_email",
+                           resource_id=entry.resource_id).first())
+        if not done:
+            return True
+    return False
+
+
+def _run_broadcast(app, row_id, user_ids, subject, body, admin_id, audience):
+    """Send to every user over ONE SMTP connection, saving progress as it goes.
+    Runs in a background thread so the admin's request returns immediately
+    instead of timing out on a long list."""
+    from flask_mail import Mail
+    from app.services.email_service import send_broadcast_email
+
+    with app.app_context():
+        sent = failed = 0
+        row = db.session.get(BroadcastEmail, row_id)
+        try:
+            configured = bool(app.config.get("MAIL_USERNAME"))
+            conn_cm = Mail(app).connect() if configured else None
+            conn = conn_cm.__enter__() if conn_cm else None
+            try:
+                for n, uid in enumerate(user_ids, 1):
+                    user = db.session.get(User, uid)
+                    try:
+                        ok = bool(user) and send_broadcast_email(user, subject, body, conn=conn)
+                    except Exception as e:
+                        app.logger.warning(f"Broadcast failed for user {uid}: {e}")
+                        ok = False
+                    sent += 1 if ok else 0
+                    failed += 0 if ok else 1
+                    if n % BROADCAST_PROGRESS_EVERY == 0:
+                        row.recipient_count, row.failed_count = sent, failed
+                        db.session.commit()
+            finally:
+                if conn_cm:
+                    conn_cm.__exit__(None, None, None)
+        except Exception as e:           # SMTP connect failure etc.
+            app.logger.error(f"Broadcast {row_id} aborted: {e}")
+            failed = len(user_ids) - sent
+        finally:
+            row.recipient_count, row.failed_count = sent, failed
+            db.session.add(ActivityLog(
+                user_id=admin_id, action="admin_broadcast",
+                resource_type="broadcast_email", resource_id=row_id,
+                details={"audience": audience, "sent": sent, "failed": failed},
+            ))
+            db.session.commit()
+            db.session.remove()
+
+
+@admin_bp.route("/broadcast/<int:row_id>/status")
+@login_required
+@admin_required
+def broadcast_status(row_id):
+    row = db.session.get(BroadcastEmail, row_id)
+    if not row:
+        abort(404)
+    state, total = _broadcast_state(row)
+    return jsonify({"state": state, "total": total, "sent": row.recipient_count or 0,
+                    "failed": row.failed_count or 0})
+
+
 @admin_bp.route("/broadcast", methods=["GET", "POST"])
 @login_required
 @admin_required
@@ -775,7 +987,7 @@ def broadcast():
         if audience == "free":
             q = q.filter(User.plan == "free")
         elif audience == "paid":
-            q = q.filter(User.plan.in_(["basic", "pro", "premium"]))
+            q = q.filter(User.plan != "free", User.plan_expires_at > utcnow())
         elif audience == "verified":
             q = q.filter(User.is_verified.is_(True))
         elif audience == "newsletter":
@@ -787,56 +999,57 @@ def broadcast():
         recipients = q.order_by(User.created_at.asc()).all()
 
         if preview_only:
+            recent_rows = _recent_broadcasts()
+            _recent_states = {b.id: _broadcast_state(b) for b in recent_rows}
             return render_template("admin/broadcast.html",
-                                   recent=BroadcastEmail.query
-                                            .order_by(BroadcastEmail.created_at.desc())
-                                            .limit(20).all(),
+                                   recent=recent_rows, states=_recent_states,
                                    preview_subject=subject,
                                    preview_body=body,
                                    preview_count=len(recipients),
                                    subject=subject, body=body, audience=audience)
 
-        from app.services.email_service import send_broadcast_email
+        if _broadcast_in_progress():
+            flash("Another broadcast is still sending. Wait for it to finish first.", "warning")
+            return redirect(url_for("admin.broadcast"))
+        if not recipients:
+            flash("No users match that audience.", "warning")
+            return redirect(url_for("admin.broadcast"))
 
         row = BroadcastEmail(
             subject=subject, body=body, audience=audience,
-            sent_by=current_user.id,
+            sent_by=current_user.id, recipient_count=0, failed_count=0,
         )
         db.session.add(row)
         db.session.flush()
-
-        sent = 0
-        failed = 0
-        for user in recipients:
-            try:
-                ok = send_broadcast_email(user, subject, body)
-                if ok:
-                    sent += 1
-                else:
-                    failed += 1
-            except Exception as e:
-                current_app.logger.warning(f"Broadcast failed for user {user.id}: {e}")
-                failed += 1
-
-        row.recipient_count = sent
-        row.failed_count = failed
+        # "Started" marker. Progress lives in the existing recipient_count and
+        # failed_count columns; this row records the total and the start time,
+        # and the "finished" row below closes it. No new columns needed.
         db.session.add(ActivityLog(
-            user_id=current_user.id, action="admin_broadcast",
+            user_id=current_user.id, action="admin_broadcast_started",
             resource_type="broadcast_email", resource_id=row.id,
             ip_address=request.remote_addr,
-            details={"audience": audience, "sent": sent, "failed": failed},
+            details={"audience": audience, "total": len(recipients)},
         ))
         db.session.commit()
 
-        msg = f"Broadcast sent to {sent} user(s)."
-        if failed:
-            msg += f" {failed} failed — check logs."
-        flash(msg, "success" if not failed else "warning")
+        recipient_ids = [u.id for u in recipients]
+        app_obj = current_app._get_current_object()
+        if app_obj.config.get("BROADCAST_SYNC"):       # tests
+            _run_broadcast(app_obj, row.id, recipient_ids, subject, body, current_user.id, audience)
+        else:
+            import threading
+            threading.Thread(
+                target=_run_broadcast,
+                args=(app_obj, row.id, recipient_ids, subject, body, current_user.id, audience),
+                daemon=True, name=f"broadcast-{row.id}",
+            ).start()
+
+        flash(f"Broadcast started for {len(recipient_ids)} user(s). Progress shows below; "
+              "you can leave this page.", "success")
         return redirect(url_for("admin.broadcast"))
 
+    recent = _recent_broadcasts()
     return render_template("admin/broadcast.html",
-                           recent=BroadcastEmail.query
-                                    .order_by(BroadcastEmail.created_at.desc())
-                                    .limit(20).all(),
+                           recent=recent, states={b.id: _broadcast_state(b) for b in recent},
                            preview_subject=None, preview_body=None,
                            preview_count=None, subject="", body="", audience="all")

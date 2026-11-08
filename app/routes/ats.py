@@ -133,6 +133,17 @@ def check():
     resume = None
     if resume_id:
         resume = Resume.query.filter_by(id=resume_id, user_id=current_user.id).first()
+    # Only ever store an id the user owns; a foreign id used to be saved on the
+    # report and then rendered back on /ats/report/<id>.
+    resume_id = resume.id if resume else None
+
+    if not resume and not job_description.strip():
+        msg = "Choose one of your CVs, or paste a job description, to run a check."
+        if request.is_json:
+            return jsonify({"error": msg}), 400
+        flash(msg, "warning")
+        return redirect(url_for("ats.index"))
+    job_description = job_description[:8000]
 
     try:
         ai = get_ai_service()
@@ -200,7 +211,7 @@ def check_upload():
         flash(msg, "error")
         return redirect(url_for("ats.index"))
 
-    job_description = _get_job_description_from_request()  # optional, may be ""
+    job_description = _get_job_description_from_request()[:8000]  # optional, may be ""
 
     filename = secure_filename(file.filename)
     ext = filename.rsplit(".", 1)[1].lower()
@@ -273,7 +284,8 @@ def check_upload():
 @login_required
 def report(report_id):
     report = ATSReport.query.filter_by(id=report_id, user_id=current_user.id).first_or_404()
-    resume = db.session.get(Resume, report.resume_id) if report.resume_id else None
+    resume = (Resume.query.filter_by(id=report.resume_id, user_id=current_user.id).first()
+              if report.resume_id else None)
     report_data = {
         "ats_score": report.score,
         "grade": report.grade,

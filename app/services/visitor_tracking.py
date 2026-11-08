@@ -15,6 +15,7 @@ pruning) and consider batching writes or moving to a real analytics
 service instead.
 """
 import hashlib
+from urllib.parse import urlparse
 from flask import request, session, current_app
 from app.models import db, PageVisit
 
@@ -22,8 +23,30 @@ from app.models import db, PageVisit
 # noise, webhooks (external services, not visitors), and API polling.
 SKIP_PREFIXES = ("/static/", "/webhooks/", "/api/", "/favicon.ico")
 
+# Paths whose last segment is a secret (reset / verify tokens, public CV links).
+# The token is stored as "<redacted>" so the visits table never holds a working
+# account-takeover link.
+TOKEN_PREFIXES = ("/auth/reset-password/", "/auth/verify/", "/resume/")
+
+
+def _redact_path(path: str) -> str:
+    for prefix in TOKEN_PREFIXES:
+        if path.startswith(prefix):
+            return prefix + "<redacted>"
+    return path
+
 # How long to keep visit rows before pruning (see prune_old_visits below).
 KEEP_DAYS = 90
+
+
+def _clean_referrer(ref):
+    """Referrer with any secret token path swapped for a placeholder."""
+    if not ref:
+        return None
+    parsed = urlparse(ref)
+    if any(parsed.path.startswith(p) for p in TOKEN_PREFIXES):
+        return f"{parsed.scheme}://{parsed.netloc}{_redact_path(parsed.path)}"[:500]
+    return ref[:500]
 
 
 def _truncate_ip(ip: str) -> str:
@@ -80,11 +103,11 @@ def register_visitor_tracking(app):
 
             visit = PageVisit(
                 user_id=user_id,
-                path=path[:255],
+                path=_redact_path(path)[:255],
                 method=request.method,
                 ip_truncated=_truncate_ip(request.remote_addr or ""),
                 user_agent=(request.user_agent.string or "")[:300] if request.user_agent else None,
-                referrer=(request.referrer or "")[:500] if request.referrer else None,
+                referrer=_clean_referrer(request.referrer),
                 session_id=_get_session_id(),
             )
             db.session.add(visit)

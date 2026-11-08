@@ -296,6 +296,9 @@ class AIService:
         from app.services.section_intelligence import build_revamp_payload
 
         source = resume.to_dict()
+        # skill_groups live in custom_sections; _validate_revamp reads them from
+        # the top level, so without this a grouped-skills CV got a flat list back.
+        source["skill_groups"] = (source.get("custom_sections") or {}).get("skill_groups") or []
         # Only the fields the model needs. Keeps prompts small and avoids sending
         # internal ids, versions or other data the model has no reason to see.
         payload = build_revamp_payload(source)

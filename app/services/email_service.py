@@ -162,9 +162,10 @@ def _render_email(preheader, body_html, cta_label=None, cta_url=None, footer_not
 </html>"""
 
 
-def _send(subject, recipient, html, text=None):
+def _send(subject, recipient, html, text=None, conn=None):
+    """Send one message. Pass an open flask-mail connection (Mail.connect()) to
+    reuse one SMTP session for many messages, e.g. a broadcast."""
     from flask_mail import Mail, Message
-    mail = Mail(current_app)
     msg = Message(
         subject=subject,
         sender=current_app.config["MAIL_DEFAULT_SENDER"],
@@ -172,7 +173,10 @@ def _send(subject, recipient, html, text=None):
         body=text or _html_to_text(html),
         html=html,
     )
-    mail.send(msg)
+    if conn is not None:
+        conn.send(msg)
+    else:
+        Mail(current_app).send(msg)
 
 
 def send_verification_email(user, next_url=None):
@@ -341,7 +345,7 @@ def send_pro_nudge_email(user):
 
     content = {}
     try:
-        from app.services.ai_service import get_ai_service
+        from app.ai_service import get_ai_service
         content = get_ai_service().generate_nudge_email(user, user_id=user.id) or {}
     except Exception as e:
         current_app.logger.warning(
@@ -377,7 +381,7 @@ def _render_plain_body(user, body):
     return f'<p style="margin:0 0 16px;">Hi {_first_name(user)},</p>' + "".join(paragraphs)
 
 
-def send_broadcast_email(user, subject, body):
+def send_broadcast_email(user, subject, body, conn=None):
     """Plain-text announcement email. Returns True if handed to the
     mailer, False if mail isn't configured (so the admin broadcast
     route can report an accurate 'failed' count in dev)."""
@@ -391,7 +395,7 @@ def send_broadcast_email(user, subject, body):
         body_html=_render_plain_body(user, body),
         footer_note="You're receiving this because you have a CVForge AI account.",
     )
-    _send(subject, user.email, html)
+    _send(subject, user.email, html, conn=conn)
     return True
 
 

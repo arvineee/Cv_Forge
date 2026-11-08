@@ -151,6 +151,15 @@
 
     <!-- Page content -->
     <main class="flex-1 p-4 pb-28 lg:p-8 lg:pb-8 min-w-0">
+      {% if session.get('impersonator_id') %}
+      <div class="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        <span>You are viewing the site as <strong>{{ current_user.email }}</strong>. Changes you make are made on their account.</span>
+        <form method="POST" action="{{ url_for('admin.stop_impersonation') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="px-3 py-1.5 rounded-md bg-amber-600 text-white font-semibold hover:bg-amber-700">Stop impersonating</button>
+        </form>
+      </div>
+      {% endif %}
       {% if self.page_title() %}
       <div class="mb-6 flex items-center justify-between gap-4">
         <div>

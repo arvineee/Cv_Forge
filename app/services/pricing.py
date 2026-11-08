@@ -147,6 +147,60 @@ def banner_offer(now=None):
     return best
 
 
+# ── Plan changes: renew, upgrade, downgrade ───────────────────────
+#
+# One place decides what a successful payment does to a user's plan, so the
+# webhook, the status-poll reconcile and admin claim approval all agree.
+#
+#   same plan, still active   -> RENEW: new days are added after the current
+#                                expiry, so paying early never loses time.
+#   higher-priced plan        -> UPGRADE: switches now, full new period from today.
+#                                (Unused days on the old plan are not credited.)
+#   lower-priced plan         -> blocked at checkout (see purchase_blocker). If one
+#                                still gets paid, e.g. two checkouts in flight, the
+#                                user keeps the higher plan and the paid days are
+#                                added to it, so nobody loses money.
+
+def _plan_price(slug: str) -> int:
+    row = PricingPlan.query.filter_by(slug=slug).first()
+    return row.price_kes if row else 0
+
+
+def _active_paid_expiry(user):
+    """Aware expiry of the user's current paid plan, or None if free/expired."""
+    from app.models import _make_aware
+    if not user.plan or user.plan == "free" or not user.plan_expires_at:
+        return None
+    expiry = _make_aware(user.plan_expires_at)
+    return expiry if expiry > _now() else None
+
+
+def resolve_plan_change(user, new_slug: str, days: int, now=None):
+    """Return (plan_slug, expires_at, kind) for a paid purchase. kind is
+    'new', 'renewal', 'upgrade' or 'kept_higher'. Does not modify the user."""
+    now = now or _now()
+    expiry = _active_paid_expiry(user)
+    if expiry is None:
+        return new_slug, now + timedelta(days=days), "new"
+    if user.plan == new_slug:
+        return new_slug, expiry + timedelta(days=days), "renewal"
+    if _plan_price(new_slug) > _plan_price(user.plan):
+        return new_slug, now + timedelta(days=days), "upgrade"
+    return user.plan, expiry + timedelta(days=days), "kept_higher"
+
+
+def purchase_blocker(user, plan: PricingPlan):
+    """Message explaining why this purchase should not go ahead, or None."""
+    expiry = _active_paid_expiry(user)
+    if expiry is None or user.plan == plan.slug:
+        return None
+    if plan.price_kes < _plan_price(user.plan):
+        until = expiry.astimezone(EAT).strftime("%d %b %Y")
+        return (f"Your {user.plan.title()} plan is active until {until}, so you can't buy a "
+                f"cheaper plan now. Renew {user.plan.title()} or upgrade instead.")
+    return None
+
+
 # ── Redemption bookkeeping (called from billing and webhooks) ────
 
 def reserve_redemption(offer: Offer, subscription, user_id: int, base: int, charged: int):

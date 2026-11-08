@@ -179,6 +179,7 @@ def login():
         _log_activity(user.id, "login", {"method": "email"})
         db.session.commit()
 
+        session.pop("impersonator_id", None)
         login_user(user, remember=remember)
         return redirect(next_url or url_for("dashboard.index"))
 
@@ -191,6 +192,7 @@ def logout():
     _log_activity(current_user.id, "logout")
     db.session.commit()
     logout_user()
+    session.pop("impersonator_id", None)
     flash("You've been logged out.", "info")
     return redirect(url_for("main.index"))
 
@@ -284,7 +286,12 @@ def reset_password(token):
     if not user or not user.reset_token_expires:
         flash("Invalid or expired reset link.", "error")
         return redirect(url_for("auth.forgot_password"))
-    if user.reset_token_expires < datetime.now(timezone.utc):
+    # The DB hands back naive datetimes (SQLite/MySQL); comparing one with an
+    # aware "now" raised TypeError, so every reset link returned a 500.
+    expires = user.reset_token_expires
+    if expires.tzinfo is None:
+        expires = expires.replace(tzinfo=timezone.utc)
+    if expires < datetime.now(timezone.utc):
         flash("Reset link has expired. Please request a new one.", "error")
         return redirect(url_for("auth.forgot_password"))
 
@@ -300,6 +307,9 @@ def reset_password(token):
         user.set_password(password)
         user.reset_token = None
         user.reset_token_expires = None
+        # Following the emailed link proves control of the inbox.
+        user.is_verified = True
+        user.verification_token = None
         _log_activity(user.id, "password_reset")
         db.session.commit()
         flash("Password reset successfully. You can now log in.", "success")
@@ -360,13 +370,25 @@ def google_callback():
         return redirect(url_for("auth.login", **({"next": next_url} if next_url else {})))
 
     google_id = userinfo.get("sub")
-    email = userinfo.get("email", "").lower()
+    email = (userinfo.get("email") or "").lower()
+    if not google_id or not email or userinfo.get("email_verified") is False:
+        flash("Google did not return a verified email address for this account.", "error")
+        return redirect(url_for("auth.login", **({"next": next_url} if next_url else {})))
 
     user = User.query.filter_by(google_id=google_id).first()
     if not user:
         user = User.query.filter_by(email=email).first()
 
+    if user and not user.is_active:
+        flash("Your account has been deactivated. Please contact support.", "error")
+        return redirect(url_for("auth.login"))
+
     if user:
+        if not user.is_verified and user.password_hash:
+            # Someone registered this address with a password but never proved they
+            # own it. Drop that password so they cannot ride along on the real
+            # owner's Google sign-in.
+            user.password_hash = None
         if not user.google_id:
             user.google_id = google_id
             user.oauth_provider = "google"
@@ -387,6 +409,7 @@ def google_callback():
     user.last_login_at = datetime.now(timezone.utc)
     _log_activity(user.id, "login", {"method": "google"})
     db.session.commit()
+    session.pop("impersonator_id", None)
     login_user(user, remember=True)
     flash(f"Welcome, {user.first_name or user.email}!", "success")
     return redirect(next_url or url_for("dashboard.index"))

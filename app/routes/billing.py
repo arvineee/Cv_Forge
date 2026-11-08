@@ -13,7 +13,7 @@ from flask_login import login_required, current_user
 from app.models import (db, PricingPlan, Subscription, Payment,
                         ManualPaymentClaim, Notification)
 from app.services.pricing import (
-    annotate_plans, checkout_price, reserve_redemption, banner_offer,
+    annotate_plans, checkout_price, reserve_redemption, banner_offer, purchase_blocker,
 )
 
 billing_bp = Blueprint("billing", __name__)
@@ -90,6 +90,20 @@ def _reconcile_with_intasend(subscription, reference: str) -> None:
     elif state == "FAILED":
         _handle_payment_failed({"reference": reference, "checkout_request_id": reference,
                                 "failed_reason": invoice.get("failed_reason")})
+
+
+def _abandon_pending(reference: str) -> None:
+    """The provider never accepted this checkout: close it and free any offer seat."""
+    from app.services.pricing import release_redemption
+    sub = Subscription.query.filter_by(payment_reference=reference, status="pending").first()
+    if not sub:
+        return
+    sub.status = "failed"
+    release_redemption(sub.id)
+    payment = Payment.query.filter_by(lipana_checkout_request_id=reference).first()
+    if payment and payment.status == "pending":
+        payment.status = "failed"
+    db.session.commit()
 
 
 def _create_pending(plan, method, phone=None):
@@ -174,6 +188,11 @@ def subscribe(plan_slug):
         flash("You're already on the free plan.", "info")
         return redirect(url_for("billing.index"))
 
+    blocker = purchase_blocker(current_user, plan)
+    if blocker:
+        flash(blocker, "warning")
+        return redirect(url_for("billing.index"))
+
     phone = request.form.get("phone", "").strip()
     if not phone:
         flash("Phone number is required for M-Pesa payment.", "error")
@@ -196,9 +215,12 @@ def subscribe(plan_slug):
             flash("M-Pesa payment request sent! Check your phone.", "success")
             return redirect(url_for("billing.payment_pending", reference=reference))
         else:
+            _abandon_pending(reference)
             flash(f"Payment initiation failed: {resp.get('message', 'Unknown error')}", "error")
     except Exception as e:
         current_app.logger.error(f"IntaSend error: {e}")
+        db.session.rollback()
+        _abandon_pending(reference)
         flash("Payment service unavailable. Please try again.", "error")
 
     return redirect(url_for("billing.plans"))
@@ -216,6 +238,11 @@ def subscribe_card(plan_slug):
 
     if plan.price_kes == 0:
         flash("You're already on the free plan.", "info")
+        return redirect(url_for("billing.index"))
+
+    blocker = purchase_blocker(current_user, plan)
+    if blocker:
+        flash(blocker, "warning")
         return redirect(url_for("billing.index"))
 
     reference, charged, _base = _create_pending(plan, "card")
@@ -237,9 +264,12 @@ def subscribe_card(plan_slug):
             _remember_invoice(reference, _invoice_id_from(resp))
             return redirect(resp["checkout_url"])
         else:
+            _abandon_pending(reference)
             flash(f"Card payment could not be started: {resp.get('message', 'Unknown error')}", "error")
     except Exception as e:
         current_app.logger.error(f"IntaSend card checkout error: {e}")
+        db.session.rollback()
+        _abandon_pending(reference)
         flash("Card payment service unavailable. Please try again.", "error")
 
     return redirect(url_for("billing.plans"))

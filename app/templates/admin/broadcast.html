@@ -63,10 +63,14 @@
       <div class="flex justify-between items-start">
         <div>
           <p class="font-semibold text-gray-900">{{ b.subject }}</p>
-          <p class="text-xs text-gray-500">
-            To: {{ b.audience }} · {{ b.recipient_count }} sent
-            {% if b.failed_count %} · {{ b.failed_count }} failed{% endif %}
+          {% set st = states.get(b.id, ('done', None)) %}
+          <p class="text-xs text-gray-500" data-broadcast="{{ b.id }}" data-state="{{ st[0] }}">
+            To: {{ b.audience }} ·
+            <span data-sent>{{ b.recipient_count }}</span>{% if st[1] %} of {{ st[1] }}{% endif %} sent
+            {% if b.failed_count %} · <span data-failed>{{ b.failed_count }}</span> failed{% endif %}
             · {{ b.created_at.strftime('%d %b %Y %H:%M') }}
+            {% if st[0] == 'sending' %} · <span data-label class="font-semibold text-blue-600">sending…</span>
+            {% elif st[0] == 'interrupted' %} · <span class="font-semibold text-red-600">interrupted (server restarted); check the counts</span>{% endif %}
           </p>
         </div>
       </div>
@@ -77,4 +81,20 @@
   <div class="text-center py-8 text-gray-400 text-sm">No broadcasts yet.</div>
   {% endif %}
 </div>
+<script>
+  // Poll any broadcast that is still sending and refresh when it finishes.
+  (function () {
+    document.querySelectorAll('[data-broadcast][data-state="sending"]').forEach(function (el) {
+      var id = el.getAttribute('data-broadcast');
+      var timer = setInterval(function () {
+        fetch('{{ url_for("admin.broadcast") }}/' + id + '/status', {credentials: 'same-origin'})
+          .then(function (r) { return r.json(); })
+          .then(function (d) {
+            el.querySelector('[data-sent]').textContent = d.sent;
+            if (d.state !== 'sending') { clearInterval(timer); window.location.reload(); }
+          }).catch(function () {});
+      }, 4000);
+    });
+  })();
+</script>
 {% endblock %}

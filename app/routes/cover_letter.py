@@ -4,7 +4,8 @@ Fixed: BytesIO download (works under all WSGI servers), XSS-safe rendering,
 PDF download option added
 """
 import io
-from flask import (Blueprint, render_template, redirect, url_for, flash,
+import os
+from flask import (Blueprint, after_this_request, render_template, redirect, url_for, flash,
                    request, jsonify, current_app, send_file, abort)
 from flask_login import login_required, current_user
 
@@ -53,9 +54,9 @@ def new_letter():
             flash(err, "warning")
             return redirect(url_for("cover_letter.new_letter"))
 
-        job_title = request.form.get("job_title", "").strip()
-        company_name = request.form.get("company_name", "").strip()
-        job_description = request.form.get("job_description", "").strip()
+        job_title = request.form.get("job_title", "").strip()[:255]
+        company_name = request.form.get("company_name", "").strip()[:255]
+        job_description = request.form.get("job_description", "").strip()[:8000]
         tone = request.form.get("tone", "professional")
         resume_id = request.form.get("resume_id", type=int)
 
@@ -84,7 +85,7 @@ def new_letter():
 
         letter = CoverLetter(
             user_id=current_user.id,
-            resume_id=resume_id,
+            resume_id=resume.id if resume else None,  # never store someone else's id
             title=title[:255],
             job_title=job_title,
             company_name=company_name,
@@ -121,9 +122,9 @@ def edit_letter(letter_id):
         id=letter_id, user_id=current_user.id
     ).first_or_404()
     data = request.get_json(silent=True) or {}
-    if "content" in data:
-        letter.content = data["content"]
-    if "title" in data:
+    if isinstance(data.get("content"), str):
+        letter.content = data["content"][:20000]
+    if isinstance(data.get("title"), str):
         letter.title = data["title"][:255]
     db.session.commit()
     return jsonify({"success": True})
@@ -156,6 +157,15 @@ def download(letter_id, fmt):
             from app.services.pdf_service import PDFService
             file_path = PDFService().generate_cover_letter(letter)
             filename = f"cover_letter_{letter_id}.pdf"
+
+            @after_this_request
+            def _remove_tmp(response, _p=file_path):
+                try:
+                    os.remove(_p)
+                except OSError:
+                    pass
+                return response
+
             letter.download_count = (letter.download_count or 0) + 1
             db.session.commit()
             return send_file(
