@@ -26,6 +26,8 @@ seo_bp = Blueprint("seo", __name__)
 # taking the whole sitemap down with a 500.
 PUBLIC_PAGES = [
     ("main.index", "daily", "1.0"),
+    ("main.about", "monthly", "0.5"),
+    ("main.pricing", "weekly", "0.8"),
     ("auth.login", "monthly", "0.3"),
     ("auth.register", "monthly", "0.5"),
     ("billing.plans", "weekly", "0.8"),

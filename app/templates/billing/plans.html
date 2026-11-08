@@ -1,5 +1,6 @@
 {% extends "base.html" %}
-{% block title %}Pricing Plans{% endblock %}
+{% block title %}CVForge Plans — CV & Resume Builder{% endblock %}
+{% block meta_description %}Choose a CVForge plan. Pay in Kenyan shillings (KES) using M-Pesa in Kenya or supported international debit and credit cards through Paystack.{% endblock %}
 {% block body %}
 <div class="min-h-screen bg-gray-50 py-16 px-4">
   <div class="max-w-5xl mx-auto">
@@ -12,7 +13,7 @@
         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
           <path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
         </svg>
-        Secure payments via M-Pesa or Card · Cancel anytime · No auto-renewal
+        Kenya: M-Pesa · International: debit and credit cards via Paystack · Prices in KES · No auto-renewal
       </div>
     </div>
 
@@ -88,7 +89,7 @@
           </button>
           <div x-show="open" x-cloak @click.away="open=false"
                class="absolute bottom-full mb-2 left-0 right-0 bg-white rounded-xl border border-gray-200 shadow-xl p-4 z-10">
-            <p class="font-semibold text-sm text-gray-900 mb-3">Pay with M-Pesa</p>
+            <p class="font-semibold text-sm text-gray-900 mb-3">M-Pesa (Kenya)</p>
             <form method="POST" action="{{ url_for('billing.subscribe', plan_slug=plan.slug) }}">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
               <label class="block text-xs font-medium text-gray-700 mb-1">M-Pesa Phone Number</label>
@@ -125,7 +126,7 @@
                   <rect x="2" y="5" width="20" height="14" rx="2"/>
                   <path d="M2 10h20"/>
                 </svg>
-                Pay with Card (Paystack)
+                International debit or credit card (Paystack)
               </button>
             </form>
           </div>
@@ -146,7 +147,7 @@
       <h2 class="text-lg font-bold text-gray-900 text-center mb-6">Common questions</h2>
       <div class="space-y-3">
         {% for q, a in [
-          ('How does payment work?', 'Click Subscribe and choose M-Pesa or Card. With M-Pesa, enter your Safaricom number and confirm the STK push on your phone. With Card, you\'ll be taken to a secure checkout page. Either way, your plan activates within seconds of payment.'),
+          ('How can I pay?', 'Customers in Kenya can choose M-Pesa and approve the payment prompt on their phone. Customers outside Kenya can use supported debit or credit cards through Paystack’s secure hosted checkout. Prices are shown in Kenyan shillings (KES); multi-currency checkout is not currently available.'),
           ('Will my plan renew automatically?', 'No. Each plan lasts for the period shown on its card and does not renew automatically.'),
           ('What does the AI Career Coach do?', 'On plans that include it, you get a direct, line-by-line review of your CV — what\'s weak, what\'s missing, and exactly how to fix it, not just a generic checklist.'),
         ] %}
@@ -162,7 +163,7 @@
     </div>
 
     <p class="text-center text-xs text-gray-400 mt-8">
-      M-Pesa via IntaSend · Secure online card checkout via Paystack.
+      Kenya: M-Pesa via IntaSend · International card payments: Paystack · All listed prices are in KES.
     </p>
   </div>
 </div>

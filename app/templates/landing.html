@@ -1,6 +1,6 @@
 {% extends "base.html" %}
-{% block title %}CVForge AI — Professional CV Builder for African Professionals{% endblock %}
-{% block meta_description %}Build an ATS-optimized CV in minutes with AI. Designed for African job seekers. Pay with M-Pesa.{% endblock %}
+{% block title %}CVForge AI — Online CV & ATS-Friendly Resume Builder{% endblock %}
+{% block meta_description %}Build a professional CV or ATS-friendly resume online. Improve your experience, match job descriptions, create cover letters, and download polished PDF or Word files.{% endblock %}
 
 {% block body %}
 <style>
@@ -176,18 +176,18 @@
 <section style="background: linear-gradient(180deg, #F4F7FA 0%, #FFFFFF 100%); overflow: hidden;">
   <div class="wrap grid lg:grid-cols-[1.05fr_1fr] gap-12 items-center" style="padding-top: 64px; padding-bottom: 80px;">
     <div>
-      <p class="eyebrow">AI CV builder for African professionals</p>
+      <p class="eyebrow">Online CV & resume builder for every career</p>
       <h1 style="font-weight: 800; font-size: clamp(2.4rem, 5.6vw, 4.1rem); line-height: 1.05;">
-        Say what you did.<br/><span class="underline-accent">We'll make it sound like it mattered.</span>
+        Build a CV That Gets You Noticed,<br/><span class="underline-accent">Wherever You Want to Work.</span>
       </h1>
       <p style="font-size: 19px; line-height: 1.6; color: var(--ink-2); max-width: 30em; margin-top: 24px;">
-        CVForge turns your work history into a clean, recruiter-ready CV, checks it against the job you're applying for, and lets you pay with M-Pesa.
+        Create a professional CV or resume, improve existing content with AI, compare your experience with a job description, and prepare a tailored cover letter. Build for the roles and markets you want to reach.
       </p>
       <div class="flex flex-col sm:flex-row gap-3" style="margin-top: 36px;">
         <a href="{{ url_for('auth.register') }}" class="btn btn-primary">Build my CV free</a>
         <a href="{{ url_for('templates_gallery.index') }}" class="btn btn-ghost">Browse templates</a>
       </div>
-      <p style="margin-top: 16px; font-size: 14px; color: var(--ink-2);">Build and preview free. Choose a plan for export or more tools; pay by M-Pesa or card when you're ready.</p>
+      <p style="margin-top: 16px; font-size: 14px; color: var(--ink-2);">Build and preview for free. Choose a plan when you need premium tools or downloads. Kenyan customers can pay with M-Pesa; international customers can pay securely by debit or credit card through Paystack.</p>
     </div>
 
     <!-- Real template previews -->
@@ -203,8 +203,8 @@
 <section class="trust" aria-label="Highlights">
   <ul class="wrap grid grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-4" style="padding-top: 22px; padding-bottom: 22px; list-style: none; margin: 0 auto;">
     <li><svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none" style="flex:none;"><circle cx="10" cy="10" r="10" fill="#FDEBD0"/><path d="M5.5 10.5l3 3 6-6.5" stroke="#0B3D6B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>ATS-friendly layouts</li>
-    <li><svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none" style="flex:none;"><circle cx="10" cy="10" r="10" fill="#FDEBD0"/><path d="M5.5 10.5l3 3 6-6.5" stroke="#0B3D6B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>PDF export, with Word on eligible paid plans</li>
-    <li><svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none" style="flex:none;"><circle cx="10" cy="10" r="10" fill="#FDEBD0"/><path d="M5.5 10.5l3 3 6-6.5" stroke="#0B3D6B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pay with M-Pesa</li>
+    <li><svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none" style="flex:none;"><circle cx="10" cy="10" r="10" fill="#FDEBD0"/><path d="M5.5 10.5l3 3 6-6.5" stroke="#0B3D6B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>PDF and Word downloads on eligible plans</li>
+    <li><svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none" style="flex:none;"><circle cx="10" cy="10" r="10" fill="#FDEBD0"/><path d="M5.5 10.5l3 3 6-6.5" stroke="#0B3D6B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>M-Pesa in Kenya · Cards worldwide</li>
     <li><svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none" style="flex:none;"><circle cx="10" cy="10" r="10" fill="#FDEBD0"/><path d="M5.5 10.5l3 3 6-6.5" stroke="#0B3D6B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Built in Kenya</li>
   </ul>
 </section>
@@ -419,10 +419,13 @@
     <div style="border-top: 1px solid var(--line);">
       {% for q, a in [
         ('Do I need to pay to try it?', 'No. You can create an account and build a CV on the free plan. Paid plans unlock more of the AI tools.'),
-        ('How does M-Pesa payment work?', 'Choose a plan, enter your Safaricom number and approve the STK push on your phone. That is the whole process.'),
+        ('Which payment methods are available?', 'Customers in Kenya can pay using M-Pesa. Customers internationally can pay by supported debit or credit card through Paystack. Prices are currently displayed and charged in Kenyan shillings (KES); multi-currency checkout is not currently offered.'),
         ('Can I use a CV I already have?', 'Yes. Upload a PDF or DOCX and CVForge reads it so you can edit and improve it instead of starting over.'),
-        ('Will my CV pass screening software?', 'No tool can promise that, but CVForge uses clean, single-column layouts and shows how your wording matches the job posting, so you can fix gaps before you apply.'),
+        ('Can CVForge help with applicant tracking systems (ATS)?', 'CVForge offers ATS-friendly layouts, CV improvement tools and job-description matching to help you make your experience clearer and more relevant. No tool can guarantee that an employer’s screening system will select your application.'),
         ('Which file formats can I download?', 'PDF for sending to employers and DOCX if you want to keep editing in Word.'),
+        ('Can I improve a CV I already have?', 'Yes. Upload an existing PDF or DOCX to review, edit and improve your content without starting from a blank page.'),
+        ('Does CVForge support different countries and job markets?', 'CVForge is designed for job seekers worldwide. You can tailor your CV or resume to the role and job description you are applying for. Choose the terminology and details appropriate to your target market.'),
+        ('Can I create a cover letter?', 'Yes. Use the cover letter tools to prepare a professional letter that supports your application and can be tailored to a specific opportunity.'),
       ] %}
       <details style="border-bottom: 1px solid var(--line);">
         <summary class="flex items-center justify-between gap-4" style="min-height: 64px; font-weight: 600; font-size: 18px; padding: 12px 0; color: var(--navy);">
@@ -451,7 +454,7 @@
   <div class="wrap grid md:grid-cols-4 gap-10">
     <div>
       <img src="{{ url_for('static', filename='logo-full.png') }}" alt="CVForge — Building your professional future" width="170" height="67" style="height: 67px; width: auto;" loading="lazy"/>
-      <p style="font-size: 15px; line-height: 1.6; margin-top: 14px; max-width: 18em;">An AI CV builder for African professionals. Pay with M-Pesa.</p>
+      <p style="font-size: 15px; line-height: 1.6; margin-top: 14px; max-width: 18em;">An Online CV & resume builder for every career. Pay with M-Pesa.</p>
     </div>
     <div>
       <p style="color: var(--navy); font-weight: 600; margin-bottom: 12px;">Product</p>

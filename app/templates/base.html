@@ -5,10 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 
   <!-- ── Core SEO ─────────────────────────────────────────────── -->
-  <title>{% block title %}CVForge AI — Build a Job-Winning CV in Minutes{% endblock %}</title>
-  <meta name="description" content="{% block meta_description %}Build an ATS-optimized, professional CV with AI in minutes. Free templates, instant PDF & Word download, trusted by African job seekers.{% endblock %}"/>
+  <title>{% block title %}CVForge AI — Online CV Builder & ATS-Friendly Resume Creator{% endblock %}</title>
+  <meta name="description" content="{% block meta_description %}Create a professional CV or resume online with AI assistance. Improve your CV, match job descriptions, generate cover letters and download PDF or Word documents.{% endblock %}"/>
   <meta name="robots" content="{% block robots %}index, follow, max-image-preview:large, max-snippet:-1{% endblock %}"/>
   <meta name="author" content="CVForge AI"/>
+  <meta name="keywords" content="Online CV Builder, ATS-Friendly Resume Builder, Professional Resume Builder, CV Builder Online, Resume Creator, Cover Letter Generator, AI CV Builder, Resume Optimisation Tool, CV Writing Tool"/>
   <link rel="canonical" href="{% block canonical %}{{ request.url_root.rstrip('/') }}{{ request.path }}{% endblock %}"/>
   <meta name="theme-color" content="#1e40af"/>
   <meta name="google-site-verification" content="PTBfBlpvOOpZEUnjCPpjUN4pGJ6JABkbeH8BmkXlAno" />
@@ -29,6 +30,7 @@
   <meta property="og:type" content="{% block og_type %}website{% endblock %}"/>
   <meta property="og:site_name" content="CVForge AI"/>
   <meta property="og:locale" content="en_US"/>
+  <meta property="og:locale:alternate" content="en_GB"/>
   <meta property="og:url" content="{{ share_url }}"/>
   <meta property="og:title" content="{{ share_title|trim }}"/>
   <meta property="og:description" content="{{ share_description|trim }}"/>
@@ -51,10 +53,15 @@
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
-    "@type": "Organization",
-    "name": "CVForge AI",
+    "@type": ["Organization", "SoftwareApplication"],
+    "name": "CVForge",
+    "applicationCategory": "BusinessApplication",
+    "operatingSystem": "Web",
+    "description": "Online CV and resume builder with ATS-friendly templates, CV improvement, job-description matching and cover letter tools.",
     "url": "{{ request.url_root }}",
     "logo": "{{ url_for('static', filename='logo.png', _external=True) }}",
+    "areaServed": "Worldwide",
+    "availableLanguage": "English",
     "sameAs": []
   }
   </script>
