@@ -275,6 +275,89 @@ def subscribe_card(plan_slug):
     return redirect(url_for("billing.plans"))
 
 
+@billing_bp.route("/subscribe-paystack/<plan_slug>", methods=["POST"])
+@login_required
+def subscribe_paystack(plan_slug):
+    """Start a Paystack hosted checkout using the server-resolved plan price."""
+    plan = PricingPlan.query.filter_by(slug=plan_slug, is_active=True).first_or_404()
+
+    if plan.price_kes <= 0:
+        flash("The free plan does not require payment.", "info")
+        return redirect(url_for("billing.index"))
+
+    blocker = purchase_blocker(current_user, plan)
+    if blocker:
+        flash(blocker, "warning")
+        return redirect(url_for("billing.index"))
+
+    reference, charged, _base = _create_pending(plan, "paystack")
+    try:
+        from app.services.paystack_service import PaystackService
+        service = PaystackService()
+        result = service.initialize(
+            email=current_user.email,
+            amount_kes=charged,
+            reference=reference,
+            callback_url=url_for("billing.paystack_callback", _external=True),
+            metadata={
+                "user_id": current_user.id,
+                "subscription_reference": reference,
+                "plan": plan.slug,
+                "custom_fields": [
+                    {"display_name": "Plan", "variable_name": "plan", "value": plan.name},
+                    {"display_name": "CVForge Reference", "variable_name": "cvforge_reference", "value": reference},
+                ],
+            },
+        )
+        # Keep the checkout URL and Paystack reference for support/audit.
+        payment = Payment.query.filter_by(lipana_checkout_request_id=reference).first()
+        if payment:
+            payment.raw_webhook = {
+                "provider": "paystack",
+                "checkout_url": result.get("authorization_url"),
+                "access_code": result.get("access_code"),
+            }
+            db.session.commit()
+        return redirect(result["authorization_url"])
+    except Exception as exc:
+        current_app.logger.exception("Paystack checkout initialization failed for %s", reference)
+        db.session.rollback()
+        _abandon_pending(reference)
+        flash("Paystack checkout could not be started. Please try again or use M-Pesa.", "error")
+        return redirect(url_for("billing.plans"))
+
+
+@billing_bp.route("/paystack/callback")
+@login_required
+def paystack_callback():
+    """Verify the return from Paystack; the redirect itself is never proof of payment."""
+    reference = (request.args.get("reference") or "").strip()
+    if not reference:
+        flash("We could not identify that payment. Please check your payment history.", "error")
+        return redirect(url_for("billing.index"))
+
+    subscription = Subscription.query.filter_by(
+        payment_reference=reference, user_id=current_user.id
+    ).first()
+    if not subscription:
+        flash("That payment reference does not belong to your account.", "error")
+        return redirect(url_for("billing.index"))
+
+    from app.routes.webhooks import confirm_paystack_payment
+    try:
+        confirmed = confirm_paystack_payment(reference)
+    except Exception:
+        current_app.logger.exception("Paystack callback verification failed for %s", reference)
+        confirmed = False
+
+    if confirmed:
+        flash("Payment confirmed. Your CVForge plan is now active.", "success")
+        return redirect(url_for("billing.success"))
+
+    flash("Payment is not confirmed yet. If you completed checkout, allow a moment for confirmation.", "info")
+    return redirect(url_for("billing.payment_pending", reference=reference))
+
+
 @billing_bp.route("/pending/<reference>")
 @login_required
 def payment_pending(reference):
@@ -301,7 +384,38 @@ def payment_status(reference):
 
     status = subscription.status
     if status == "pending":
-        _reconcile_with_intasend(subscription, reference)
+        payment = Payment.query.filter_by(lipana_checkout_request_id=reference).first()
+        if payment and payment.payment_method == "paystack":
+            created = subscription.created_at
+            if created.tzinfo is None:
+                created = created.replace(tzinfo=timezone.utc)
+            raw = payment.raw_webhook if isinstance(payment.raw_webhook, dict) else {}
+            last_checked = raw.get("paystack_last_checked_at")
+            try:
+                last_checked_at = datetime.fromisoformat(last_checked) if last_checked else None
+                if last_checked_at and last_checked_at.tzinfo is None:
+                    last_checked_at = last_checked_at.replace(tzinfo=timezone.utc)
+            except (TypeError, ValueError):
+                last_checked_at = None
+            now = datetime.now(timezone.utc)
+            due = (now - created).total_seconds() >= RECONCILE_AFTER_SECONDS
+            due = due and (not last_checked_at or (now - last_checked_at).total_seconds() >= 60)
+            if due:
+                try:
+                    from app.routes.webhooks import confirm_paystack_payment
+                    confirm_paystack_payment(reference)
+                except Exception:
+                    current_app.logger.exception("Paystack status reconciliation failed for %s", reference)
+                # Throttle verification polling if the provider still reports pending.
+                db.session.refresh(payment)
+                latest_raw = payment.raw_webhook if isinstance(payment.raw_webhook, dict) else {}
+                if payment.status == "pending":
+                    latest_raw["paystack_last_checked_at"] = now.isoformat()
+                    payment.raw_webhook = latest_raw
+                    db.session.commit()
+        else:
+            _reconcile_with_intasend(subscription, reference)
+        db.session.refresh(subscription)
         status = subscription.status
     if status == "pending":
         created = subscription.created_at

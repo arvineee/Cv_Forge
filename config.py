@@ -62,6 +62,12 @@ class Config:
     # authenticated (not HMAC).
     INTASEND_WEBHOOK_CHALLENGE = os.environ.get("INTASEND_WEBHOOK_CHALLENGE", "")
 
+    # Paystack hosted checkout (KES). Keep secret values in the deployment environment.
+    PAYSTACK_SECRET_KEY = os.environ.get("PAYSTACK_SECRET_KEY", "")
+    PAYSTACK_PUBLIC_KEY = os.environ.get("PAYSTACK_PUBLIC_KEY", "")
+    PAYSTACK_WEBHOOK_SECRET = os.environ.get("PAYSTACK_WEBHOOK_SECRET", "")
+    PAYSTACK_BASE_URL = os.environ.get("PAYSTACK_BASE_URL", "https://api.paystack.co")
+
     # Uploads — absolute path so PythonAnywhere can find it
     UPLOAD_FOLDER = os.environ.get(
         "UPLOAD_FOLDER",

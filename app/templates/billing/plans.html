@@ -102,9 +102,20 @@
 
             <div class="flex items-center gap-3 my-4">
               <div class="flex-1 h-px bg-gray-100"></div>
-              <span class="text-xs text-gray-400 font-medium">OR</span>
+              <span class="text-xs text-gray-400 font-medium">OR PAY ONLINE</span>
               <div class="flex-1 h-px bg-gray-100"></div>
             </div>
+
+            <form method="POST" action="{{ url_for('billing.subscribe_paystack', plan_slug=plan.slug) }}" class="mb-2">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+              <button type="submit"
+                      class="w-full py-2.5 bg-purple-700 text-white font-semibold rounded-lg text-sm hover:bg-purple-800 transition flex items-center justify-center gap-2">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5v-9Zm4.1 2.1v4.8l4.9 2.45v-4.8L7.1 9.6Zm9.8 0L12 12.05v4.8l4.9-2.45V9.6Z"/>
+                </svg>
+                Pay securely with Paystack
+              </button>
+            </form>
 
             <form method="POST" action="{{ url_for('billing.subscribe_card', plan_slug=plan.slug) }}">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
@@ -114,7 +125,7 @@
                   <rect x="2" y="5" width="20" height="14" rx="2"/>
                   <path d="M2 10h20"/>
                 </svg>
-                Pay with Card
+                Pay with Card (IntaSend)
               </button>
             </form>
           </div>
@@ -151,7 +162,7 @@
     </div>
 
     <p class="text-center text-xs text-gray-400 mt-8">
-      Secure payments via M-Pesa or Card, powered by IntaSend.
+      M-Pesa via IntaSend · Secure online checkout via Paystack and IntaSend.
     </p>
   </div>
 </div>

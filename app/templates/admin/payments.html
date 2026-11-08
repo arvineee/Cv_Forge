@@ -13,6 +13,7 @@
           <th class="px-4 py-3 text-left">User</th>
           <th class="px-4 py-3 text-left">Plan</th>
           <th class="px-4 py-3 text-left">Amount</th>
+          <th class="px-4 py-3 text-left">Gateway</th>
           <th class="px-4 py-3 text-left">Status</th>
           <th class="px-4 py-3 text-left">Transaction ID</th>
         </tr>
@@ -29,6 +30,7 @@
             {{ p.subscription.plan if p.subscription else '—' }}
           </td>
           <td class="px-4 py-3 font-semibold">KES {{ p.amount }}</td>
+          <td class="px-4 py-3 text-gray-600 capitalize">{{ p.payment_method or '—' }}</td>
           <td class="px-4 py-3">
             <span class="px-2 py-0.5 rounded-full text-xs font-semibold
               {% if p.status == 'success' %}bg-green-100 text-green-700
@@ -43,7 +45,7 @@
         </tr>
         {% else %}
         <tr>
-          <td colspan="6" class="px-4 py-12 text-center text-gray-400">No payments yet.</td>
+          <td colspan="7" class="px-4 py-12 text-center text-gray-400">No payments yet.</td>
         </tr>
         {% endfor %}
       </tbody>
