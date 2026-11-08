@@ -1,5 +1,6 @@
 {% extends "base.html" %}
-{% block title %}About CVForge AI{% endblock %}
+{% block title %}About CVForge: CV & Resume Builder for Job Seekers Worldwide{% endblock %}
+{% block meta_description %}CVForge is a professional CV and resume builder built in Kenya for job seekers worldwide. Learn what we build, how the AI works and what we believe.{% endblock %}
 {% block body %}
 <nav class="sticky top-0 z-50 bg-white/90 backdrop-blur-sm border-b border-gray-100">
   <div class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
@@ -20,21 +21,26 @@
   <div class="max-w-3xl mx-auto">
     <h1 class="text-4xl font-black text-gray-900 mb-6">Our Mission</h1>
     <p class="text-lg text-gray-600 leading-relaxed mb-6">
-      CVForge was built in Kenya with a simple conviction: people everywhere deserve clear, professional tools to present their experience. Talented candidates can be overlooked when their CV or resume does not communicate their strengths clearly or align with a role’s requirements.
+      CVForge AI was built with a simple conviction: good people lose opportunities not because of their skills,
+      but because their CV or resume is hard to read, badly organised, or filtered out by applicant tracking
+      software before a person ever sees it.
     </p>
     <p class="text-lg text-gray-600 leading-relaxed mb-6">
-      We built CVForge to help job seekers worldwide create, improve and tailor CVs and resumes. Whether you are applying locally or exploring opportunities in another country, you can shape your application around your experience and the role you want.
+      CVForge is built in Kenya, and we build for job seekers wherever they are, from graduates writing a first CV to
+      experienced professionals changing country or career. CVForge helps you create a professional CV or resume,
+      improve an existing one, match it to a job description and write a tailored cover letter.
     </p>
     <p class="text-lg text-gray-600 leading-relaxed mb-12">
-      No design skills needed. Create and refine your document with guided tools and professional templates. Kenyan customers can pay with M-Pesa, while supported international debit and credit cards are available through Paystack.
+      No design skills needed. Choose a template, add your details, and download a clean PDF or Word file.
+      You can pay by debit or credit card through Paystack, or by M-Pesa if you are in Kenya.
     </p>
 
     <h2 class="text-2xl font-bold text-gray-900 mb-6">What we believe</h2>
     <div class="space-y-5 mb-16">
       {% for title, desc in [
-        ('Your opportunity shouldn\'t depend on who you know.', 'A great CV levels the playing field. We make it easy for anyone to create one.'),
-        ('AI should work for you, not against you.', 'Most ATS systems reject good candidates on technicalities. We help you beat those systems.'),
-        ('Price shouldn\'t be a barrier.', 'Our free plan is genuinely useful. Pro plans start at KES 799 — less than a bowl of ugali and nyama choma.'),
+        ('Your opportunity shouldn\'t depend on who you know.', 'A clear, well-written CV helps your experience speak for itself. We make it easy for anyone to create one.'),
+        ('AI should work for you, not against you.', 'Screening software can overlook good candidates on technicalities. We show you where your wording and the job description differ so you can fix it. We never invent experience for you.'),
+        ('Pricing should be clear.', 'You can build and preview for free, see current prices before you pay, and plans never renew automatically. Prices are in Kenyan shillings (KES).'),
       ] %}
       <div class="flex gap-4">
         <div class="w-1.5 h-1.5 rounded-full bg-blue-500 mt-3 flex-shrink-0"></div>
@@ -48,7 +54,7 @@
 
     <div class="bg-gray-50 rounded-2xl p-8 border border-gray-100 text-center">
       <p class="text-2xl font-black text-gray-900 mb-2">Ready to build your best CV?</p>
-      <p class="text-gray-500 mb-6">Free to start. No credit card required.</p>
+      <p class="text-gray-500 mb-6">Free to start. No credit card required to create an account.</p>
       <a href="{{ url_for('auth.register') }}"
          class="inline-block px-8 py-3 gradient-brand text-white font-bold rounded-xl hover:opacity-90 transition">
         Get Started Free →
@@ -58,7 +64,10 @@
 </section>
 
 <footer class="bg-gray-900 text-gray-400 py-8 px-4 text-center text-sm">
-  © 2025 CVForge AI · Built in Kenya 🇰🇪 ·
-  <a href="{{ url_for('main.index') }}" class="hover:text-white transition">Home</a>
+  © 2026 CVForge AI · Built in Kenya, for job seekers worldwide ·
+  <a href="{{ url_for('main.index') }}" class="hover:text-white transition">Home</a> ·
+  <a href="{{ url_for('main.pricing') }}" class="hover:text-white transition">Pricing</a> ·
+  <a href="{{ url_for('main.privacy') }}" class="hover:text-white transition">Privacy</a> ·
+  <a href="{{ url_for('main.terms') }}" class="hover:text-white transition">Terms</a>
 </footer>
 {% endblock %}

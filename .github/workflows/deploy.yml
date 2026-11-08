@@ -1,0 +1,46 @@
+name: Test and deploy to PythonAnywhere
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+      - run: pip install -r requirements-dev.txt
+      - name: Run tests
+        env:
+          SECRET_KEY: ci-test-secret
+          DATABASE_URL: sqlite://
+          SESSION_COOKIE_SECURE: "false"
+        run: python -m pytest -q
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install requests
+      - name: Upload files and reload web app
+        env:
+          PA_USERNAME: ${{ secrets.PA_USERNAME }}
+          PA_API_TOKEN: ${{ secrets.PA_API_TOKEN }}
+          PA_PROJECT_DIR: ${{ vars.PA_PROJECT_DIR }}
+          PA_DOMAIN: ${{ vars.PA_DOMAIN }}
+          PA_HOST: ${{ vars.PA_HOST }}
+        run: python scripts/pa_deploy.py

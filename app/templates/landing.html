@@ -1,6 +1,11 @@
 {% extends "base.html" %}
-{% block title %}CVForge AI — Online CV & ATS-Friendly Resume Builder{% endblock %}
-{% block meta_description %}Build a professional CV or ATS-friendly resume online. Improve your experience, match job descriptions, create cover letters, and download polished PDF or Word files.{% endblock %}
+{% block title %}CVForge: Online CV Builder & ATS-Friendly Resume Maker{% endblock %}
+{% block meta_description %}Build a professional, ATS-friendly CV or resume online. Improve an existing CV, match it to a job description, write a cover letter and download PDF or Word.{% endblock %}
+{% block structured_data %}
+<script type="application/ld+json">
+{{ jsonld|tojson }}
+</script>
+{% endblock %}
 
 {% block body %}
 <style>
@@ -176,18 +181,23 @@
 <section style="background: linear-gradient(180deg, #F4F7FA 0%, #FFFFFF 100%); overflow: hidden;">
   <div class="wrap grid lg:grid-cols-[1.05fr_1fr] gap-12 items-center" style="padding-top: 64px; padding-bottom: 80px;">
     <div>
-      <p class="eyebrow">Online CV & resume builder for every career</p>
-      <h1 style="font-weight: 800; font-size: clamp(2.4rem, 5.6vw, 4.1rem); line-height: 1.05;">
-        Build a CV That Gets You Noticed,<br/><span class="underline-accent">Wherever You Want to Work.</span>
+      <p class="eyebrow">Online CV &amp; resume builder</p>
+      <h1 style="font-weight: 800; font-size: clamp(2.3rem, 5.2vw, 3.8rem); line-height: 1.07;">
+        Build a CV That Gets You Noticed, <span class="underline-accent">Wherever You Want to Work.</span>
       </h1>
-      <p style="font-size: 19px; line-height: 1.6; color: var(--ink-2); max-width: 30em; margin-top: 24px;">
-        Create a professional CV or resume, improve existing content with AI, compare your experience with a job description, and prepare a tailored cover letter. Build for the roles and markets you want to reach.
+      <p style="font-size: 19px; line-height: 1.6; color: var(--ink-2); max-width: 31em; margin-top: 24px;">
+        Create a professional, ATS-friendly CV or resume, improve the one you already have, match it to a job description and write a tailored cover letter. Download it as a PDF or Word file.
       </p>
-      <div class="flex flex-col sm:flex-row gap-3" style="margin-top: 36px;">
+      <ul style="margin-top: 20px; display: grid; gap: 8px; padding: 0; list-style: none; font-size: 16px; color: var(--ink);">
+        {% for item in ['Professional CV and resume creation', 'ATS-friendly optimisation and rewriting', 'Job description matching and cover letters'] %}
+        <li class="flex items-start gap-3"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none" style="flex:none; margin-top: 2px;"><circle cx="10" cy="10" r="10" fill="#FDEBD0"/><path d="M5.5 10.5l3 3 6-6.5" stroke="#0B3D6B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>{{ item }}</span></li>
+        {% endfor %}
+      </ul>
+      <div class="flex flex-col sm:flex-row gap-3" style="margin-top: 32px;">
         <a href="{{ url_for('auth.register') }}" class="btn btn-primary">Build my CV free</a>
         <a href="{{ url_for('templates_gallery.index') }}" class="btn btn-ghost">Browse templates</a>
       </div>
-      <p style="margin-top: 16px; font-size: 14px; color: var(--ink-2);">Build and preview for free. Choose a plan when you need premium tools or downloads. Kenyan customers can pay with M-Pesa; international customers can pay securely by debit or credit card through Paystack.</p>
+      <p style="margin-top: 16px; font-size: 14px; color: var(--ink-2);">Build and preview free. Choose a plan when you want to download. Pay by debit or credit card (Paystack), or M-Pesa in Kenya.</p>
     </div>
 
     <!-- Real template previews -->
@@ -202,10 +212,10 @@
 <!-- TRUST STRIP -->
 <section class="trust" aria-label="Highlights">
   <ul class="wrap grid grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-4" style="padding-top: 22px; padding-bottom: 22px; list-style: none; margin: 0 auto;">
-    <li><svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none" style="flex:none;"><circle cx="10" cy="10" r="10" fill="#FDEBD0"/><path d="M5.5 10.5l3 3 6-6.5" stroke="#0B3D6B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>ATS-friendly layouts</li>
-    <li><svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none" style="flex:none;"><circle cx="10" cy="10" r="10" fill="#FDEBD0"/><path d="M5.5 10.5l3 3 6-6.5" stroke="#0B3D6B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>PDF and Word downloads on eligible plans</li>
-    <li><svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none" style="flex:none;"><circle cx="10" cy="10" r="10" fill="#FDEBD0"/><path d="M5.5 10.5l3 3 6-6.5" stroke="#0B3D6B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>M-Pesa in Kenya · Cards worldwide</li>
-    <li><svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none" style="flex:none;"><circle cx="10" cy="10" r="10" fill="#FDEBD0"/><path d="M5.5 10.5l3 3 6-6.5" stroke="#0B3D6B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Built in Kenya</li>
+    <li><svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none" style="flex:none;"><circle cx="10" cy="10" r="10" fill="#FDEBD0"/><path d="M5.5 10.5l3 3 6-6.5" stroke="#0B3D6B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>ATS-friendly CV &amp; resume layouts</li>
+    <li><svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none" style="flex:none;"><circle cx="10" cy="10" r="10" fill="#FDEBD0"/><path d="M5.5 10.5l3 3 6-6.5" stroke="#0B3D6B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>PDF and Word (DOCX) downloads</li>
+    <li><svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none" style="flex:none;"><circle cx="10" cy="10" r="10" fill="#FDEBD0"/><path d="M5.5 10.5l3 3 6-6.5" stroke="#0B3D6B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Secure card payments via Paystack</li>
+    <li><svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none" style="flex:none;"><circle cx="10" cy="10" r="10" fill="#FDEBD0"/><path d="M5.5 10.5l3 3 6-6.5" stroke="#0B3D6B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>M-Pesa available in Kenya</li>
   </ul>
 </section>
 
@@ -216,7 +226,7 @@
       <p class="eyebrow">The difference</p>
       <h2 style="font-weight: 800; font-size: clamp(2rem, 4vw, 3rem); line-height: 1.08;">Same experience, written to be read</h2>
       <p style="font-size: 18px; line-height: 1.65; color: var(--ink-2); margin-top: 20px; max-width: 30em;">
-        Most CVs undersell good work. CVForge keeps your facts and rewrites them with the scope, numbers and results a recruiter looks for.
+        Many CVs and resumes undersell good work. CVForge keeps your facts and rewrites them with the scope, numbers and results a recruiter looks for. Where a number is missing, it leaves a placeholder for you to fill in rather than inventing one.
       </p>
     </div>
 
@@ -231,8 +241,8 @@
 
       <div class="sheet" style="padding: 28px;">
         <div style="border-bottom: 1px solid var(--line); padding-bottom: 16px; margin-bottom: 18px;">
-          <p class="display" style="font-weight: 800; font-size: 24px;">Amina W. Otieno</p>
-          <p style="color: var(--ink-2); font-size: 15px;">Sales Supervisor · Nairobi</p>
+          <p class="display" style="font-weight: 800; font-size: 24px;">Alex M. Morgan</p>
+          <p style="color: var(--ink-2); font-size: 15px;">Sales Supervisor · Manchester</p>
         </div>
         <p style="font-weight: 700; font-size: 14px; margin-bottom: 10px; color: var(--navy);">Experience</p>
         <div style="min-height: 132px;" aria-live="polite">
@@ -254,10 +264,10 @@
 <section style="background: var(--mist); padding: 96px 0;">
   <div class="wrap grid lg:grid-cols-2 gap-14 items-center">
     <div>
-      <p class="eyebrow">ATS check</p>
-      <h2 style="font-weight: 800; font-size: clamp(2rem, 4vw, 3rem); line-height: 1.08;">Know how your CV scores before the recruiter does</h2>
+      <p class="eyebrow">ATS check &amp; job matching</p>
+      <h2 style="font-weight: 800; font-size: clamp(2rem, 4vw, 3rem); line-height: 1.08;">Know how your CV scores against the job before you apply</h2>
       <p style="font-size: 18px; line-height: 1.65; color: var(--ink-2); margin-top: 20px; max-width: 30em;">
-        Many employers filter applications with screening software. Paste the job posting and CVForge shows which keywords you already cover, which you're missing, and what to change.
+        Many employers filter applications with applicant tracking software. Paste the job description and CVForge shows which keywords you already cover, which you're missing, and what to change. The score is a guide, not a guarantee.
       </p>
       <a href="{{ url_for('auth.register') }}" class="btn btn-ghost" style="margin-top: 28px;">Check my CV</a>
     </div>
@@ -318,32 +328,23 @@
 <!-- FEATURES -->
 <section style="background: var(--mist); padding: 96px 0;">
   <div class="wrap">
-    <p class="eyebrow">Features</p>
-      <h2 style="font-weight: 800; font-size: clamp(2rem, 4vw, 3rem); line-height: 1.08; max-width: 14em;">Everything between "I need a job" and "Application sent"</h2>
+    <p class="eyebrow">What you can do</p>
+    <h2 style="font-weight: 800; font-size: clamp(2rem, 4vw, 3rem); line-height: 1.08; max-width: 15em;">Everything between &ldquo;I need a new job&rdquo; and &ldquo;Application sent&rdquo;</h2>
 
-    <div class="grid md:grid-cols-6 gap-5" style="margin-top: 48px;">
-      <div class="feature md:col-span-3">
-        <h3 style="font-weight: 800; font-size: 24px; margin-top: 8px;">AI that writes like a professional</h3>
-        <p style="font-size: 16px; line-height: 1.6; margin-top: 12px; color: var(--ink-2);">
-          Paste your work history in plain words. Get back bullet points that open with strong verbs and carry real numbers.
-        </p>
+    <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-5" style="margin-top: 48px;">
+      {% for title, desc in [
+        ('Professional CV and resume creation', 'A guided builder walks you through your details, experience, education and skills. Choose from 20 templates and switch any time without retyping.'),
+        ('ATS-friendly optimisation', 'Clean layouts and clear section headings help screening software read your document. The ATS checker shows what to fix.'),
+        ('Resume improvement and rewriting', 'Upload a PDF or DOCX, or paste your work history. The AI rewrites weak bullets using only the facts you give it.'),
+        ('Job description matching', 'Paste a job posting to see which keywords you cover, which are missing and how to adjust your wording.'),
+        ('Professional cover letters', 'Generate a letter written for one specific role and company, then edit it before you send it.'),
+        ('PDF and Word downloads', 'Download a clean PDF to send to employers. Word (DOCX) files are included on eligible plans if you want to keep editing.'),
+      ] %}
+      <div class="feature">
+        <h3 style="font-weight: 800; font-size: 21px; margin-top: 8px;">{{ title }}</h3>
+        <p style="font-size: 16px; line-height: 1.6; margin-top: 12px; color: var(--ink-2);">{{ desc }}</p>
       </div>
-      <div class="feature md:col-span-3">
-        <h3 style="font-weight: 800; font-size: 24px; margin-top: 8px;">Cover letters in seconds</h3>
-        <p style="font-size: 16px; line-height: 1.6; margin-top: 12px; color: var(--ink-2);">Written for one specific job, not a template with the name swapped.</p>
-      </div>
-      <div class="feature md:col-span-2">
-        <h3 style="font-weight: 800; font-size: 22px; margin-top: 8px;">12+ templates</h3>
-        <p style="font-size: 16px; line-height: 1.6; margin-top: 12px; color: var(--ink-2);">Layouts for tech, finance, creative and clinical roles. Switch any time without retyping.</p>
-      </div>
-      <div class="feature md:col-span-2">
-        <h3 style="font-weight: 800; font-size: 22px; margin-top: 8px;">PDF and Word</h3>
-        <p style="font-size: 16px; line-height: 1.6; margin-top: 12px; color: var(--ink-2);">PDF to send, DOCX when you want to keep editing.</p>
-      </div>
-      <div class="feature md:col-span-2">
-        <h3 style="font-weight: 800; font-size: 22px; margin-top: 8px;">Pay with M-Pesa</h3>
-        <p style="font-size: 16px; line-height: 1.6; margin-top: 12px; color: var(--ink-2);">Approve an STK push on your phone. No card, no long forms.</p>
-      </div>
+      {% endfor %}
     </div>
   </div>
 </section>
@@ -352,12 +353,12 @@
 <section id="how" style="padding: 96px 0;">
   <div class="wrap">
     <p class="eyebrow">How it works</p>
-      <h2 style="font-weight: 800; font-size: clamp(2rem, 4vw, 3rem); line-height: 1.08;">From blank page to download in three steps</h2>
+      <h2 style="font-weight: 800; font-size: clamp(2rem, 4vw, 3rem); line-height: 1.08;">From blank page to finished CV in three steps</h2>
     <ol class="grid md:grid-cols-3 gap-10" style="margin-top: 52px; list-style: none; padding: 0;">
       {% for num, title, desc in [
         ('1', 'Add your details', 'Fill in the guided builder, or start from what you already have.'),
-        ('2', 'Let the AI edit', 'It rewrites your content, compares it to the job posting and flags what a screener would miss.'),
-        ('3', 'Preview, then export', 'Build and preview free. Unlock a clean PDF, with Word on eligible plans.'),
+        ('2', 'Improve and match', 'The AI rewrites your content, compares it with the job description and flags keywords a screener could miss.'),
+        ('3', 'Preview, then download', 'Build and preview free. Choose a plan to download a clean PDF, with Word (DOCX) on eligible plans.'),
       ] %}
       <li>
         <span class="display" style="display: grid; place-items: center; width: 52px; height: 52px; border-radius: 50%; background: var(--navy); color: #fff; font-weight: 800; font-size: 22px;">{{ num }}</span>
@@ -375,7 +376,7 @@
     <div style="max-width: 36em;">
       <p class="eyebrow">Pricing</p>
       <h2 style="font-weight: 800; font-size: clamp(2rem, 4vw, 3rem); line-height: 1.08;">Start free. Pay only if you need more.</h2>
-      <p style="font-size: 18px; color: var(--ink-2); margin-top: 16px;">Pay by M-Pesa or card for the period shown. Plans do not renew automatically.</p>
+      <p style="font-size: 18px; color: var(--ink-2); margin-top: 16px;">Pay by debit or credit card through Paystack, or by M-Pesa in Kenya, for the period shown. Prices are in Kenyan shillings (KES). Plans do not renew automatically.</p>
     </div>
 
     <div class="plans" style="margin-top: 48px;">
@@ -407,6 +408,8 @@
       {% endfor %}
     </div>
 
+    <div style="margin-top: 32px;">{% include "_payment_methods.html" %}</div>
+
     <p style="margin-top: 28px;"><a href="{{ url_for('main.pricing') }}" class="underline" style="font-weight: 600; color: var(--navy);">Compare every feature</a></p>
   </div>
 </section>
@@ -414,19 +417,12 @@
 <!-- FAQ -->
 <section style="padding: 96px 0;">
   <div class="wrap grid lg:grid-cols-[1fr_1.4fr] gap-14">
-    <p class="eyebrow">FAQ</p>
+    <div>
+      <p class="eyebrow">FAQ</p>
       <h2 style="font-weight: 800; font-size: clamp(2rem, 4vw, 3rem); line-height: 1.08;">Questions before you start</h2>
+    </div>
     <div style="border-top: 1px solid var(--line);">
-      {% for q, a in [
-        ('Do I need to pay to try it?', 'No. You can create an account and build a CV on the free plan. Paid plans unlock more of the AI tools.'),
-        ('Which payment methods are available?', 'Customers in Kenya can pay using M-Pesa. Customers internationally can pay by supported debit or credit card through Paystack. Prices are currently displayed and charged in Kenyan shillings (KES); multi-currency checkout is not currently offered.'),
-        ('Can I use a CV I already have?', 'Yes. Upload a PDF or DOCX and CVForge reads it so you can edit and improve it instead of starting over.'),
-        ('Can CVForge help with applicant tracking systems (ATS)?', 'CVForge offers ATS-friendly layouts, CV improvement tools and job-description matching to help you make your experience clearer and more relevant. No tool can guarantee that an employer’s screening system will select your application.'),
-        ('Which file formats can I download?', 'PDF for sending to employers and DOCX if you want to keep editing in Word.'),
-        ('Can I improve a CV I already have?', 'Yes. Upload an existing PDF or DOCX to review, edit and improve your content without starting from a blank page.'),
-        ('Does CVForge support different countries and job markets?', 'CVForge is designed for job seekers worldwide. You can tailor your CV or resume to the role and job description you are applying for. Choose the terminology and details appropriate to your target market.'),
-        ('Can I create a cover letter?', 'Yes. Use the cover letter tools to prepare a professional letter that supports your application and can be tailored to a specific opportunity.'),
-      ] %}
+      {% for q, a in faqs %}
       <details style="border-bottom: 1px solid var(--line);">
         <summary class="flex items-center justify-between gap-4" style="min-height: 64px; font-weight: 600; font-size: 18px; padding: 12px 0; color: var(--navy);">
           {{ q }}
@@ -443,6 +439,7 @@
 <section style="background: var(--navy); color: #fff; padding: 88px 0;">
   <div class="wrap" style="text-align: left;">
     <h2 style="font-weight: 800; font-size: clamp(2.2rem, 5vw, 3.4rem); line-height: 1.06; max-width: 14em; color: #fff;">The closing date won't move. Your CV can be ready today.</h2>
+    <p style="margin-top: 16px; font-size: 18px; color: #D6E4F2; max-width: 32em;">Create your account, build and preview your CV for free, and choose a plan only when you are ready to download.</p>
     <a href="{{ url_for('auth.register') }}" class="btn btn-accent" style="margin-top: 32px;">Build my CV free</a>
   </div>
 </section>
@@ -454,7 +451,7 @@
   <div class="wrap grid md:grid-cols-4 gap-10">
     <div>
       <img src="{{ url_for('static', filename='logo-full.png') }}" alt="CVForge — Building your professional future" width="170" height="67" style="height: 67px; width: auto;" loading="lazy"/>
-      <p style="font-size: 15px; line-height: 1.6; margin-top: 14px; max-width: 18em;">An Online CV & resume builder for every career. Pay with M-Pesa.</p>
+      <p style="font-size: 15px; line-height: 1.6; margin-top: 14px; max-width: 18em;">A professional CV and resume builder for job seekers worldwide. Cards via Paystack; M-Pesa in Kenya.</p>
     </div>
     <div>
       <p style="color: var(--navy); font-weight: 600; margin-bottom: 12px;">Product</p>
@@ -462,12 +459,15 @@
         <li><a href="{{ url_for('templates_gallery.index') }}" class="hover:underline">Templates</a></li>
         <li><a href="{{ url_for('main.pricing') }}" class="hover:underline">Pricing</a></li>
         <li><a href="{{ url_for('guide.index') }}" class="hover:underline">User Guide</a></li>
+        <li><a href="{{ url_for('support.index') }}" class="hover:underline">Support</a></li>
       </ul>
     </div>
     <div>
       <p style="color: var(--navy); font-weight: 600; margin-bottom: 12px;">Company</p>
       <ul style="display: grid; gap: 8px; font-size: 15px; padding: 0; list-style: none;">
         <li><a href="{{ url_for('main.about') }}" class="hover:underline">About</a></li>
+        <li><a href="{{ url_for('main.privacy') }}" class="hover:underline">Privacy Policy</a></li>
+        <li><a href="{{ url_for('main.terms') }}" class="hover:underline">Terms of Service</a></li>
       </ul>
     </div>
     <div>
@@ -479,7 +479,7 @@
     </div>
   </div>
   <div class="wrap" style="margin-top: 40px; padding-top: 24px; border-top: 1px solid var(--line); font-size: 14px;">
-    &copy; 2026 CVForge AI. Built in Kenya.
+    &copy; 2026 CVForge AI. Built in Kenya, for job seekers worldwide.
   </div>
 </footer>
 

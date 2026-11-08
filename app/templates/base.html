@@ -5,12 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 
   <!-- ── Core SEO ─────────────────────────────────────────────── -->
-  <title>{% block title %}CVForge AI — Online CV Builder & ATS-Friendly Resume Creator{% endblock %}</title>
-  <meta name="description" content="{% block meta_description %}Create a professional CV or resume online with AI assistance. Improve your CV, match job descriptions, generate cover letters and download PDF or Word documents.{% endblock %}"/>
+  <title>{% block title %}CVForge: Online CV Builder & ATS-Friendly Resume Maker{% endblock %}</title>
+  <meta name="description" content="{% block meta_description %}Build a professional, ATS-friendly CV or resume online. Improve an existing CV, match it to a job description, write a cover letter and download PDF or Word.{% endblock %}"/>
+  <meta name="keywords" content="{% block meta_keywords %}online CV builder, ATS-friendly resume builder, professional resume builder, CV builder online, resume creator, cover letter generator, AI CV builder, resume optimisation tool, CV writing tool{% endblock %}"/>
   <meta name="robots" content="{% block robots %}index, follow, max-image-preview:large, max-snippet:-1{% endblock %}"/>
   <meta name="author" content="CVForge AI"/>
-  <meta name="keywords" content="Online CV Builder, ATS-Friendly Resume Builder, Professional Resume Builder, CV Builder Online, Resume Creator, Cover Letter Generator, AI CV Builder, Resume Optimisation Tool, CV Writing Tool"/>
-  <link rel="canonical" href="{% block canonical %}{{ request.url_root.rstrip('/') }}{{ request.path }}{% endblock %}"/>
+  {# site_url comes from the SEO blueprint: the SITE_URL setting, else the request's own address #}
+  {% set page_canonical %}{% block canonical %}{{ site_url }}{{ request.path }}{% endblock %}{% endset %}
+  <link rel="canonical" href="{{ page_canonical|trim }}"/>
+  <link rel="alternate" hreflang="en" href="{{ page_canonical|trim }}"/>
+  <link rel="alternate" hreflang="x-default" href="{{ page_canonical|trim }}"/>
   <meta name="theme-color" content="#1e40af"/>
   <meta name="google-site-verification" content="PTBfBlpvOOpZEUnjCPpjUN4pGJ6JABkbeH8BmkXlAno" />
 
@@ -23,14 +27,13 @@
 
   {% set share_title = self.title() %}
   {% set share_description = self.meta_description() %}
-  {% set share_url = request.url_root.rstrip('/') + request.path %}
-  {% set share_image %}{% block og_image %}{{ url_for('static', filename='og-default.jpg', _external=True) }}{% endblock %}{% endset %}
+  {% set share_url = page_canonical|trim %}
+  {% set share_image %}{% block og_image %}{{ site_url }}{{ url_for('static', filename='og-default.jpg') }}{% endblock %}{% endset %}
 
   <!-- ── Open Graph (Facebook, WhatsApp, LinkedIn, Telegram) ───── -->
   <meta property="og:type" content="{% block og_type %}website{% endblock %}"/>
   <meta property="og:site_name" content="CVForge AI"/>
   <meta property="og:locale" content="en_US"/>
-  <meta property="og:locale:alternate" content="en_GB"/>
   <meta property="og:url" content="{{ share_url }}"/>
   <meta property="og:title" content="{{ share_title|trim }}"/>
   <meta property="og:description" content="{{ share_description|trim }}"/>
@@ -53,15 +56,13 @@
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
-    "@type": ["Organization", "SoftwareApplication"],
-    "name": "CVForge",
-    "applicationCategory": "BusinessApplication",
-    "operatingSystem": "Web",
-    "description": "Online CV and resume builder with ATS-friendly templates, CV improvement, job-description matching and cover letter tools.",
-    "url": "{{ request.url_root }}",
-    "logo": "{{ url_for('static', filename='logo.png', _external=True) }}",
+    "@type": "Organization",
+    "@id": "{{ site_url }}/#organization",
+    "name": "CVForge AI",
+    "url": "{{ site_url }}/",
+    "logo": "{{ site_url }}{{ url_for('static', filename='logo.png') }}",
+    "description": "CVForge AI is a professional CV and resume builder for job seekers worldwide, built in Kenya.",
     "areaServed": "Worldwide",
-    "availableLanguage": "English",
     "sameAs": []
   }
   </script>

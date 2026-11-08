@@ -1,6 +1,6 @@
 # CVForge AI
 
-AI-powered CV/resume builder for the Kenyan market — guided step-by-step CV wizard with inline AI writing help, CV parsing and AI revamp, ATS scoring, cover letter generation, PDF/DOCX export, public CV sharing, and M-Pesa + card payments. Flask, deployed on PythonAnywhere.
+AI-powered CV and resume builder for job seekers worldwide (built in Kenya) — guided step-by-step CV wizard with inline AI writing help, CV parsing and AI revamp, ATS scoring, cover letter generation, PDF/DOCX export, public CV sharing, and card payments (Paystack) plus M-Pesa for customers in Kenya. Flask, deployed on PythonAnywhere.
 
 ## Quick Setup
 
@@ -83,7 +83,7 @@ flask run
 - **ATS Checker** — score a saved CV, or upload a file directly with no job description required for a general audit; add a job description for a targeted match analysis
 - **Cover Letter Generator** — tone-adjustable, resume-aware
 - **Export** — PDF and DOCX, both gated behind an active paid plan; DOCX is additionally restricted to plans with `allow_docx` set. DOCX generator has full section parity with PDF (certifications, achievements, languages, interests, awards, projects, publications, volunteer, references)
-- **Payments** — M-Pesa (STK Push) and card, both via IntaSend; card uses IntaSend's hosted Checkout, M-Pesa is inline. Both share one webhook handler.
+- **Payments** — M-Pesa (STK Push) via IntaSend; debit/credit cards via Paystack hosted checkout (see `PAYSTACK_SETUP.md`). Prices and charges are in KES; no multi-currency pricing. An IntaSend card route still exists in `billing.py` but is not linked from the pricing pages.
 - **Email verification gate** — new email/password signups can't log in until they verify their email (`auth.login` blocks unverified users and offers a resend link via `auth.resend_verification`, which is email-based rather than login-gated so a stuck user can still request a new link). Google OAuth signups are pre-verified by Google and skip this gate.
 - **AI Support Chat** — Gemini-powered, grounded in a static product-facts block so it won't invent pricing or features; rate-limited by IP since it's reachable without login
 - **Admin visitor tracking** — lightweight page-view log with truncated IPs, not a full analytics replacement
@@ -117,3 +117,26 @@ An earlier pass fixed: unified AI service imports, missing `cv.restore_version` 
 
 A later pass added the guided CV wizard, AI Career Coach, per-plan public-link sharing, and shifted monetization from a login-time paywall to the pay-to-download model described above; fixed a missing CSRF token on the admin nudges form; and reworked the email-verification flow so unverified users can no longer log in at all (previously verification was optional after registration).
 
+
+
+## International SEO / public site address
+
+Set `SITE_URL` (for example `https://cvforgeai.com`) in the environment so canonical links, Open Graph URLs, the sitemap, `robots.txt` and JSON-LD always use your public domain, even when the site is also reachable on another host such as `cvforge.pythonanywhere.com`. If it is blank, the address of each incoming request is used.
+
+Public marketing copy that is shared between a page and its structured data (FAQs, default title/description/keywords) lives in `app/services/site_content.py`. Sitemap pages and robots rules are in `app/routes/seo.py`.
+
+## Auto-deploy (GitHub Actions → PythonAnywhere)
+
+Every push to `main` runs the tests, then `scripts/pa_deploy.py` uploads the git-tracked app files through the PythonAnywhere API and reloads the web app (`.github/workflows/deploy.yml`). It never uploads `.env`, databases, `instance/`, `uploads/`, tests or caches, so production data and secrets stay as they are.
+
+One-time setup in GitHub → Settings → Secrets and variables → Actions:
+
+| Type | Name | Example |
+|---|---|---|
+| Secret | `PA_USERNAME` | your PythonAnywhere username |
+| Secret | `PA_API_TOKEN` | PythonAnywhere → Account → API token |
+| Variable | `PA_PROJECT_DIR` | `/home/<username>/<project folder>` |
+| Variable | `PA_DOMAIN` | `cvforge.pythonanywhere.com` (or your custom domain) |
+| Variable | `PA_HOST` | only for EU accounts: `eu.pythonanywhere.com` |
+
+Notes: files deleted from git are not deleted on the server, and new dependencies in `requirements.txt` still need `pip install` in a PythonAnywhere console. Preview what would upload with `python scripts/pa_deploy.py --dry-run`.

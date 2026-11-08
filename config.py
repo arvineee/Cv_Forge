@@ -30,6 +30,11 @@ class Config:
     # so url_for() generates correct https:// URLs and CSRF origin checks pass
     PREFERRED_URL_SCHEME = "https"
 
+    # Public site address used for canonical URLs, Open Graph URLs and the
+    # sitemap (e.g. https://cvforgeai.com). Optional: when blank, the address
+    # of the incoming request is used, which is the previous behaviour.
+    SITE_URL = os.environ.get("SITE_URL", "").strip().rstrip("/")
+
     # Google OAuth
     GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID")
     GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET")

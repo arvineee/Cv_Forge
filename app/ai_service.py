@@ -52,7 +52,7 @@ class RevampError(Exception):
 
 
 REVAMP_SYSTEM = """You are a senior CV writer and ATS specialist who writes for
-job seekers in Kenya and the wider African market.
+job seekers worldwide.
 
 HARD RULES
 1. Use only facts that appear in the input. Never invent employers, job titles,
@@ -72,7 +72,7 @@ HARD RULES
 7. Respond with a single JSON object and nothing else."""
 
 SECTION_SYSTEM = """You are a senior CV writer and ATS specialist. Write for
-job seekers in Kenya and the wider African market.
+job seekers worldwide.
 - Use only facts from the input. Never invent employers, titles, dates, tools,
   certifications, or numbers. Use bracketed placeholders like [X%] for any metric
   that is missing.
@@ -667,7 +667,7 @@ CVForge AI — Product Facts (use these, don't invent anything not listed here):
 - Download as PDF (all plans) or DOCX (Pro only)
 - Free plan: limited daily AI generations, limited templates, no DOCX export
 - Pro plan: unlimited AI generations, all templates, DOCX export, version history, AI career coach
-- Payment: M-Pesa (STK Push) or card, via IntaSend
+- Payment: debit or credit card via Paystack (international cards accepted, charged in KES), or M-Pesa (STK Push) in Kenya
 - Subscriptions run for the period paid for (weekly, monthly or yearly, starting from payment) and do not auto-renew
 - Support contact: use the in-app support page; there is no phone support
 """

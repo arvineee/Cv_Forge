@@ -35,11 +35,11 @@ def nudge_price_note() -> str:
         if cheapest:
             annotate_plans([cheapest])
             return (f"From KES {cheapest.display_price} per {cheapest.billing_period}. "
-                    f"Pay with M-Pesa. Each payment lasts {cheapest.period_days} days "
+                    f"Pay by card or M-Pesa. Each payment lasts {cheapest.period_days} days "
                     f"and does not renew automatically.")
     except Exception:
         pass
-    return "Pay with M-Pesa or card. Each payment lasts for its plan period and does not renew automatically."
+    return "Pay by card or M-Pesa. Each payment lasts for its plan period and does not renew automatically."
 
 
 # What Pro includes (matches AIService.SUPPORT_KNOWLEDGE).
@@ -280,7 +280,7 @@ def _build_nudge_email(user, content, billing_url):
               </table>"""
 
     html = _render_email(
-        preheader="Unlimited AI, every template and Word downloads. Pay with M-Pesa.",
+        preheader="Unlimited AI, every template and Word downloads. Pay by card or M-Pesa.",
         body_html=body,
         hero_title="Your CV, without the limits",
         hero_text="See what changes when you move from Free to Pro.",

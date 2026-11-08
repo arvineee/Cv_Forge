@@ -28,24 +28,24 @@ CROP_FRACTION = 0.55 # top share of the page to keep, so the header and first se
 
 SAMPLE = {
     "personal_info": {
-        "full_name": "Amina W. Otieno", "job_title": "Sales Supervisor",
-        "email": "amina@example.com", "phone": "+254 700 000 000",
-        "location": "Nairobi, Kenya", "linkedin": "linkedin.com/in/amina-otieno",
+        "full_name": "Alex M. Morgan", "job_title": "Sales Supervisor",
+        "email": "alex@example.com", "phone": "+44 7700 900000",
+        "location": "Manchester, UK", "linkedin": "linkedin.com/in/alex-morgan",
     },
     "professional_summary": "Sales supervisor with five years leading retail teams across three branches. "
                             "Grew monthly sales by 32% and cut stock-outs through weekly reorder reviews.",
     "work_experience": [
-        {"job_title": "Sales Supervisor", "company": "Example Retail Ltd", "location": "Nairobi",
+        {"job_title": "Sales Supervisor", "company": "Example Retail Ltd", "location": "Manchester",
          "start_date": "Jan 2022", "end_date": "Present",
          "achievements": ["Led a team of 6 across 3 branches", "Grew monthly sales 32% in 8 months",
                           "Cut stock-outs by a quarter with weekly reorder checks"]},
-        {"job_title": "Sales Associate", "company": "Sample Stores", "location": "Mombasa",
+        {"job_title": "Sales Associate", "company": "Sample Stores", "location": "Leeds",
          "start_date": "Mar 2019", "end_date": "Dec 2021",
-         "achievements": ["Handled key accounts worth KES 4M per year", "Trained 8 new staff"]},
+         "achievements": ["Handled key accounts worth £400k per year", "Trained 8 new staff"]},
     ],
     "education": [{"degree": "BBA Marketing", "institution": "Example University", "year": "2015 - 2019"}],
     "skills": ["Team leadership", "Inventory control", "Customer service", "Sales targets", "POS systems"],
-    "languages": ["English (Fluent)", "Swahili (Native)"],
+    "languages": ["English (Native)", "French (Intermediate)"],
 }
 
 

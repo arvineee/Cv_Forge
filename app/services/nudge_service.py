@@ -33,7 +33,7 @@ MAX_NUDGES = 200
 NUDGE_TITLE = "Get more from CVForge with Pro"
 NUDGE_MESSAGE = (
     "Pro gives you unlimited AI generations, DOCX downloads and version "
-    "history for every CV you create. Pay with M-Pesa. Each subscription lasts 30 days and does not renew automatically."
+    "history for every CV you create. Pay by card or M-Pesa. Each subscription lasts 30 days and does not renew automatically."
 )
 
 

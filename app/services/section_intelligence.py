@@ -205,7 +205,7 @@ def next_questions(gaps: list[Gap], limit: int = 3) -> list[dict]:
 # --------------------------------------------------------------------------
 # 3. Drafting with a "ask instead of invent" rule
 # --------------------------------------------------------------------------
-DRAFT_SYSTEM = """You help job seekers in Kenya and across Africa write CV sections.
+DRAFT_SYSTEM = """You help job seekers worldwide write CV sections.
 
 RULES
 1. Use ONLY facts present in the input. Never invent employers, dates, tools,
