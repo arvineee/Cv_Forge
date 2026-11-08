@@ -4,6 +4,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      full:
+        description: "Upload ALL files instead of only changed ones"
+        type: boolean
+        default: false
 
 concurrency:
   group: deploy
@@ -32,6 +37,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -43,4 +50,6 @@ jobs:
           PA_PROJECT_DIR: ${{ vars.PA_PROJECT_DIR }}
           PA_DOMAIN: ${{ vars.PA_DOMAIN }}
           PA_HOST: ${{ vars.PA_HOST }}
+          PA_DB_PATH: ${{ vars.PA_DB_PATH }}
+          PA_FORCE_FULL: ${{ inputs.full }}
         run: python scripts/pa_deploy.py
