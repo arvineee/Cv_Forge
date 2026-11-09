@@ -107,4 +107,3 @@ yarn-error.log
 .env.development
 debug.log
 
-config.py

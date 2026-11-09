@@ -1,6 +1,6 @@
 {% extends "base.html" %}
-{% block title %}CVForge: Online CV Builder & ATS-Friendly Resume Maker{% endblock %}
-{% block meta_description %}Build a professional, ATS-friendly CV or resume online. Improve an existing CV, match it to a job description, write a cover letter and download PDF or Word.{% endblock %}
+{% block title %}CVForge: Online CV Builder, Resume Maker & CV Generator{% endblock %}
+{% block meta_description %}Start free: an online CV creator and resume maker with AI. Build an ATS-friendly CV, improve an old resume, write cover letters, download PDF or Word.{% endblock %}
 {% block structured_data %}
 <script type="application/ld+json">
 {{ jsonld|tojson }}
@@ -346,6 +346,38 @@
       </div>
       {% endfor %}
     </div>
+  </div>
+</section>
+
+<!-- ONE TOOL, EVERY NAME (CV maker / resume maker / generator) -->
+<section style="padding: 96px 0;">
+  <div class="wrap">
+    <p class="eyebrow">CV maker and resume maker</p>
+    <h2 style="font-weight: 800; font-size: clamp(2rem, 4vw, 3rem); line-height: 1.08; max-width: 16em;">A CV creator, resume maker and CV generator in one place</h2>
+    <p style="font-size: 18px; line-height: 1.65; margin-top: 18px; max-width: 40em; color: var(--ink-2);">
+      Whether you search for a CV maker, a resume builder or a resume generator, you get the same thing: a guided online tool that turns your details into a clean, professional document you can send today.
+    </p>
+
+    <div class="grid md:grid-cols-3 gap-5" style="margin-top: 40px;">
+      {% for title, desc in [
+        ('CV maker and CV creator', 'Make a CV online from scratch with a step-by-step builder, or upload the one you already have. Choose from 20 templates and download a PDF.'),
+        ('Resume maker and resume builder', 'Create a resume in the format employers expect, with clear section headings and a layout that screening software can read.'),
+        ('AI CV generator and resume generator', 'Let the AI draft your summary and experience bullets from the facts you give it, then edit every line. It never invents jobs or qualifications.'),
+      ] %}
+      <div class="feature">
+        <h3 style="font-weight: 800; font-size: 21px; margin-top: 8px;">{{ title }}</h3>
+        <p style="font-size: 16px; line-height: 1.6; margin-top: 12px; color: var(--ink-2);">{{ desc }}</p>
+      </div>
+      {% endfor %}
+    </div>
+
+    <p style="margin-top: 32px; font-size: 16px; line-height: 1.8; color: var(--ink-2);">
+      Explore:
+      <a href="{{ url_for('templates_gallery.index') }}" style="color: var(--blue); font-weight: 600;">CV and resume templates</a> &middot;
+      <a href="{{ url_for('main.pricing') }}" style="color: var(--blue); font-weight: 600;">CV maker pricing</a> &middot;
+      <a href="{{ url_for('guide.index') }}" style="color: var(--blue); font-weight: 600;">how to make a CV online</a> &middot;
+      <a href="{{ url_for('auth.register') }}" style="color: var(--blue); font-weight: 600;">create your free account</a>
+    </p>
   </div>
 </section>
 

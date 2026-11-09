@@ -37,11 +37,17 @@ def site_base_url() -> str:
 
 @seo_bp.app_context_processor
 def _inject_site_url():
-    from app.services.site_content import PAYMENT_CARD_NOTE, PRICING_FAQS
+    from app.services import site_content as _sc
+    from app.services.site_content import PAYMENT_CARD_NOTE, PRICING_FAQS, SEO_KEYWORDS
     return {
         "site_url": site_base_url(),
         "payment_card_note": PAYMENT_CARD_NOTE,
         "pricing_faqs": PRICING_FAQS,
+        "seo_keywords": SEO_KEYWORDS,
+        "templates_keywords": _sc.TEMPLATES_KEYWORDS,
+        "pricing_keywords": _sc.PRICING_KEYWORDS,
+        "register_keywords": _sc.REGISTER_KEYWORDS,
+        "guide_keywords": _sc.GUIDE_KEYWORDS,
     }
 
 

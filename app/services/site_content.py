@@ -12,15 +12,43 @@ Wording rules for this file:
 
 SITE_NAME = "CVForge AI"
 
-HOME_TITLE = "CVForge: Online CV Builder & ATS-Friendly Resume Maker"
+HOME_TITLE = "CVForge: Online CV Builder, Resume Maker & CV Generator"
 HOME_DESCRIPTION = (
-    "Build a professional, ATS-friendly CV or resume online. Improve an existing "
-    "CV, match it to a job description, write a cover letter and download PDF or Word."
+    "Start free: an online CV creator and resume maker with AI. Build an ATS-friendly CV, improve an old resume, write cover letters, download PDF or Word."
 )
+# The 9 original phrases come first and must stay (tests pin them). The rest cover the
+# other names people search for. Search engines mostly ignore the keywords tag, so the
+# real ranking work is done by the title, description, headings, FAQ and body copy.
 SEO_KEYWORDS = (
     "online CV builder, ATS-friendly resume builder, professional resume builder, "
     "CV builder online, resume creator, cover letter generator, AI CV builder, "
-    "resume optimisation tool, CV writing tool"
+    "resume optimisation tool, CV writing tool, "
+    "CV maker, CV creator, CV generator, resume maker, resume generator, "
+    "resume builder online, online resume maker, online CV maker, CV maker online, "
+    "AI resume builder, AI CV generator, AI resume generator, professional CV maker, "
+    "curriculum vitae maker, create a CV online, make a CV online, make a resume online, "
+    "ATS resume checker, ATS-friendly CV template, CV templates, resume templates, "
+    "cover letter maker, CV maker Kenya, CV builder Kenya"
+)
+
+# Keywords for specific pages (used by the pages' own meta_keywords block).
+TEMPLATES_KEYWORDS = (
+    "CV templates, resume templates, ATS-friendly CV templates, professional CV templates, "
+    "modern resume templates, simple CV templates, CV template PDF, CV template Word, "
+    "resume template download, CV maker, resume maker"
+)
+PRICING_KEYWORDS = (
+    "CV maker pricing, resume builder pricing, CV builder plans, resume maker plans, "
+    "pay for CV builder with M-Pesa, CV builder card payment, CV maker KES, "
+    "online CV builder, resume generator"
+)
+REGISTER_KEYWORDS = (
+    "free CV maker, free resume builder account, create a CV online, make a resume online, "
+    "start free CV builder, CV creator, resume maker"
+)
+GUIDE_KEYWORDS = (
+    "how to make a CV, how to write a CV, how to make a resume online, CV writing guide, "
+    "CV maker guide, resume builder tutorial, CV generator, resume maker"
 )
 
 PAYMENT_CARD_NOTE = (
@@ -40,8 +68,27 @@ LANDING_FAQS = [
         "Is this a CV builder or a resume builder?",
         "Both. The two words are used differently around the world: \"resume\" is the usual term in "
         "the USA and Canada, while \"CV\" is common in the UK, Australia, South Africa and much of "
-        "Europe. CVForge builds a clean, professional document you can use for either. Always check "
+        "Europe. Whether you call it a CV maker, CV creator, resume maker or resume generator, "
+        "CVForge builds a clean, professional document you can use for either. Always check "
         "each employer's instructions for things like length or whether to include a photo.",
+    ),
+    (
+        "Is there a free CV maker or resume creator online?",
+        "You can start free. Create an account, build your CV with the guided builder and preview it "
+        "at no cost. A paid plan is only needed for the clean PDF download, Word (DOCX) on eligible "
+        "plans and more of the AI tools. Current plans are on the pricing page.",
+    ),
+    (
+        "Can AI generate my CV or resume for me?",
+        "CVForge works as an AI CV generator and resume generator. It drafts your summary, experience "
+        "bullets and a cover letter from the details you enter. It uses only the facts you provide and "
+        "does not invent jobs or qualifications, so review and edit every line before you send it.",
+    ),
+    (
+        "Does CVForge have CV and resume templates?",
+        "Yes. There are 20 professional CV and resume templates. Preview them, choose one for your "
+        "details and switch designs at any time without retyping. You can browse them on the "
+        "Templates page.",
     ),
     (
         "Do I need to pay to try it?",
@@ -156,6 +203,7 @@ def landing_jsonld(base_url, plans, pricing_url, logo_url):
             "url": f"{base}/",
             "name": SITE_NAME,
             "inLanguage": "en",
+            "alternateName": ["CVForge", "CVForge CV Maker", "CVForge Resume Builder"],
             "description": HOME_DESCRIPTION,
         },
         {
@@ -167,6 +215,8 @@ def landing_jsonld(base_url, plans, pricing_url, logo_url):
             "operatingSystem": "Any (web browser)",
             "browserRequirements": "Requires JavaScript",
             "description": HOME_DESCRIPTION,
+            "alternateName": ["CVForge CV Maker", "CVForge Resume Maker", "CVForge CV Generator"],
+            "keywords": SEO_KEYWORDS,
             "featureList": [
                 "Professional CV and resume builder",
                 "ATS-friendly CV and resume optimisation",
@@ -174,6 +224,10 @@ def landing_jsonld(base_url, plans, pricing_url, logo_url):
                 "Job description matching",
                 "Cover letter generator",
                 "PDF and Word (DOCX) downloads",
+                "CV maker and CV creator",
+                "Resume maker and resume generator",
+                "AI CV generator",
+                "CV and resume templates",
             ],
             "publisher": {"@id": f"{base}/#organization"},
         },
