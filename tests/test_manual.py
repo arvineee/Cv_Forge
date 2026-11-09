@@ -47,7 +47,7 @@ class ManualAppTests(unittest.TestCase):
         import json, re
         html = self.client.get("/guide").get_data(as_text=True)
         self.assertEqual(html.count("<h1"), 1)
-        self.assertIn("<title>How to Use CVForge AI", html)
+        self.assertIn("<title>How to Make a CV Online", html)
         self.assertRegex(html, r'<meta name="description" content="[^"]{80,170}"')
         self.assertIn('rel="canonical"', html)
         self.assertIn('property="og:type" content="article"', html)

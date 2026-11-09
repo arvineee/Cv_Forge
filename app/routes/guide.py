@@ -34,7 +34,7 @@ def _jsonld():
         "@graph": [
             {
                 "@type": "TechArticle",
-                "headline": "How to Use CVForge AI: User Manual and CV Guide",
+                "headline": "How to Make a CV Online: Step-by-Step CVForge Guide",
                 "description": "Step-by-step guide to building, revamping, checking and downloading a CV with CVForge AI.",
                 "image": url_for("static", filename="og-default.jpg", _external=True),
                 "inLanguage": "en",
