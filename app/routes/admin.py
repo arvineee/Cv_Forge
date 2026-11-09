@@ -160,6 +160,41 @@ def payments():
     return render_template("admin/payments.html", payments=payments)
 
 
+@admin_bp.route("/payment-methods", methods=["GET", "POST"])
+@login_required
+@admin_required
+def payment_methods():
+    """Switch Paystack / IntaSend on or off for NEW checkouts. Nothing is
+    disconnected: keys, webhooks and callbacks stay live, so payments already
+    in progress still confirm."""
+    from app.services.payment_settings import PROVIDERS, all_status, set_enabled
+
+    if request.method == "POST":
+        provider = request.form.get("provider", "")
+        if provider not in PROVIDERS:
+            abort(400)
+        enabled = request.form.get("enabled") == "1"
+        set_enabled(provider, enabled)
+        db.session.add(ActivityLog(
+            user_id=current_user.id, action="admin_toggle_payment_provider",
+            resource_type="payment_provider", resource_id=None,
+            ip_address=request.remote_addr,
+            details={"provider": provider, "enabled": enabled},
+        ))
+        db.session.commit()
+        flash(f"{PROVIDERS[provider]['label']} is now {'ON' if enabled else 'OFF'} for new payments.",
+              "success" if enabled else "warning")
+        return redirect(url_for("admin.payment_methods"))
+
+    status = all_status()
+    configured = {
+        "paystack": bool((current_app.config.get("PAYSTACK_SECRET_KEY") or "").strip()),
+        "intasend": bool((current_app.config.get("INTASEND_SECRET_KEY") or "").strip()),
+    }
+    return render_template("admin/payment_methods.html", providers=PROVIDERS,
+                           status=status, configured=configured)
+
+
 # ── Pricing Plans ─────────────────────────────────────────────────
 
 @admin_bp.route("/pricing")

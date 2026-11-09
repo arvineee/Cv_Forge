@@ -1,0 +1,49 @@
+{% extends "base_dashboard.html" %}
+{% block title %}Payment methods — Admin{% endblock %}
+{% block page_title %}Payment methods{% endblock %}
+{% block page_subtitle %}Switch a provider on or off for new payments. Nothing is disconnected.{% endblock %}
+
+{% block content %}
+<p class="text-sm text-gray-500 mb-5 max-w-2xl">
+  Turning a provider off only hides it and blocks <strong>new</strong> checkouts. Your keys, webhooks and callbacks
+  stay connected, so payments already in progress still confirm. Turn it back on any time.
+</p>
+
+{% if not status.paystack and not status.intasend %}
+<div class="bg-red-50 border border-red-200 rounded-xl p-4 mb-5 text-sm text-red-800">
+  Both providers are off. Customers cannot pay online until you switch one on.
+</div>
+{% endif %}
+
+<div class="grid md:grid-cols-2 gap-5 max-w-3xl">
+  {% for key, info in providers.items() %}
+  <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+    <div class="flex items-center justify-between mb-2">
+      <h2 class="font-semibold text-lg">{{ info.label }}</h2>
+      <span class="text-xs font-semibold px-2.5 py-1 rounded-full {{ 'bg-green-100 text-green-700' if status[key] else 'bg-gray-200 text-gray-600' }}">
+        {{ 'ON' if status[key] else 'OFF' }}
+      </span>
+    </div>
+    <p class="text-sm text-gray-500">{{ info.covers }}</p>
+    <p class="text-xs mt-2 {{ 'text-gray-400' if configured[key] else 'text-amber-700' }}">
+      {{ 'API keys found in server settings.' if configured[key] else 'No API key found in .env, so checkout would fail even if ON.' }}
+    </p>
+    <form method="POST" class="mt-4"
+          {% if status[key] %}onsubmit="return confirm('Turn {{ info.label }} OFF for new payments?')"{% endif %}>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="provider" value="{{ key }}">
+      <input type="hidden" name="enabled" value="{{ '0' if status[key] else '1' }}">
+      <button type="submit"
+              class="w-full py-2.5 rounded-lg text-sm font-semibold transition {{ 'border border-gray-300 text-gray-700 hover:bg-gray-50' if status[key] else 'gradient-brand text-white hover:opacity-90' }}">
+        {{ 'Turn OFF' if status[key] else 'Turn ON' }}
+      </button>
+    </form>
+  </div>
+  {% endfor %}
+</div>
+
+<p class="text-xs text-gray-400 mt-5 max-w-2xl">
+  When IntaSend is off and Paystack is on, the pay button reads "card or M-Pesa", because Paystack's checkout also
+  offers M-Pesa (it must be enabled on your Paystack dashboard).
+</p>
+{% endblock %}

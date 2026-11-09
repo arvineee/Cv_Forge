@@ -100,6 +100,10 @@ flask run
 
 See the script's header comment for the full backup/restore behavior and configuration variables.
 
+## Payment methods on/off
+
+Admin -> **Payment methods** switches Paystack and IntaSend on or off for *new* checkouts. Nothing is disconnected: keys, webhooks and callbacks stay live, so payments already in progress still confirm. The state is stored in `instance/payment_settings.json` (survives deploys, no migration). With IntaSend off and Paystack on, the pay button reads "card or M-Pesa" because Paystack's checkout also offers M-Pesa (enable it on the Paystack dashboard).
+
 ## Known Issues / Caveats
 
 - **PythonAnywhere free tier blocks outbound SMTP** — verification, password reset, and nudge emails will fail with `Network is unreachable` until you either upgrade your PythonAnywhere plan or switch `email_service.py` to an HTTP-based email API.

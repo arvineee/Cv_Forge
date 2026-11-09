@@ -91,7 +91,8 @@
           </button>
           <div x-show="open" x-cloak @click.away="open=false"
                class="absolute bottom-full mb-2 left-0 right-0 bg-white rounded-xl border border-gray-200 shadow-xl p-4 z-10">
-            <p class="font-semibold text-sm text-gray-900 mb-1">Pay by card or Mpesa <span class="font-normal text-gray-500">(international cards accepted)</span></p>
+            {% if pay_paystack %}
+            <p class="font-semibold text-sm text-gray-900 mb-1">Pay by card{% if not pay_intasend %} or M-Pesa{% endif %} <span class="font-normal text-gray-500">(international cards accepted)</span></p>
             <p class="text-xs text-gray-500 mb-3">Secure checkout by Paystack. Charged in KES.</p>
             <form method="POST" action="{{ url_for('billing.subscribe_paystack', plan_slug=plan.slug) }}">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
@@ -101,16 +102,20 @@
                   <rect x="2" y="5" width="20" height="14" rx="2"/>
                   <path d="M2 10h20"/>
                 </svg>
-                Pay KES {{ plan.display_price }} by card
+                Pay KES {{ plan.display_price }} by card{% if not pay_intasend %} or M-Pesa{% endif %}
               </button>
             </form>
+            {% endif %}
 
+            {% if pay_paystack and pay_intasend %}
             <div class="flex items-center gap-3 my-4">
               <div class="flex-1 h-px bg-gray-100"></div>
               <span class="text-xs text-gray-400 font-medium">OR</span>
               <div class="flex-1 h-px bg-gray-100"></div>
             </div>
 
+            {% endif %}
+            {% if pay_intasend %}
             <p class="font-semibold text-sm text-gray-900 mb-3">Pay with M-Pesa <span class="font-normal text-gray-500">(Kenya)</span></p>
             <form method="POST" action="{{ url_for('billing.subscribe', plan_slug=plan.slug) }}">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
@@ -122,6 +127,10 @@
                 Pay KES {{ plan.display_price }} with M-Pesa
               </button>
             </form>
+            {% endif %}
+            {% if not pay_any %}
+            <p class="text-sm text-gray-600 text-center py-2">Online payments are temporarily unavailable. Please check back soon.</p>
+            {% endif %}
           </div>
           {% else %}
           <a href="{{ url_for('billing.continue_to_plan', plan_slug=plan.slug) }}"

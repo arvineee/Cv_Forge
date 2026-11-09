@@ -157,6 +157,27 @@ def index():
                            plans=plans)
 
 
+def _provider_unavailable(provider):
+    """If this provider is switched off in Admin -> Payment methods, stop a NEW
+    checkout before anything is created. Webhooks, callbacks and status polling
+    never call this, so payments already in flight still confirm."""
+    from app.services.payment_settings import is_enabled, PROVIDERS
+    if is_enabled(provider):
+        return None
+    flash(f"{PROVIDERS[provider]['label']} payments are temporarily unavailable. "
+          "Please choose another payment method or try again later.", "warning")
+    return redirect(url_for("billing.plans"))
+
+
+@billing_bp.app_context_processor
+def _inject_payment_providers():
+    from app.services.payment_settings import all_status
+    status = all_status()
+    return {"pay_paystack": status["paystack"],
+            "pay_intasend": status["intasend"],
+            "pay_any": any(status.values())}
+
+
 @billing_bp.route("/plans")
 def plans():
     plans = annotate_plans(_active_plans())
@@ -192,6 +213,10 @@ def subscribe(plan_slug):
     if blocker:
         flash(blocker, "warning")
         return redirect(url_for("billing.index"))
+
+    off = _provider_unavailable("intasend")
+    if off:
+        return off
 
     phone = request.form.get("phone", "").strip()
     if not phone:
@@ -245,6 +270,10 @@ def subscribe_card(plan_slug):
         flash(blocker, "warning")
         return redirect(url_for("billing.index"))
 
+    off = _provider_unavailable("intasend")
+    if off:
+        return off
+
     reference, charged, _base = _create_pending(plan, "card")
 
     try:
@@ -289,6 +318,10 @@ def subscribe_paystack(plan_slug):
     if blocker:
         flash(blocker, "warning")
         return redirect(url_for("billing.index"))
+
+    off = _provider_unavailable("paystack")
+    if off:
+        return off
 
     reference, charged, _base = _create_pending(plan, "paystack")
     try:
