@@ -64,7 +64,7 @@ class _Db:
     @staticmethod
     def and_(*a): return None
 
-def utcnow(): return datetime.utcnow()
+def utcnow(): return datetime.now(timezone.utc).replace(tzinfo=None)
 
 models = types.ModuleType("app.models")
 models.db = _Db; models.Offer = Offer; models.OfferRedemption = OfferRedemption

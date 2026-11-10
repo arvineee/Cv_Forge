@@ -18,7 +18,7 @@ db = SQLAlchemy()
 
 def utcnow():
     """Naive UTC — SQLite strips tzinfo; keeping naive avoids comparison errors."""
-    return datetime.utcnow()
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 def _make_aware(dt):
@@ -376,7 +376,7 @@ class AIUsage(db.Model):
     @classmethod
     def get_daily_count(cls, user_id: int, feature: str = None) -> int:
         # Use naive UTC to match what SQLite actually stores
-        today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        today_start = datetime.now(timezone.utc).replace(tzinfo=None).replace(hour=0, minute=0, second=0, microsecond=0)
         q = cls.query.filter(cls.user_id == user_id, cls.created_at >= today_start)
         if feature:
             q = q.filter_by(feature=feature)
@@ -384,12 +384,12 @@ class AIUsage(db.Model):
 
     @classmethod
     def get_total_daily_count(cls) -> int:
-        today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        today_start = datetime.now(timezone.utc).replace(tzinfo=None).replace(hour=0, minute=0, second=0, microsecond=0)
         return cls.query.filter(cls.created_at >= today_start).count()
 
     @classmethod
     def find_cached(cls, prompt_hash: str, feature: str):
-        cutoff = datetime.utcnow() - timedelta(hours=24)
+        cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=24)
         return cls.query.filter(
             cls.prompt_hash == prompt_hash,
             cls.feature == feature,
