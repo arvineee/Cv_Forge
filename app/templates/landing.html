@@ -373,6 +373,7 @@
 
     <p style="margin-top: 32px; font-size: 16px; line-height: 1.8; color: var(--ink-2);">
       Explore:
+      <a href="{{ url_for('free_ats.checker') }}" style="color: var(--blue); font-weight: 600;">free ATS resume checker</a> &middot;
       <a href="{{ url_for('cv_examples.index') }}" style="color: var(--blue); font-weight: 600;">CV examples</a> &middot;
       <a href="{{ url_for('templates_gallery.index') }}" style="color: var(--blue); font-weight: 600;">CV and resume templates</a> &middot;
       <a href="{{ url_for('main.pricing') }}" style="color: var(--blue); font-weight: 600;">CV maker pricing</a> &middot;
@@ -491,6 +492,7 @@
       <ul style="display: grid; gap: 8px; font-size: 15px; padding: 0; list-style: none;">
         <li><a href="{{ url_for('templates_gallery.index') }}" class="hover:underline">Templates</a></li>
         <li><a href="{{ url_for('cv_examples.index') }}" class="hover:underline">CV examples</a></li>
+        <li><a href="{{ url_for('free_ats.checker') }}" class="hover:underline">Free ATS checker</a></li>
         <li><a href="{{ url_for('main.pricing') }}" class="hover:underline">Pricing</a></li>
         <li><a href="{{ url_for('guide.index') }}" class="hover:underline">User Guide</a></li>
         <li><a href="{{ url_for('support.index') }}" class="hover:underline">Support</a></li>
