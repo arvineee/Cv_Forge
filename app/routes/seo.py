@@ -66,6 +66,7 @@ PUBLIC_PAGES = [
     ("main.index", "weekly", "1.0"),
     ("main.pricing", "weekly", "0.9"),
     ("templates_gallery.index", "weekly", "0.8"),
+    ("cv_examples.index", "weekly", "0.7"),
     ("auth.register", "monthly", "0.6"),
     ("guide.index", "monthly", "0.6"),
     ("main.about", "monthly", "0.5"),
@@ -104,6 +105,7 @@ def robots():
         "Allow: /billing/plans",
         "Allow: /templates/",
         "Allow: /guide",
+        "Allow: /cv-examples",
         "Allow: /pricing",
         "Allow: /about",
         "",
@@ -128,6 +130,21 @@ def sitemap():
             f"    <loc>{loc}</loc>\n"
             f"    <changefreq>{changefreq}</changefreq>\n"
             f"    <priority>{priority}</priority>\n"
+            "  </url>"
+        )
+
+    # One URL per CV example page (generated from app/services/cv_examples.py).
+    from app.services.cv_examples import all_examples
+    for ex in all_examples():
+        try:
+            loc = _absolute("cv_examples.detail", slug=ex["slug"])
+        except BuildError:
+            continue
+        urls.append(
+            "  <url>\n"
+            f"    <loc>{loc}</loc>\n"
+            "    <changefreq>monthly</changefreq>\n"
+            "    <priority>0.6</priority>\n"
             "  </url>"
         )
 

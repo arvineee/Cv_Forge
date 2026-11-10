@@ -82,6 +82,8 @@ def create_app(config_object=None):
     app.register_blueprint(feedback_bp)
     from app.routes.guide import guide_bp
     app.register_blueprint(guide_bp)
+    from app.routes.cv_examples import cv_examples_bp
+    app.register_blueprint(cv_examples_bp, url_prefix="/cv-examples")
 
     # ── Visitor tracking ─────────────────────────────────────────
     from app.services.visitor_tracking import register_visitor_tracking

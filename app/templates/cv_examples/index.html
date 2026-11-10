@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}{{ page_title }}{% endblock %}
+{% block meta_description %}{{ page_description }}{% endblock %}
+{% block meta_keywords %}{{ page_keywords }}{% endblock %}
+
+{% block body %}
+{% include "cv_examples/_header.html" %}
+
+<main class="max-w-6xl mx-auto px-5 sm:px-8 py-10 pb-20">
+  <nav aria-label="Breadcrumb" class="text-sm text-gray-500 mb-4">
+    <a href="{{ url_for('main.index') }}" class="hover:underline">Home</a> <span aria-hidden="true">/</span> CV examples
+  </nav>
+  <h1 class="text-3xl sm:text-4xl font-bold" style="color:#0B3D6B;">CV Examples for Every Job</h1>
+  <p class="text-gray-600 mt-3 max-w-2xl text-lg">
+    See how a strong CV is put together. Each example has a sample summary, experience bullets and skills, plus tips for that job.
+    Use it as a guide, then build your own CV with real details.
+  </p>
+
+  <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 mt-10">
+    {% for ex in examples %}
+    <a href="{{ url_for('cv_examples.detail', slug=ex.slug) }}"
+       class="block bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md hover:border-blue-300 transition">
+      <h2 class="font-bold text-lg" style="color:#0B3D6B;">{{ ex.short }} CV example</h2>
+      <p class="text-gray-600 mt-2 text-sm">{{ ex.card }}</p>
+      <p class="mt-4 text-sm font-semibold" style="color:#E8742A;">See the example &rarr;</p>
+    </a>
+    {% endfor %}
+  </div>
+
+  <section class="mt-14 rounded-2xl p-8 text-white gradient-brand">
+    <h2 class="text-2xl font-bold">Ready to make your own CV?</h2>
+    <p class="mt-2 text-blue-100 max-w-xl">Build and preview your CV free, then choose a plan when you want to download it.</p>
+    <div class="mt-5 flex flex-wrap gap-3">
+      <a href="{{ url_for('auth.register') }}" class="inline-flex items-center justify-center rounded-full bg-white font-semibold px-6" style="min-height:44px;color:#0B3D6B;">Start free</a>
+      <a href="{{ url_for('templates_gallery.index') }}" class="inline-flex items-center justify-center rounded-full border border-white/60 font-semibold px-6 text-white" style="min-height:44px;">Browse CV templates</a>
+    </div>
+  </section>
+</main>
+
+{% include "cv_examples/_footer.html" %}
+{% endblock %}
