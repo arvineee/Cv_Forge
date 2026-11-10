@@ -72,7 +72,29 @@ def discount_amount(offer: Offer, base_price: int) -> int:
     return max(0, min(raw, base_price - MIN_CHARGE_KES))
 
 
-def _best_live_offer(plan: PricingPlan, offers, now):
+def _offer_is_live(offer: Offer, now, redemption_counts=None) -> bool:
+    """Check offer dates and cap, optionally reusing a request-local count cache."""
+    if not offer.is_active:
+        return False
+    starts, ends = offer.starts_at_aware, offer.ends_at_aware
+    if starts and now < starts:
+        return False
+    if ends and now >= ends:
+        return False
+    if offer.max_redemptions:
+        key = id(offer)
+        if redemption_counts is not None and key in redemption_counts:
+            used = redemption_counts[key]
+        else:
+            used = redemption_count(offer)
+            if redemption_counts is not None:
+                redemption_counts[key] = used
+        if used >= offer.max_redemptions:
+            return False
+    return True
+
+
+def _best_live_offer(plan: PricingPlan, offers, now, redemption_counts=None):
     """Live offer that saves the customer the most on this plan, or None."""
     best, best_saving = None, 0
     if plan.price_kes <= 0:
@@ -80,7 +102,7 @@ def _best_live_offer(plan: PricingPlan, offers, now):
     for offer in offers:
         if not offer.applies_to(plan.slug):
             continue
-        if offer_status(offer, now) != "live":
+        if not _offer_is_live(offer, now, redemption_counts):
             continue
         saving = discount_amount(offer, plan.price_kes)
         if saving > best_saving:
@@ -102,13 +124,17 @@ def annotate_plans(plans, now=None):
     """
     now = now or _now()
     offers = Offer.query.filter_by(is_active=True).all()
+    # A capped offer can be evaluated against several plans. Reuse its seat
+    # count within this operation instead of issuing the same COUNT query for
+    # every plan that the offer applies to.
+    redemption_counts = {}
     for plan in plans:
         plan.base_price = plan.price_kes
         plan.period_days = period_days(plan.billing_period)
         plan.live_offer = None
         plan.saving = 0
         plan.display_price = plan.price_kes
-        offer = _best_live_offer(plan, offers, now)
+        offer = _best_live_offer(plan, offers, now, redemption_counts)
         if offer:
             saving = discount_amount(offer, plan.price_kes)
             plan.live_offer = offer
@@ -124,7 +150,7 @@ def checkout_price(plan: PricingPlan, now=None):
     """
     now = now or _now()
     offers = Offer.query.filter_by(is_active=True).all()
-    offer = _best_live_offer(plan, offers, now)
+    offer = _best_live_offer(plan, offers, now, {})
     if not offer:
         return plan.price_kes, None, 0
     saving = discount_amount(offer, plan.price_kes)
@@ -135,11 +161,13 @@ def banner_offer(now=None):
     """The live offer with the biggest saving on any paid plan, for the pricing banner."""
     now = now or _now()
     offers = Offer.query.filter_by(is_active=True).all()
+    plans = PricingPlan.query.filter_by(is_active=True).all()
+    redemption_counts = {}
     best, best_saving = None, 0
     for offer in offers:
-        if offer_status(offer, now) != "live":
+        if not _offer_is_live(offer, now, redemption_counts):
             continue
-        for plan in PricingPlan.query.filter_by(is_active=True).all():
+        for plan in plans:
             if plan.price_kes > 0 and offer.applies_to(plan.slug):
                 saving = discount_amount(offer, plan.price_kes)
                 if saving > best_saving:

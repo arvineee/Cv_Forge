@@ -4,7 +4,7 @@ Includes Flask-WTF CSRF protection, IP-based rate limiting (see routes/auth.py),
 errorhandler for 403/404/500, and CLI commands for admin management.
 """
 import click
-from flask import Flask, render_template, abort
+from flask import Flask, render_template, abort, request
 from flask_login import LoginManager
 from flask_wtf.csrf import CSRFProtect
 from flask_migrate import Migrate
@@ -101,8 +101,21 @@ def create_app(config_object=None):
         )
         if app.config.get("SESSION_COOKIE_SECURE"):
             response.headers.setdefault(
-                "Strict-Transport-Security", "max-age=31536000; includeSubDomains"
+                "Strict-Transport-Security", "max-age=63072000; includeSubDomains"
             )
+
+        # Report-only CSP is opt-in until the deployment's real third-party
+        # integrations have been verified. This lets operators collect browser
+        # violations without risking checkout, OAuth, AI or support widgets.
+        csp_report_only = app.config.get("CONTENT_SECURITY_POLICY_REPORT_ONLY")
+        if csp_report_only:
+            response.headers.setdefault("Content-Security-Policy-Report-Only", csp_report_only)
+
+        # Cache only Flask-served static assets. Dynamic HTML, account pages,
+        # payment flows and generated documents retain their existing policy.
+        if request.endpoint == "static" and response.status_code == 200:
+            response.cache_control.public = True
+            response.cache_control.max_age = int(app.config.get("STATIC_ASSET_MAX_AGE", 86400))
         return response
 
     # ── Pro-upgrade nudge scheduler (optional, in-process) ─────────
@@ -153,6 +166,7 @@ def create_app(config_object=None):
     _register_cli(app)
 
     return app
+
 
 
 @login_manager.user_loader

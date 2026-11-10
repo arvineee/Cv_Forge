@@ -13,6 +13,18 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {"pool_pre_ping": True}
 
+    # Visitor analytics uses a bounded in-process queue so page requests do
+    # not wait for analytics database commits. Set false only for debugging.
+    VISITOR_TRACKING_ASYNC = os.environ.get("VISITOR_TRACKING_ASYNC", "true").lower() == "true"
+    VISITOR_TRACKING_QUEUE_SIZE = int(os.environ.get("VISITOR_TRACKING_QUEUE_SIZE", 2048))
+
+    # Report-only first: configure a policy after checking real browser
+    # dependencies; never enforce an untested CSP on payment/auth pages.
+    CONTENT_SECURITY_POLICY_REPORT_ONLY = os.environ.get(
+        "CONTENT_SECURITY_POLICY_REPORT_ONLY", ""
+    ).strip()
+    STATIC_ASSET_MAX_AGE = int(os.environ.get("STATIC_ASSET_MAX_AGE", 86400))
+
     # Session & cookies
     # PythonAnywhere runs behind a proxy — cookies must NOT require HTTPS
     # or the session will never persist between requests
