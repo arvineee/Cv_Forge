@@ -6,6 +6,18 @@ import json
 import re
 import unittest
 
+# --- sitemap path helper (added by fix_sitemap_test.py) ---
+def _assert_path_not_in_sitemap(case, prefix, xml, msg=None):
+    """Fail only if a <loc> path equals `prefix` or sits under it as a whole
+    path segment ('/admin' matches /admin and /admin/x, not /administrative-x)."""
+    import re as _re
+    from urllib.parse import urlparse as _urlparse
+    prefix = str(prefix).rstrip("/") or "/"
+    paths = [_urlparse(u).path for u in _re.findall(r"<loc>([^<]+)</loc>", xml)]
+    bad = [p for p in paths if p == prefix or p.startswith(prefix + "/")]
+    case.assertFalse(bad, msg or f"{prefix} unexpectedly in sitemap: {bad}")
+# --- end helper ---
+
 try:
     from app import create_app
     from app.models import db, PricingPlan, User
@@ -197,7 +209,7 @@ class InternationalSiteTests(unittest.TestCase):
                      "/guide</loc>", "/auth/register</loc>", "/privacy</loc>", "/terms</loc>"):
             self.assertIn(path, xml, path)
         for private in ("/dashboard", "/admin", "/cv/", "/billing/plans", "/auth/login", "/api/"):
-            self.assertNotIn(private, xml, private)
+            _assert_path_not_in_sitemap(self, private, xml, private)
         self.assertEqual(len(re.findall(r"<loc>", xml)), len(set(re.findall(r"<loc>(.*?)</loc>", xml))))
 
     def test_robots_txt(self):
