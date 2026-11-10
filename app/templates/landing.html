@@ -7,9 +7,15 @@
 </script>
 {% endblock %}
 
+{% block extra_head %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=DM+Sans:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=DM+Sans:wght@400;500;600;700&display=swap"></noscript>
+{% endblock %}
+
 {% block body %}
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=DM+Sans:wght@400;500;600;700&display=swap');
 
   .lp {
     /* Brand colours, taken from the CVForge logo */
@@ -69,7 +75,7 @@
   }
   .lp .toggle button {
     min-height: 40px; padding: 0 16px; border-radius: 999px; font-size: 14px; font-weight: 600; color: var(--ink-2);
-    transition: background-color .2s, color .2s;
+    transition: background-color .2s;
   }
   .lp .toggle button[aria-pressed="true"] { background: var(--navy); color: #fff; }
 
@@ -137,7 +143,7 @@
         x-data="{ open: false }" @keydown.escape.window="open = false" @click.outside="open = false">
   <div class="wrap flex items-center justify-between" style="min-height: 72px;">
     <a href="{{ url_for('main.index') }}" class="flex items-center" style="min-height: 48px;" aria-label="CVForge home">
-      <img src="{{ url_for('static', filename='logo-nav.png') }}" alt="CVForge" width="116" height="45" style="height: 45px; width: auto;"/>
+      <img src="{{ url_for('static', filename='logo-nav.webp') }}" alt="CVForge" width="116" height="45" style="height: 45px; width: auto;"/>
     </a>
 
     <nav class="hidden md:flex items-center gap-8" style="font-weight: 500; color: var(--ink-2);" aria-label="Main">
@@ -202,9 +208,9 @@
 
     <!-- Real template previews -->
     <div class="collage settle">
-      <img class="c1" src="{{ url_for('static', filename='templates/modern-blue.png') }}" alt="" width="480" height="372"/>
-      <img class="c2" src="{{ url_for('static', filename='templates/timeline-teal.png') }}" alt="" width="480" height="372"/>
-      <img class="c3" src="{{ url_for('static', filename='templates/sidebar-navy.png') }}" alt="Example CV made with the Sidebar Navy template" width="480" height="372" fetchpriority="high"/>
+      <img class="c1" src="{{ url_for('static', filename='templates/modern-blue.webp') }}" alt="" width="480" height="372"/>
+      <img class="c2" src="{{ url_for('static', filename='templates/timeline-teal.webp') }}" alt="" width="480" height="372"/>
+      <img class="c3" src="{{ url_for('static', filename='templates/sidebar-navy.webp') }}" alt="Example CV made with the Sidebar Navy template" width="480" height="372" fetchpriority="high"/>
     </div>
   </div>
 </section>
@@ -310,10 +316,10 @@
 
     <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-6" style="margin-top: 48px;">
       {% for file, name, kind in [
-        ('sidebar-navy.png', 'Sidebar Navy', 'Two-column'),
-        ('modern-blue.png', 'Modern Blue', 'Single column'),
-        ('timeline-teal.png', 'Timeline Teal', 'Single column'),
-        ('centred-classic.png', 'Centred Classic', 'Single column'),
+        ('sidebar-navy.webp', 'Sidebar Navy', 'Two-column'),
+        ('modern-blue.webp', 'Modern Blue', 'Single column'),
+        ('timeline-teal.webp', 'Timeline Teal', 'Single column'),
+        ('centred-classic.webp', 'Centred Classic', 'Single column'),
       ] %}
       <a href="{{ url_for('templates_gallery.index') }}" class="tpl-card">
         <img src="{{ url_for('static', filename='templates/' ~ file) }}" alt="{{ name }} CV template preview" width="480" height="372" loading="lazy"/>
@@ -484,7 +490,7 @@
 <footer style="background: #fff; color: var(--ink-2); padding: 56px 0 32px; border-top: 1px solid var(--line);">
   <div class="wrap grid md:grid-cols-4 gap-10">
     <div>
-      <img src="{{ url_for('static', filename='logo-full.png') }}" alt="CVForge — Building your professional future" width="170" height="67" style="height: 67px; width: auto;" loading="lazy"/>
+      <img src="{{ url_for('static', filename='logo-full.webp') }}" alt="CVForge — Building your professional future" width="170" height="67" style="height: 67px; width: auto;" loading="lazy"/>
       <p style="font-size: 15px; line-height: 1.6; margin-top: 14px; max-width: 18em;">A professional CV and resume builder for job seekers worldwide. Cards via Paystack; M-Pesa in Kenya.</p>
     </div>
     <div>

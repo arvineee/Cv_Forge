@@ -13,7 +13,7 @@
       {% set current = resume.template_id == t.id %}
       <button type="submit" name="template_id" value="{{ t.id }}" {% if locked %}disabled{% endif %}
               class="text-left rounded-lg border-2 overflow-hidden transition {{ 'border-blue-500' if current else 'border-gray-100 hover:border-gray-300' }} {{ 'opacity-50 cursor-not-allowed' if locked }}">
-        <img src="{{ t.thumbnail_url or url_for('static', filename='templates/' ~ t.slug ~ '.png') }}"
+        <img src="{{ t.thumbnail_url or url_for('static', filename='templates/' ~ t.slug ~ '.webp') }}"
              alt="" loading="lazy" class="w-full h-28 object-cover object-top bg-gray-50"
              onerror="this.style.display='none'"/>
         <span class="block px-2 py-1.5 text-xs font-medium text-gray-800">
