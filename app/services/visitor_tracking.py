@@ -15,7 +15,7 @@ import hashlib
 import queue
 import threading
 import time
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlunparse
 from flask import request, session, current_app
 from app.models import db, PageVisit
 
@@ -44,13 +44,21 @@ KEEP_DAYS = 90
 
 
 def _clean_referrer(ref):
-    """Referrer with any secret token path swapped for a placeholder."""
+    """Keep referrer host/path, redact token paths and drop query/fragment."""
     if not ref:
         return None
-    parsed = urlparse(ref)
-    if any(parsed.path.startswith(p) for p in TOKEN_PREFIXES):
-        return f"{parsed.scheme}://{parsed.netloc}{_redact_path(parsed.path)}"[:500]
-    return ref[:500]
+    try:
+        parsed = urlparse(ref)
+        scheme = parsed.scheme if parsed.scheme in ("http", "https") else ""
+        host = parsed.hostname or ""
+        if parsed.port:
+            host = f"{host}:{parsed.port}"
+        path = _redact_path(parsed.path)
+        # Do not retain search terms, campaign query strings, fragments or
+        # userinfo that might appear in a referring URL.
+        return urlunparse((scheme, host, path, "", "", ""))[:500]
+    except (TypeError, ValueError):
+        return None
 
 
 def _truncate_ip(ip: str) -> str:
@@ -71,10 +79,12 @@ def _truncate_ip(ip: str) -> str:
     return ip
 
 
-def _get_session_id() -> str:
-    """Stable-per-browser-session id for rough unique-visitor counting,
-    without needing to store anything more identifying than a hash of
-    Flask's own session cookie value."""
+def get_analytics_session_id() -> str:
+    """Return the shared, privacy-preserving browser-session identifier.
+
+    Registration events and PageVisit rows must use this exact helper so
+    the conversion report compares the same hashed identifier on both sides.
+    """
     sid = session.get("_visit_sid")
     if not sid:
         import secrets
@@ -152,6 +162,11 @@ def register_visitor_tracking(app):
             if any(path.startswith(p) for p in SKIP_PREFIXES):
                 return
 
+            # Persist a compact first-touch campaign snapshot in the signed
+            # browser session. Registration copies it into ActivityLog.details.
+            from app.services.acquisition_tracking import capture_first_touch
+            capture_first_touch()
+
             from flask_login import current_user
             user_id = None
             if current_user.is_authenticated:
@@ -168,7 +183,7 @@ def register_visitor_tracking(app):
                 "ip_truncated": _truncate_ip(request.remote_addr or ""),
                 "user_agent": (request.user_agent.string or "")[:300] if request.user_agent else None,
                 "referrer": _clean_referrer(request.referrer),
-                "session_id": _get_session_id(),
+                "session_id": get_analytics_session_id(),
             }
 
             if visit_queue is None:
