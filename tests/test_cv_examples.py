@@ -76,6 +76,10 @@ class _Config:
     SECRET_KEY = "test-secret"
     SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    # In-memory SQLite uses a shared connection. A background writer can race
+    # test teardown (db.drop_all), causing SQLITE_LOCKED. Keep analytics
+    # synchronous in this isolated test app; production remains asynchronous.
+    VISITOR_TRACKING_ASYNC = False
     WTF_CSRF_ENABLED = False
     SESSION_COOKIE_SECURE = False
     DEBUG = False

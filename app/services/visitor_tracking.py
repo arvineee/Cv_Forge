@@ -118,6 +118,10 @@ def _start_writer(app):
                     db.session.rollback()
                     app.logger.warning("Visitor tracking batch failed (non-fatal): %s", exc)
             finally:
+                # The writer thread is long-lived, so explicitly discard its
+                # scoped session after every batch. This prevents stale identity
+                # map entries from leaking into later batches.
+                db.session.remove()
                 for _ in batch:
                     visits.task_done()
 
