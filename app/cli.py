@@ -69,5 +69,41 @@ def register_cli(app):
     app.cli.add_command(send_manual_email_cmd)
     app.cli.add_command(send_nudges)
     app.cli.add_command(prune_visits)
+    app.cli.add_command(send_cv_reminders_cmd)
+    app.cli.add_command(cv_conversion_report_cmd)
 
+
+
+
+@click.command("send-cv-reminders")
+@click.option("--limit", default=200, show_default=True, help="Maximum reminder emails in this run.")
+@click.option("--dry-run", is_flag=True, help="Count eligible reminders without sending.")
+@with_appcontext
+def send_cv_reminders_cmd(limit, dry_run):
+    """Send scheduled 24h/72h reminders for unfinished CV drafts."""
+    from app.services.conversion_tracking import send_abandoned_cv_reminders
+    result = send_abandoned_cv_reminders(limit=limit, dry_run=dry_run)
+    click.echo(f"CV reminders: sent={result['sent']} failed={result['failed']} "
+               f"would_send={result['would_send']} skipped={result['skipped']}")
+
+
+@click.command("cv-conversion-report")
+@click.option("--days", default=30, show_default=True, help="Reporting window in days.")
+@with_appcontext
+def cv_conversion_report_cmd(days):
+    """Print first-CV funnel events for the selected reporting window."""
+    from datetime import datetime, timedelta, timezone
+    from app.models import ActivityLog, db
+    cutoff = datetime.now(timezone.utc) - timedelta(days=max(1, days))
+    cohort = db.session.query(ActivityLog.user_id).filter(
+        ActivityLog.action == "register", ActivityLog.created_at >= cutoff,
+        ActivityLog.user_id.isnot(None)).distinct().subquery()
+    actions = ("register", "first_cv_started", "first_cv_completed", "first_cv_downloaded")
+    for action in actions:
+        query = db.session.query(db.func.count(db.distinct(ActivityLog.user_id))).filter(
+            ActivityLog.action == action, ActivityLog.user_id.in_(cohort))
+        if action == "register":
+            query = query.filter(ActivityLog.created_at >= cutoff)
+        count = query.scalar() or 0
+        click.echo(f"{action}: {count}")
 

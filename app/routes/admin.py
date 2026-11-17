@@ -16,7 +16,7 @@ from flask_login import login_required, current_user
 from functools import wraps
 from app.models import (db, User, Payment, Subscription, ActivityLog, AIUsage, Template,
                         PricingPlan, Offer, OfferRedemption, Feedback,
-                        ManualPaymentClaim, BroadcastEmail, Notification, utcnow)
+                        ManualPaymentClaim, BroadcastEmail, Notification, PageVisit, utcnow)
 
 admin_bp = Blueprint("admin", __name__)
 
@@ -56,6 +56,52 @@ def index():
                            daily_ai_usage=daily_ai_usage,
                            nudge_due_count=nudge_due_count,
                            pending_claims=pending_claims)
+
+
+@admin_bp.route("/conversion")
+@login_required
+@admin_required
+def conversion():
+    """Account-level first-CV funnel metrics from ActivityLog events."""
+    from datetime import datetime, timedelta, timezone
+    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+    cohort = db.session.query(ActivityLog.user_id).filter(
+        ActivityLog.action == "register", ActivityLog.created_at >= cutoff,
+        ActivityLog.user_id.isnot(None)).distinct().subquery()
+    landing_session_ids = {row[0] for row in db.session.query(PageVisit.session_id).filter(
+        PageVisit.path == "/", PageVisit.created_at >= cutoff,
+        PageVisit.session_id.isnot(None)).distinct().all()}
+    landing_sessions = len(landing_session_ids)
+    registration_events = ActivityLog.query.filter(
+        ActivityLog.action == "register", ActivityLog.created_at >= cutoff,
+        ActivityLog.user_id.isnot(None)).all()
+    converted_sessions = {((event.details or {}).get("session_id")) for event in registration_events}
+    converted_sessions.discard(None)
+    converted_sessions.intersection_update(landing_session_ids)
+    actions = [
+        ("register", "Registrations"),
+        ("first_cv_started", "Started first CV"),
+        ("first_cv_completed", "Completed first CV"),
+        ("first_cv_downloaded", "Downloaded first CV"),
+    ]
+    metrics = [{"label": "Unique landing sessions", "count": landing_sessions}]
+    counts = {}
+    for action, label in actions:
+        query = db.session.query(db.func.count(db.distinct(ActivityLog.user_id))).filter(
+            ActivityLog.action == action, ActivityLog.user_id.in_(cohort))
+        if action == "register":
+            query = query.filter(ActivityLog.created_at >= cutoff)
+        count = query.scalar() or 0
+        counts[action] = count
+        metrics.append({"label": label, "count": count})
+    registrations = counts.get("register", 0)
+    landing_rate = round(len(converted_sessions) * 100 / landing_sessions, 1) if landing_sessions else 0
+    metrics.append({"label": "Landing session → registration", "rate": landing_rate})
+    for key, label in (("first_cv_started", "Registration → first CV start"),
+                       ("first_cv_completed", "Registration → first CV completion"),
+                       ("first_cv_downloaded", "Registration → first CV download")):
+        metrics.append({"label": label, "rate": round(counts.get(key, 0) * 100 / registrations, 1) if registrations else 0})
+    return render_template("admin/conversion.html", metrics=metrics, days=30)
 
 
 # ── Users ─────────────────────────────────────────────────────────

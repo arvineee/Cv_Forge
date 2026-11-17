@@ -10,31 +10,31 @@
   <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
     <div>
       <label class="block text-sm font-medium text-gray-700 mb-1">Full name</label>
-      <input name="full_name" required value="{{ (resume.personal_info or {}).get('full_name', '') }}"
+      <input name="full_name" required value="{{ (resume.personal_info or {}).get('full_name', ((current_user.first_name or '') ~ ' ' ~ (current_user.last_name or '')).strip()) }}"
              class="w-full rounded-lg border border-gray-200 px-3 py-2.5 min-h-[44px] text-base sm:text-sm">
     </div>
     <div>
       <label class="block text-sm font-medium text-gray-700 mb-1">Job title / headline</label>
-      <input name="job_title" placeholder="e.g. Software Engineer" value="{{ (resume.personal_info or {}).get('job_title', '') }}"
+      <input name="job_title" placeholder="e.g. Software Engineer" value="{{ (resume.personal_info or {}).get('job_title', (current_user.profile.job_title if current_user.profile else '') or '') }}"
              class="w-full rounded-lg border border-gray-200 px-3 py-2.5 min-h-[44px] text-base sm:text-sm">
     </div>
   </div>
   <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
     <div>
       <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-      <input name="email" type="email" value="{{ (resume.personal_info or {}).get('email', '') }}"
+      <input name="email" type="email" value="{{ (resume.personal_info or {}).get('email', current_user.email) }}"
              class="w-full rounded-lg border border-gray-200 px-3 py-2.5 min-h-[44px] text-base sm:text-sm">
     </div>
     <div>
       <label class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-      <input name="phone" value="{{ (resume.personal_info or {}).get('phone', '') }}"
+      <input name="phone" value="{{ (resume.personal_info or {}).get('phone', (current_user.profile.phone if current_user.profile else '') or '') }}"
              class="w-full rounded-lg border border-gray-200 px-3 py-2.5 min-h-[44px] text-base sm:text-sm">
     </div>
   </div>
   <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
     <div>
       <label class="block text-sm font-medium text-gray-700 mb-1">Location</label>
-      <input name="location" value="{{ (resume.personal_info or {}).get('location', '') }}"
+      <input name="location" value="{{ (resume.personal_info or {}).get('location', (current_user.profile.location if current_user.profile else '') or '') }}"
              class="w-full rounded-lg border border-gray-200 px-3 py-2.5 min-h-[44px] text-base sm:text-sm">
     </div>
     <div>

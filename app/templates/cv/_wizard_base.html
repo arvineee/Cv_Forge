@@ -55,9 +55,60 @@
   </nav>
 
   <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-4 sm:p-6">
+    <div class="flex items-center justify-between gap-3 mb-4 text-xs text-gray-500" aria-live="polite">
+      <span> Your progress is saved as you work.</span>
+      <span id="cv-autosave-status" class="font-medium" data-state="saved">Saved</span>
+    </div>
     {% block wizard_content %}{% endblock %}
   </div>
 
 </div>
+<script>
+(function () {
+  const form = document.querySelector('form[action*="/cv/wizard/"]');
+  const status = document.getElementById('cv-autosave-status');
+  if (!form || !status || !window.fetch) return;
+  let timer = null;
+  let inFlight = false;
+  let pending = false;
+  const setStatus = (label, state) => {
+    status.textContent = label;
+    status.dataset.state = state;
+    status.className = 'font-medium ' + (state === 'error' ? 'text-red-600' : state === 'saving' ? 'text-blue-600' : 'text-green-700');
+  };
+  const save = async () => {
+    if (inFlight) { pending = true; return; }
+    inFlight = true;
+    setStatus('Saving…', 'saving');
+    const data = new FormData(form);
+    data.set('action', 'autosave');
+    try {
+      const response = await fetch(form.action, {method: 'POST', body: data, credentials: 'same-origin', headers: {'X-Requested-With': 'XMLHttpRequest'}});
+      if (!response.ok) throw new Error('Save failed');
+      const result = await response.json();
+      if (!result.ok) throw new Error('Save failed');
+      setStatus('Saved', 'saved');
+    } catch (error) {
+      setStatus('Could not save — check your connection', 'error');
+    } finally {
+      inFlight = false;
+      if (pending) { pending = false; save(); }
+    }
+  };
+  const schedule = () => {
+    setStatus('Unsaved changes', 'saving');
+    window.clearTimeout(timer);
+    timer = window.setTimeout(save, 900);
+  };
+  form.addEventListener('input', schedule);
+  form.addEventListener('change', schedule);
+  form.addEventListener('submit', () => window.clearTimeout(timer));
+  window.addEventListener('beforeunload', (event) => {
+    if (status.dataset.state === 'saving' || status.dataset.state === 'error') {
+      event.preventDefault(); event.returnValue = '';
+    }
+  });
+})();
+</script>
 {% endblock %}
 

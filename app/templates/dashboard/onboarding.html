@@ -1,0 +1,24 @@
+{% extends "base_dashboard.html" %}
+{% block title %}Get started with your first CV — CVForge{% endblock %}
+{% block page_title %}Let's build your first CV{% endblock %}
+{% block page_subtitle %}A simple guided process. You can save your progress and come back at any time.{% endblock %}
+{% block content %}
+<div class="mx-auto max-w-4xl">
+  <div class="rounded-2xl border border-gray-100 bg-white p-6 sm:p-8 shadow-sm">
+    <div class="grid gap-6 sm:grid-cols-3">
+      <div><div class="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-blue-50 font-bold text-blue-700">1</div><h2 class="font-semibold text-gray-900">Add your details</h2><p class="mt-1 text-sm text-gray-500">Start with your name, contact details and professional headline.</p></div>
+      <div><div class="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-blue-50 font-bold text-blue-700">2</div><h2 class="font-semibold text-gray-900">Build your experience</h2><p class="mt-1 text-sm text-gray-500">Add work history, education, skills and any other relevant sections.</p></div>
+      <div><div class="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-blue-50 font-bold text-blue-700">3</div><h2 class="font-semibold text-gray-900">Review and download</h2><p class="mt-1 text-sm text-gray-500">Check your layout, make improvements and choose an available download format.</p></div>
+    </div>
+    <div class="mt-8 rounded-xl bg-gray-50 p-5">
+      <h3 class="font-semibold text-gray-900">Your progress is protected</h3>
+      <p class="mt-1 text-sm text-gray-600">The guided builder saves each step and autosaves edits while you type. You can leave and continue later from your dashboard.</p>
+    </div>
+    <div class="mt-6 flex flex-col gap-3 sm:flex-row">
+      <a href="{{ url_for('cv.wizard_new') }}" class="inline-flex min-h-[46px] items-center justify-center rounded-lg gradient-brand px-6 text-sm font-semibold text-white">{% if has_started %}Start another CV{% else %}Create my first CV{% endif %}</a>
+      <a href="{{ url_for('cv.upload') }}" class="inline-flex min-h-[46px] items-center justify-center rounded-lg border border-gray-200 px-6 text-sm font-semibold text-gray-700">Upload an existing CV</a>
+      <a href="{{ url_for('dashboard.index') }}" class="inline-flex min-h-[46px] items-center justify-center rounded-lg px-4 text-sm font-semibold text-gray-500">Back to dashboard</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

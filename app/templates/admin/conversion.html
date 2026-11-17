@@ -1,0 +1,20 @@
+{% extends "base_dashboard.html" %}
+{% block title %}CV Conversion — Admin{% endblock %}
+{% block page_title %}First CV conversion{% endblock %}
+{% block page_subtitle %}Account-level funnel events recorded in the last {{ days }} days.{% endblock %}
+{% block content %}
+<div class="mb-5 rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900">Counts are unique users, not button clicks. Completion is recorded when a CV has a name, contact email and at least one substantive content section and the user opens its review step.</div>
+<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+{% for item in metrics if item.count is defined %}
+<div class="rounded-xl border border-gray-100 bg-white p-5 shadow-sm"><p class="text-sm text-gray-500">{{ item.label }}</p><p class="mt-2 text-3xl font-bold text-gray-900">{{ item.count }}</p></div>
+{% endfor %}
+</div>
+<div class="mt-6 rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
+<h2 class="font-semibold text-gray-900">Conversion rates</h2>
+<div class="mt-4 space-y-4">
+{% for item in metrics if item.rate is defined %}
+<div><div class="mb-1 flex items-center justify-between gap-3 text-sm"><span class="text-gray-700">{{ item.label }}</span><strong class="text-gray-900">{{ item.rate }}%</strong></div><div class="h-2 overflow-hidden rounded-full bg-gray-100"><div class="h-full rounded-full bg-blue-600" style="width: {{ item.rate }}%"></div></div></div>
+{% endfor %}
+</div>
+</div>
+{% endblock %}

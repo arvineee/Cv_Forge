@@ -76,6 +76,12 @@
     </div>
     {% endif %}
 
+    <div class="px-6 pb-2">
+      <label class="flex items-start gap-3 text-sm text-gray-700">
+        <input type="checkbox" name="email_notifications" class="mt-1 rounded border-gray-300" {% if not current_user.profile or current_user.profile.email_notifications %}checked{% endif %}>
+        <span><strong class="font-semibold">CV progress reminders</strong><span class="block text-xs text-gray-500 mt-0.5">Allow occasional service emails that help you resume an unfinished CV. You can turn these off at any time.</span></span>
+      </label>
+    </div>
     <div class="p-6 flex gap-3">
       <button type="submit"
               class="px-6 py-2.5 gradient-brand text-white font-semibold rounded-lg text-sm hover:opacity-90 transition">

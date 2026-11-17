@@ -11,6 +11,8 @@ dashboard_bp = Blueprint("dashboard", __name__)
 def index():
     resumes = (Resume.query.filter_by(user_id=current_user.id)
                .order_by(Resume.updated_at.desc()).limit(5).all())
+    unfinished_resumes = (Resume.query.filter_by(user_id=current_user.id, status="draft")
+                          .order_by(Resume.updated_at.desc()).limit(10).all())
     cover_letters = (CoverLetter.query.filter_by(user_id=current_user.id, is_archived=False)
                      .order_by(CoverLetter.updated_at.desc()).limit(5).all())
     recent_report = (ATSReport.query.filter_by(user_id=current_user.id)
@@ -26,8 +28,9 @@ def index():
     from app.routes.cv import _plan_allows_public_link
     from datetime import datetime, timezone
     return render_template("dashboard/index.html",
-                           now_utc=datetime.now(timezone.utc).replace(tzinfo=None),  # naive, matches created_at.replace(tzinfo=None) in guide/_prompt.html
+                           now_utc=datetime.now(timezone.utc),
                            resumes=resumes,
+                           unfinished_resumes=unfinished_resumes,
                            cover_letters=cover_letters,
                            recent_report=recent_report,
                            daily_ai_used=daily_ai_used,
@@ -52,11 +55,13 @@ def update_profile():
         for field in ("phone", "location", "job_title", "linkedin_url", "portfolio_url", "github_url", "bio"):
             val = request.form.get(field, "").strip()
             setattr(prof, field, val or None)
+        prof.email_notifications = request.form.get("email_notifications") == "on"
     else:
         prof = Profile(user_id=current_user.id)
         for field in ("phone", "location", "job_title", "linkedin_url", "portfolio_url", "github_url", "bio"):
             val = request.form.get(field, "").strip()
             setattr(prof, field, val or None)
+        prof.email_notifications = request.form.get("email_notifications") == "on"
         db.session.add(prof)
 
     db.session.commit()
@@ -85,3 +90,12 @@ def change_password():
     return redirect(url_for("dashboard.profile"))
 
 
+
+
+@dashboard_bp.route("/onboarding")
+@login_required
+def onboarding():
+    """First-session guide that explains the guided CV path without blocking access."""
+    from app.models import ActivityLog
+    has_started = ActivityLog.query.filter_by(user_id=current_user.id, action="first_cv_started").first() is not None
+    return render_template("dashboard/onboarding.html", has_started=has_started)

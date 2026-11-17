@@ -10,7 +10,7 @@ import secrets
 import requests as http_requests
 from datetime import datetime, timezone, timedelta
 
-from app.models import db, User, Profile, ActivityLog, UserSettings
+from app.models import db, User, Profile, ActivityLog, UserSettings, Resume
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
 
@@ -119,7 +119,7 @@ def register():
         db.session.add(user)
         db.session.flush()
         _create_user_profile(user)
-        _log_activity(user.id, "register", {"method": "email"})
+        _log_activity(user.id, "register", {"method": "email", "session_id": session.get("_visit_sid")})
         db.session.commit()
 
         try:
@@ -181,7 +181,10 @@ def login():
 
         session.pop("impersonator_id", None)
         login_user(user, remember=remember)
-        return redirect(next_url or url_for("dashboard.index"))
+        if next_url:
+            return redirect(next_url)
+        has_cv = Resume.query.filter_by(user_id=user.id).first() is not None
+        return redirect(url_for("dashboard.index") if has_cv else url_for("dashboard.onboarding"))
 
     return render_template("auth/login.html", next_url=next_url)
 
@@ -378,7 +381,6 @@ def google_callback():
     user = User.query.filter_by(google_id=google_id).first()
     if not user:
         user = User.query.filter_by(email=email).first()
-
     if user and not user.is_active:
         flash("Your account has been deactivated. Please contact support.", "error")
         return redirect(url_for("auth.login"))
@@ -405,6 +407,7 @@ def google_callback():
         db.session.add(user)
         db.session.flush()
         _create_user_profile(user)
+        _log_activity(user.id, "register", {"method": "google", "session_id": session.get("_visit_sid")})
 
     user.last_login_at = datetime.now(timezone.utc)
     _log_activity(user.id, "login", {"method": "google"})
@@ -412,7 +415,10 @@ def google_callback():
     session.pop("impersonator_id", None)
     login_user(user, remember=True)
     flash(f"Welcome, {user.first_name or user.email}!", "success")
-    return redirect(next_url or url_for("dashboard.index"))
+    if next_url:
+        return redirect(next_url)
+    has_cv = Resume.query.filter_by(user_id=user.id).first() is not None
+    return redirect(url_for("dashboard.index") if has_cv else url_for("dashboard.onboarding"))
 
 
 

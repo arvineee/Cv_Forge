@@ -478,3 +478,29 @@ def send_plan_changed_email(user, plan_slug, days, admin_note=""):
         _send("Your CVForge AI plan has been updated", user.email, html)
     except Exception as e:
         current_app.logger.warning(f"Plan-changed email send failed: {e}")
+
+
+def send_cv_abandonment_email(user, resume, stage_hours=24):
+    """Remind a verified user about an unfinished CV, with a direct resume link."""
+    Mail, Message = _get_mailer()
+    if not Mail or not current_app.config.get("MAIL_USERNAME"):
+        current_app.logger.info(f"[email stub] CV reminder ({stage_hours}h) skipped for {user.email}")
+        return False
+    try:
+        resume_url = url_for("cv.wizard_start", resume_id=resume.id, _external=True)
+        body = f"""
+          <p style="margin:0 0 16px;">Hi {_first_name(user)},</p>
+          <p style="margin:0 0 16px;">Your CV, <strong>{escape(resume.title)}</strong>, is still waiting for you in CVForge.</p>
+          <p style="margin:0 0 16px;">Your progress is saved. Pick up where you left off, add the details you want, and review your CV when you are ready.</p>"""
+        html = _render_email(
+            preheader="Your CV draft is saved. Continue whenever you are ready.",
+            body_html=body, cta_label="Continue my CV", cta_url=resume_url,
+            footer_note="You are receiving this service reminder because you started creating a CV on CVForge.",
+            hero_title="Your CV is waiting",
+            hero_text="Your saved progress is ready when you are."
+        )
+        _send("Your CV draft is waiting for you", user.email, html)
+        return True
+    except Exception as e:
+        current_app.logger.warning(f"CV abandonment email failed for user {user.id}: {e}")
+        raise

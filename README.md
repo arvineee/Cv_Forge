@@ -145,3 +145,9 @@ One-time setup in GitHub → Settings → Secrets and variables → Actions:
 | Variable | `PA_HOST` | only for EU accounts: `eu.pythonanywhere.com` |
 
 Notes: files deleted from git are not deleted on the server, and new dependencies in `requirements.txt` still need `pip install` in a PythonAnywhere console. Preview what would upload with `python scripts/pa_deploy.py --dry-run`.
+
+## Sprint 003 — First CV conversion
+
+This release adds first-time onboarding, direct guided-CV entry, dashboard draft recovery, debounced wizard autosave, first-CV conversion events, an admin conversion funnel (`/admin/conversion`), and opt-out-aware abandoned-CV email reminders.
+
+No database migration is required. See `SPRINT_003_CHANGELOG.md` for the feature list and validation status, and `SPRINT_003_DEPLOYMENT.md` for backup, staging, credential-rotation and PythonAnywhere scheduled-task instructions. The reminder task is opt-in and must be scheduled deliberately with `flask send-cv-reminders` after staging email verification.

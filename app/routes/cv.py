@@ -242,6 +242,8 @@ def create_cv():
     db.session.add(resume)
     db.session.flush()
     _log("cv_create", resume.id, {"title": title})
+    from app.services.conversion_tracking import mark_cv_started
+    mark_cv_started(current_user.id, resume.id, source="builder")
     db.session.commit()
     # NOTE: builder.html's Alpine init() calls this via fetch() and regexes
     # the response URL for /cv/builder/(\d+) to pick up resumeId — keep
@@ -263,6 +265,8 @@ def wizard_new():
     db.session.add(resume)
     db.session.flush()
     _log("cv_create", resume.id, {"title": title, "via": "wizard"})
+    from app.services.conversion_tracking import mark_cv_started
+    mark_cv_started(current_user.id, resume.id, source="wizard")
     db.session.commit()
     return redirect(url_for("cv.wizard_step", resume_id=resume.id, step="personal_info"))
 
@@ -292,7 +296,10 @@ def autosave(resume_id):
     if "title" in data:
         resume.title = (data["title"] or resume.title)[:255]
 
+    from app.services.conversion_tracking import mark_cv_started
+    mark_cv_started(current_user.id, resume.id, source="autosave")
     db.session.commit()
+    return jsonify({"ok": True, "saved_at": datetime.now(timezone.utc).isoformat()})
     return jsonify({"success": True, "updated_at": resume.updated_at.isoformat()})
 
 
@@ -438,6 +445,9 @@ def wizard_start(resume_id):
     returning to an in-progress CV picks up where they left off instead of
     always restarting at personal info."""
     resume = Resume.query.filter_by(id=resume_id, user_id=current_user.id).first_or_404()
+    from app.services.conversion_tracking import mark_cv_started
+    mark_cv_started(current_user.id, resume.id, source="resume_continue")
+    db.session.commit()
     order = {
         "personal_info": resume.personal_info,
         "professional_summary": resume.professional_summary,
@@ -467,6 +477,9 @@ def wizard_step(resume_id, step):
     )
 
     if step == "review":
+        from app.services.conversion_tracking import mark_cv_completed
+        if mark_cv_completed(current_user.id, resume):
+            db.session.commit()
         plan = _current_plan()
         allow_docx = _plan_allows_docx()
         allow_coach = bool(current_user.is_premium and plan and plan.allow_career_coach)
@@ -516,6 +529,7 @@ def wizard_step_save(resume_id, step):
         abort(404)
     resume = Resume.query.filter_by(id=resume_id, user_id=current_user.id).first_or_404()
     action = request.form.get("action", "next")
+    is_autosave = action == "autosave"
     enhance_index = None
     if action.startswith("enhance:"):
         try:
@@ -604,7 +618,7 @@ def wizard_step_save(resume_id, step):
         resume.professional_summary = request.form.get("content", "").strip() or None
     elif step == "work_experience":
         jobs = _parse_jobs_from_form(request.form)
-        if jobs:
+        if jobs or is_autosave:
             resume.work_experience = jobs
     elif step == "education":
         # Field names match what builder.html / docx_service / pdf_service
@@ -623,7 +637,7 @@ def wizard_step_save(resume_id, step):
                 "year": years[i].strip() if i < len(years) else "",
                 "grade": grades[i].strip() if i < len(grades) else "",
             })
-        if entries:
+        if entries or is_autosave:
             resume.education = entries
     elif step == "skills":
         raw = request.form.get("content", "")
@@ -661,7 +675,15 @@ def wizard_step_save(resume_id, step):
         else:
             apply_section(resume, "references", raw)
 
+    if is_autosave:
+        from app.services.conversion_tracking import mark_cv_started
+        mark_cv_started(current_user.id, resume.id, source="wizard_autosave")
+        db.session.commit()
+        return jsonify({"ok": True, "saved_at": datetime.now(timezone.utc).isoformat()})
+
     _log("cv_wizard_step", resume.id, {"step": step})
+    from app.services.conversion_tracking import mark_cv_started
+    mark_cv_started(current_user.id, resume.id, source="wizard_step")
     db.session.commit()
 
     nxt = _wizard_next_step(step)
@@ -776,6 +798,8 @@ def upload():
         db.session.add(resume)
         db.session.flush()
         _log("cv_upload", resume.id, {"filename": filename})
+        from app.services.conversion_tracking import mark_cv_started
+        mark_cv_started(current_user.id, resume.id, source="upload")
         db.session.commit()
 
         if not parsed_name and not normalized_work and not parsed.get("education"):
@@ -1161,6 +1185,10 @@ def download(resume_id, fmt):
         resume.download_count = (resume.download_count or 0) + 1
         resume.last_downloaded_at = datetime.now(timezone.utc)
         _log("cv_download", resume.id, {"format": fmt})
+        from app.services.conversion_tracking import mark_cv_completed, record_event
+        mark_cv_completed(current_user.id, resume)
+        if not ActivityLog.query.filter_by(user_id=current_user.id, action="first_cv_downloaded").first():
+            record_event(current_user.id, "first_cv_downloaded", details={"resume_id": resume.id, "format": fmt})
         db.session.commit()
 
         _cleanup_after_send(file_path)
