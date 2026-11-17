@@ -15,7 +15,7 @@ from flask import Blueprint, render_template, request, flash, redirect, url_for,
 from flask_login import login_required, current_user
 from functools import wraps
 from app.models import (db, User, Payment, Subscription, ActivityLog, AIUsage, Template,
-                        PricingPlan, Offer, OfferRedemption, Feedback,
+                        PricingPlan, Offer, OfferRedemption, Feedback, Resume,
                         ManualPaymentClaim, BroadcastEmail, Notification, PageVisit, utcnow)
 
 admin_bp = Blueprint("admin", __name__)
@@ -41,12 +41,22 @@ def index():
     premium_users = User.query.filter_by(plan="premium").count()
     total_revenue = db.session.query(
         db.func.sum(Payment.amount)
-    ).filter_by(status="success").scalar() or 0
+    ).filter_by(status="success", currency="KES").scalar() or 0
     daily_ai_usage = AIUsage.get_total_daily_count()
 
     from app.services.nudge_service import get_nudge_candidates
     nudge_due_count = len(get_nudge_candidates())
     pending_claims = ManualPaymentClaim.query.filter_by(status="pending").count()
+
+    # Lightweight operational snapshot for the admin home. These are read-only
+    # aggregate queries and reuse the existing tables; no schema changes needed.
+    from datetime import datetime, timedelta, timezone
+    seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
+    new_users_7d = User.query.filter(User.created_at >= seven_days_ago).count()
+    total_resumes = Resume.query.count()
+    draft_resumes = Resume.query.filter_by(status="draft").count()
+    recent_users = User.query.order_by(User.created_at.desc()).limit(6).all()
+    recent_payments = Payment.query.order_by(Payment.created_at.desc()).limit(5).all()
 
     return render_template("admin/index.html",
                            total_users=total_users,
@@ -55,7 +65,12 @@ def index():
                            total_revenue=total_revenue,
                            daily_ai_usage=daily_ai_usage,
                            nudge_due_count=nudge_due_count,
-                           pending_claims=pending_claims)
+                           pending_claims=pending_claims,
+                           new_users_7d=new_users_7d,
+                           total_resumes=total_resumes,
+                           draft_resumes=draft_resumes,
+                           recent_users=recent_users,
+                           recent_payments=recent_payments)
 
 
 @admin_bp.route("/conversion")

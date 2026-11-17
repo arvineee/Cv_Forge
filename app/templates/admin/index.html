@@ -1,99 +1,148 @@
 {% extends "base_dashboard.html" %}
-{% block title %}Admin Dashboard{% endblock %}
-{% block page_title %}Admin Dashboard{% endblock %}
-{% block page_subtitle %}Platform overview{% endblock %}
+{% block title %}Admin Overview — CVForge{% endblock %}
+{% block page_title %}Platform overview{% endblock %}
+{% block page_subtitle %}A clear view of your users, revenue and platform operations.{% endblock %}
+
+{% block extra_head %}
+<style>
+  .admin-shell{color:#172033}
+  .admin-hero{background:linear-gradient(120deg,#111c36 0%,#1e3a68 58%,#2456a4 100%);border-radius:22px;color:#fff;padding:26px;position:relative;overflow:hidden}
+  .admin-hero:after{content:"";position:absolute;width:250px;height:250px;border:1px solid rgba(255,255,255,.12);border-radius:50%;right:-65px;top:-115px;box-shadow:0 0 0 28px rgba(255,255,255,.035),0 0 0 58px rgba(255,255,255,.025)}
+  .admin-kicker{font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:#b9c9e5;font-weight:700}
+  .admin-stat{background:#fff;border:1px solid #e7ebf2;border-radius:16px;padding:18px;box-shadow:0 3px 12px rgba(15,23,42,.035);min-width:0}
+  .admin-stat-label{font-size:12px;color:#64748b;font-weight:600}
+  .admin-stat-value{font-size:29px;line-height:1.2;font-weight:750;letter-spacing:-.04em;color:#14213b;margin-top:9px}
+  .admin-stat-note{font-size:11px;color:#8491a5;margin-top:6px}
+  .admin-icon{width:38px;height:38px;border-radius:12px;display:flex;align-items:center;justify-content:center}
+  .admin-panel{background:#fff;border:1px solid #e7ebf2;border-radius:17px;box-shadow:0 3px 12px rgba(15,23,42,.03)}
+  .admin-panel-head{padding:18px 20px;border-bottom:1px solid #edf0f5;display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .admin-panel-body{padding:18px 20px}
+  .admin-link{display:flex;align-items:center;gap:12px;padding:12px;border:1px solid #edf0f5;border-radius:12px;color:#26344d;text-decoration:none;transition:.18s ease;min-width:0}
+  .admin-link:hover{border-color:#b9c9e5;background:#f8faff;transform:translateY(-1px)}
+  .admin-link-icon{width:36px;height:36px;flex:0 0 36px;border-radius:10px;background:#eef4ff;color:#2857a4;display:flex;align-items:center;justify-content:center}
+  .admin-link-title{font-size:13px;font-weight:700}
+  .admin-link-desc{font-size:11px;color:#8491a5;margin-top:2px}
+  .admin-table-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid #f0f2f6}
+  .admin-table-row:last-child{border-bottom:0}
+  .admin-avatar{height:34px;width:34px;border-radius:50%;background:#eaf0fb;color:#244c8c;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex:0 0 34px}
+  .admin-pill{display:inline-flex;align-items:center;border-radius:999px;padding:4px 8px;font-size:10px;font-weight:700;white-space:nowrap}
+  @media(max-width:640px){.admin-hero{padding:21px}.admin-stat{padding:15px}.admin-stat-value{font-size:25px}.admin-panel-body{padding:14px}}
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-  {% for label, value, color in [
-    ('Total Users', total_users, 'blue'),
-    ('Pro Users', pro_users, 'purple'),
-    ('Premium Users', premium_users, 'indigo'),
-    ('Revenue (KES)', total_revenue, 'green'),
-  ] %}
-  <div class="bg-white rounded-xl p-5 border border-gray-100 shadow-sm">
-    <p class="text-sm text-gray-500">{{ label }}</p>
-    <p class="text-3xl font-bold text-{{ color }}-600 mt-1">{{ value }}</p>
-  </div>
-  {% endfor %}
-</div>
-
-{# ── Alert bar: only shown when something actually needs attention ── #}
-{% if pending_claims %}
-<div class="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 flex items-start gap-3">
-  <div class="w-9 h-9 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
-    <span class="text-amber-700 text-lg">!</span>
-  </div>
-  <div class="flex-1">
-    <p class="font-semibold text-amber-900 text-sm">
-      {{ pending_claims }} manual payment claim{{ 's' if pending_claims != 1 else '' }} waiting for review
-    </p>
-    <p class="text-xs text-amber-800 mt-0.5">
-      These are users whose payment didn't reach us via webhook and pasted their M-Pesa confirmation instead.
-      Review them to either activate the plan or reject with a reason.
-    </p>
-  </div>
-  <a href="{{ url_for('admin.claims') }}"
-     class="flex-shrink-0 px-3 py-1.5 rounded-lg bg-amber-600 text-white text-xs font-semibold hover:bg-amber-700 self-center">
-    Review
-  </a>
-</div>
-{% endif %}
-
-<div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-  <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-    <h2 class="font-semibold mb-4">AI Usage Today</h2>
-    <p class="text-4xl font-bold text-blue-600">{{ daily_ai_usage }}</p>
-    <p class="text-sm text-gray-400 mt-1">API calls made today</p>
-  </div>
-
-  <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-    <div class="flex items-center justify-between mb-4">
-      <h2 class="font-semibold">Pro-Upgrade Nudges</h2>
-      {% if nudge_due_count %}
-      <span class="text-xs font-semibold px-2 py-1 rounded-full bg-yellow-100 text-yellow-700">{{ nudge_due_count }} due</span>
-      {% endif %}
+<div class="admin-shell space-y-6">
+  <section class="admin-hero">
+    <div class="relative" style="z-index:1;max-width:680px">
+      <div class="admin-kicker">CVForge administration · Overview</div>
+      <h2 class="text-2xl sm:text-3xl font-bold mt-2 tracking-tight">Good to see you, {{ current_user.first_name or 'Admin' }}.</h2>
+      <p class="text-sm mt-2" style="color:#d5e1f3;max-width:560px">Monitor platform health, follow customer activity and reach the tools you need to run CVForge.</p>
+      <div class="flex flex-wrap gap-2 mt-5">
+        <a href="{{ url_for('admin.users') }}" class="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold" style="background:#fff;color:#17345f">Manage users <span aria-hidden="true">→</span></a>
+        <a href="{{ url_for('admin.growth') }}" class="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold" style="background:rgba(255,255,255,.13);color:#fff;border:1px solid rgba(255,255,255,.24)">View growth report</a>
+      </div>
     </div>
-    <p class="text-4xl font-bold {{ 'text-orange-600' if nudge_due_count else 'text-gray-300' }}">{{ nudge_due_count }}</p>
-    <p class="text-sm text-gray-400 mt-1 mb-3">Free users due for a reminder</p>
-    <a href="{{ url_for('admin.nudges') }}" class="text-sm text-blue-600 hover:underline font-medium">Review & send →</a>
-  </div>
+  </section>
 
-  <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-    <div class="flex items-center justify-between mb-4">
-      <h2 class="font-semibold">Payment Claims</h2>
-      {% if pending_claims %}
-      <span class="text-xs font-semibold px-2 py-1 rounded-full bg-amber-100 text-amber-700">{{ pending_claims }} pending</span>
-      {% endif %}
+  {% if pending_claims %}
+  <section class="rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center gap-3" style="background:#fff8e8;border:1px solid #f4d79b">
+    <div class="admin-icon" style="background:#ffedc2;color:#9a5a00;font-size:20px;font-weight:800">!</div>
+    <div class="flex-1 min-w-0">
+      <p class="font-bold text-sm" style="color:#744400">{{ pending_claims }} payment claim{{ 's' if pending_claims != 1 else '' }} need your review</p>
+      <p class="text-xs mt-1" style="color:#95651c">Review manual payment confirmations before activating or rejecting the related plans.</p>
     </div>
-    <p class="text-4xl font-bold {{ 'text-amber-600' if pending_claims else 'text-gray-300' }}">{{ pending_claims }}</p>
-    <p class="text-sm text-gray-400 mt-1 mb-3">Manual claims awaiting review</p>
-    <a href="{{ url_for('admin.claims') }}" class="text-sm text-blue-600 hover:underline font-medium">Open claims →</a>
-  </div>
+    <a href="{{ url_for('admin.claims') }}" class="rounded-lg px-4 py-2 text-sm font-semibold text-white text-center" style="background:#a76508">Review claims</a>
+  </section>
+  {% endif %}
 
-  <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-6 md:col-span-2 lg:col-span-3">
-    <h2 class="font-semibold mb-4">Quick Links</h2>
-    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2">
-      {% for label, endpoint in [
-        ('Growth & Conversion', 'admin.growth'),
-        ('First CV Conversion Funnel', 'admin.conversion'),
-        ('Manage Users', 'admin.users'),
-        ('Pricing Plans', 'admin.pricing'),
-        ('Offers & Discounts', 'admin.offers'),
-        ('User Feedback', 'admin.feedback'),
-        ('CV Templates', 'admin.templates'),
-        ('Payments', 'admin.payments'),
-        ('Payment Methods (on/off)', 'admin.payment_methods'),
-        ('Visitors', 'admin.visitors'),
-        ('Pro-Upgrade Nudges', 'admin.nudges'),
-        ('Payment Claims', 'admin.claims'),
-        ('Manual Plan Activation', 'admin.manual_plan'),
-        ('Broadcast Email', 'admin.broadcast'),
-      ] %}
-      <a href="{{ url_for(endpoint) }}"
-         class="block text-sm text-blue-600 hover:underline py-1">{{ label }} →</a>
-      {% endfor %}
+  <section>
+    <div class="flex items-center justify-between mb-3 gap-3">
+      <div><h3 class="font-bold text-base">Business snapshot</h3><p class="text-xs text-gray-500 mt-1">Current totals and recent activity</p></div>
+      <span class="text-xs text-gray-400">Live database figures</span>
     </div>
-  </div>
+    <div class="grid grid-cols-2 xl:grid-cols-4 gap-3">
+      <article class="admin-stat">
+        <div class="flex items-center justify-between gap-2"><span class="admin-stat-label">Total users</span><span class="admin-icon" style="background:#edf4ff;color:#2857a4"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></span></div>
+        <div class="admin-stat-value">{{ '{:,}'.format(total_users) }}</div><p class="admin-stat-note">{{ new_users_7d }} new in the last 7 days</p>
+      </article>
+      <article class="admin-stat">
+        <div class="flex items-center justify-between gap-2"><span class="admin-stat-label">Paid subscribers</span><span class="admin-icon" style="background:#f2edff;color:#6941a5"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span></div>
+        <div class="admin-stat-value">{{ '{:,}'.format(pro_users + premium_users) }}</div><p class="admin-stat-note">{{ pro_users }} Pro · {{ premium_users }} Premium</p>
+      </article>
+      <article class="admin-stat">
+        <div class="flex items-center justify-between gap-2"><span class="admin-stat-label">Successful revenue</span><span class="admin-icon" style="background:#e9f8f0;color:#16834b"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h3"/></svg></span></div>
+        <div class="admin-stat-value" style="font-size:25px">KES {{ '{:,.0f}'.format(total_revenue) }}</div><p class="admin-stat-note">Successful payments recorded</p>
+      </article>
+      <article class="admin-stat">
+        <div class="flex items-center justify-between gap-2"><span class="admin-stat-label">CV documents</span><span class="admin-icon" style="background:#fff3e8;color:#b65b18"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h8"/></svg></span></div>
+        <div class="admin-stat-value">{{ '{:,}'.format(total_resumes) }}</div><p class="admin-stat-note">{{ draft_resumes }} currently marked as drafts</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="grid lg:grid-cols-3 gap-4">
+    <div class="admin-panel lg:col-span-2">
+      <div class="admin-panel-head"><div><h3 class="font-bold text-sm">Administration</h3><p class="text-xs text-gray-500 mt-1">Management tools and platform controls</p></div><span class="admin-pill" style="background:#edf4ff;color:#2857a4">14 tools</span></div>
+      <div class="admin-panel-body grid sm:grid-cols-2 gap-2">
+        {% for label, desc, endpoint, symbol in [
+          ('Growth & conversion','Signups, activation and revenue','admin.growth','↗'),
+          ('First-CV funnel','Track start, completion and download','admin.conversion','◫'),
+          ('User management','Search, review and manage accounts','admin.users','♙'),
+          ('Pricing plans','Manage subscriptions and pricing','admin.pricing','◇'),
+          ('Offers & discounts','Configure promotional offers','admin.offers','％'),
+          ('Customer feedback','Review user suggestions','admin.feedback','✉'),
+          ('CV templates','Manage available CV designs','admin.templates','▤'),
+          ('Payments','Review payment transactions','admin.payments','▣'),
+          ('Payment settings','Enable or pause payment providers','admin.payment_methods','⚙'),
+          ('Visitor analytics','Inspect traffic and page visits','admin.visitors','◎'),
+          ('Upgrade reminders','Review eligible Pro nudges','admin.nudges','⌁'),
+          ('Payment claims','Resolve manual payment claims','admin.claims','✓'),
+          ('Manual plan activation','Grant approved plan access','admin.manual_plan','＋'),
+          ('Broadcast email','Prepare and send user announcements','admin.broadcast','➤')
+        ] %}
+        <a href="{{ url_for(endpoint) }}" class="admin-link">
+          <span class="admin-link-icon" aria-hidden="true">{{ symbol }}</span>
+          <span class="min-w-0"><span class="admin-link-title block">{{ label }}</span><span class="admin-link-desc block">{{ desc }}</span></span>
+          <span class="ml-auto text-gray-300" aria-hidden="true">→</span>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="space-y-4">
+      <section class="admin-panel">
+        <div class="admin-panel-head"><div><h3 class="font-bold text-sm">Operational queue</h3><p class="text-xs text-gray-500 mt-1">Items that may need attention</p></div></div>
+        <div class="admin-panel-body space-y-3">
+          <a href="{{ url_for('admin.claims') }}" class="flex items-center justify-between gap-3 text-sm"><span class="text-gray-600">Pending payment claims</span><strong class="{{ 'text-amber-600' if pending_claims else 'text-gray-400' }}">{{ pending_claims }}</strong></a>
+          <a href="{{ url_for('admin.nudges') }}" class="flex items-center justify-between gap-3 text-sm"><span class="text-gray-600">Upgrade reminders due</span><strong class="{{ 'text-blue-600' if nudge_due_count else 'text-gray-400' }}">{{ nudge_due_count }}</strong></a>
+          <div class="flex items-center justify-between gap-3 text-sm"><span class="text-gray-600">AI requests today</span><strong class="text-gray-800">{{ '{:,}'.format(daily_ai_usage) }}</strong></div>
+        </div>
+      </section>
+      <section class="admin-panel">
+        <div class="admin-panel-head"><div><h3 class="font-bold text-sm">Latest registrations</h3><p class="text-xs text-gray-500 mt-1">Most recently created accounts</p></div><a href="{{ url_for('admin.users') }}" class="text-xs font-semibold" style="color:#2857a4">View all →</a></div>
+        <div class="admin-panel-body">
+          {% for user in recent_users %}
+          <div class="admin-table-row">
+            <div class="flex items-center gap-2 min-w-0"><span class="admin-avatar">{{ (user.first_name[0] if user.first_name else user.email[0])|upper }}</span><div class="min-w-0"><p class="text-xs font-semibold text-gray-800 truncate">{{ user.full_name or user.email }}</p><p class="text-[10px] text-gray-400 truncate">{{ user.email }}</p></div></div>
+            <span class="admin-pill" style="background:{{ '#eaf8f0' if user.plan != 'free' else '#f1f3f6' }};color:{{ '#177245' if user.plan != 'free' else '#657184' }}">{{ user.plan|title }}</span>
+          </div>
+          {% else %}<p class="text-xs text-gray-400 py-3">No user registrations yet.</p>{% endfor %}
+        </div>
+      </section>
+    </div>
+  </section>
+
+  <section class="admin-panel">
+    <div class="admin-panel-head"><div><h3 class="font-bold text-sm">Recent payment activity</h3><p class="text-xs text-gray-500 mt-1">Latest transactions across the platform</p></div><a href="{{ url_for('admin.payments') }}" class="text-xs font-semibold" style="color:#2857a4">All payments →</a></div>
+    <div class="admin-panel-body">
+      {% for payment in recent_payments %}
+      <div class="admin-table-row">
+        <div class="min-w-0"><p class="text-xs font-semibold text-gray-800">Payment #{{ payment.id }}</p><p class="text-[10px] text-gray-400">{{ payment.created_at.strftime('%d %b %Y, %H:%M') if payment.created_at else 'Date unavailable' }} · {{ payment.currency or 'KES' }}</p></div>
+        <div class="text-right"><p class="text-xs font-bold text-gray-800">{{ payment.currency or 'KES' }} {{ '{:,.2f}'.format(payment.amount or 0) }}</p><span class="admin-pill" style="background:{{ '#eaf8f0' if payment.status == 'success' else '#fff4e5' if payment.status == 'pending' else '#fff0f0' }};color:{{ '#177245' if payment.status == 'success' else '#9a6200' if payment.status == 'pending' else '#a33b3b' }}">{{ payment.status|title }}</span></div>
+      </div>
+      {% else %}<p class="text-xs text-gray-400 py-3">No payment records yet.</p>{% endfor %}
+    </div>
+  </section>
+  <p class="text-[11px] text-gray-400 text-center">CVForge Admin · Figures are read from existing platform records. Revenue is shown in KES as currently aggregated by the existing dashboard query.</p>
 </div>
 {% endblock %}
