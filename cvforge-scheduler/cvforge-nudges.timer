@@ -1,0 +1,12 @@
+[Unit]
+Description=Run CVForge Pro nudges daily
+
+[Timer]
+# 09:00 server time. Check with: timedatectl
+OnCalendar=*-*-* 09:00:00
+# If the server was off at 09:00, run once when it comes back.
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

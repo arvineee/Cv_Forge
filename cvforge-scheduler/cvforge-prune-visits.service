@@ -1,0 +1,10 @@
+[Unit]
+Description=CVForge prune old page-visit rows
+
+[Service]
+Type=oneshot
+User=www-data
+WorkingDirectory=/var/www/cvforge
+EnvironmentFile=/var/www/cvforge/.env
+Environment=FLASK_APP=run.py
+ExecStart=/var/www/cvforge/venv/bin/flask prune-visits
