@@ -501,6 +501,63 @@ def visitors():
                            top_pages=top_pages, daily=daily, days=days)
 
 
+# ── Growth dashboard ──────────────────────────────────────────────
+
+@admin_bp.route("/growth")
+@login_required
+@admin_required
+def growth():
+    """Founder-facing acquisition, activation and revenue snapshot.
+
+    Uses existing User, ActivityLog and Payment records; no schema migration
+    or third-party analytics dependency is required. Revenue is grouped by
+    currency so future multi-currency transactions are never added together.
+    """
+    from datetime import timedelta
+    from sqlalchemy import func
+
+    days = request.args.get("days", 30, type=int)
+    if days not in (7, 30, 90):
+        days = 30
+    cutoff = utcnow() - timedelta(days=days)
+
+    signups = User.query.filter(User.created_at >= cutoff).count()
+    activated_users = (db.session.query(func.count(func.distinct(User.id)))
+        .join(ActivityLog, ActivityLog.user_id == User.id)
+        .filter(User.created_at >= cutoff,
+                ActivityLog.action == "cv_create",
+                ActivityLog.created_at >= cutoff).scalar()) or 0
+
+    paid_customers = (db.session.query(func.count(func.distinct(User.id)))
+        .join(Payment, Payment.user_id == User.id)
+        .filter(User.created_at >= cutoff,
+                Payment.status == "success",
+                Payment.created_at >= cutoff).scalar()) or 0
+
+    revenue_rows = (db.session.query(Payment.currency, func.sum(Payment.amount))
+        .filter(Payment.status == "success", Payment.created_at >= cutoff)
+        .group_by(Payment.currency).all())
+    revenue_by_currency = [
+        {"currency": currency or "KES", "amount": int(amount or 0)}
+        for currency, amount in revenue_rows
+    ]
+
+    signup_daily = (db.session.query(func.date(User.created_at).label("day"),
+                                      func.count(User.id).label("count"))
+        .filter(User.created_at >= cutoff)
+        .group_by("day").order_by("day").all())
+
+    activation_rate = round((activated_users / signups) * 100, 1) if signups else 0
+    paid_conversion = round((paid_customers / signups) * 100, 1) if signups else 0
+
+    return render_template(
+        "admin/growth.html", days=days, signups=signups,
+        activated_users=activated_users, paid_customers=paid_customers,
+        revenue_by_currency=revenue_by_currency, signup_daily=signup_daily,
+        activation_rate=activation_rate, paid_conversion=paid_conversion,
+    )
+
+
 # ── Offers (time-limited discounts) ───────────────────────────────
 
 def _offer_form_values(form):

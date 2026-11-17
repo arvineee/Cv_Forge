@@ -66,6 +66,7 @@ flask run
 ## Admin Panel Routes
 
 - `/admin/` — Dashboard
+- `/admin/growth` — Founder growth dashboard: registration, CV activation, paid-customer conversion, and successful revenue grouped by currency
 - `/admin/users` — User management (includes impersonate, audit-logged)
 - `/admin/pricing` — Edit pricing plans (name, price, features, limits, and per-plan toggles for DOCX export, version history, AI Career Coach, and public CV sharing)
 - `/admin/templates` — Manage CV templates (add/edit/enable/disable)
@@ -110,7 +111,7 @@ Admin -> **Payment methods** switches Paystack and IntaSend on or off for *new* 
 - **SQLite strips tzinfo on read-back**, even on `DateTime(timezone=True)` columns. The app's convention is naive UTC via `models.utcnow()` on write, and `models._make_aware()` before any comparison against a DB-read datetime. Follow this pattern for any new expiry/timestamp field, or you'll hit `TypeError: can't compare offset-naive and offset-aware datetimes`.
 - **`with_for_update()` row locking in the webhook handler is a no-op on SQLite** — it only actually prevents concurrent double-processing on Postgres/MySQL. The `status == "active"` idempotency check still helps in the meantime.
 - **IntaSend sandbox and live are separate accounts** (`sandbox.intasend.com` vs `payment.intasend.com`), not a dashboard toggle. Mismatched keys/env produce a confusing `authentication_failed: Invalid token for sandbox environment` error rather than a clear "wrong account" message — `IntaSendService` logs its resolved mode (`SANDBOX`/`LIVE`) on every init to make this easier to catch.
-- **`GEMINI_MODEL`** — verify the configured model id is still current for your `google-generativeai` SDK version before deploying; `google-generativeai` itself is deprecated in favor of `google-genai` (still functional, no further updates).
+- **`GEMINI_MODEL`** — verify the configured model id is available to your Google AI project and region before deploying. The application uses Google's supported `google-genai` Python SDK.
 - **Blueprint modules live under `app/routes/`** (e.g. `app/routes/cv.py`, `app/routes/dashboard.py`, `app/routes/auth.py`), not directly under `app/`. Cross-file imports between blueprints must use the full `app.routes.<module>` path — a plain `from app.cv import ...` will raise `ModuleNotFoundError` in production even though it may look fine locally depending on your `sys.path`.
 - **No `"free"` plan row currently exists** in the pricing table (see CLI Commands note above) — don't assume `PricingPlan.query.filter_by(slug="free")` will resolve to anything.
 - **`User.is_premium` only recognizes `"pro"`/`"premium"`**, not `"basic"` — a paying Basic subscriber is never `is_premium`. Anything gating a feature on "has the user paid at all" should use `_has_active_paid_plan()` in `cv.py`, not `is_premium`.

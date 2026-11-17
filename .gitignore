@@ -107,3 +107,23 @@ yarn-error.log
 .env.development
 debug.log
 
+
+# Release hygiene: never package repository metadata, credentials, local data,
+# runtime caches, editor state, or generated archives. Keep .env.example tracked.
+.env
+.env.*
+!.env.example
+.git/
+instance/
+*.db
+*.sqlite
+*.sqlite3
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+*.swp
+*.swo
+*.zip
+.DS_Store

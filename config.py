@@ -54,12 +54,9 @@ class Config:
 
     # Gemini AI
     GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-    # FIX: this default ("gemini-3.1-flash-lite") didn't match ai_service.py's
-    # own hardcoded fallback ("gemini-1.5-flash"), so the two could silently
-    # disagree depending on which one actually got used. Aligned to the same
-    # value here — but verify against Google's current model list for your
-    # google-generativeai SDK version before deploying; model names change.
-    GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.1-flash-lite")
+    # Keep this model configurable: verify availability and regional access
+    # against Google's current model catalogue before production rollout.
+    GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite")
     GEMINI_DAILY_LIMIT = int(os.environ.get("GEMINI_DAILY_LIMIT", 1400))
     GEMINI_FREE_USER_DAILY_LIMIT = int(os.environ.get("GEMINI_FREE_USER_DAILY_LIMIT", 3))
 

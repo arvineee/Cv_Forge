@@ -189,27 +189,24 @@ def _validate_revamp(out, source: dict) -> dict:
 
 
 class AIService:
-    # NOTE: verify this is a real, currently-available model id for your
-    # google-generativeai SDK version before deploying — model names change
-    # and this fallback should match config.py's GEMINI_MODEL default.
-    MODEL = "gemini-3.1-flash-lite"
+    """Gemini client wrapper using Google's supported google-genai SDK."""
+    MODEL = "gemini-3.5-flash-lite"
 
     def __init__(self):
         self.api_key = current_app.config.get("GEMINI_API_KEY", "")
         self.model_name = current_app.config.get("GEMINI_MODEL", self.MODEL)
-        self._model = None
+        self._client = None
 
-    def _get_model(self):
-        if self._model is None:
-            import google.generativeai as genai
-            genai.configure(api_key=self.api_key)
-            self._model = genai.GenerativeModel(self.model_name)
-        return self._model
+    def _get_client(self):
+        if self._client is None:
+            from google import genai
+            self._client = genai.Client(api_key=self.api_key)
+        return self._client
 
     def _call(self, prompt: str, feature: str = "general", user_id: int = None,
               *, system_instruction: str = None, config: dict = None,
               context_tag: str = None) -> str:
-        import google.generativeai as genai
+        from google.genai import types
         from app.models import db, AIUsage
 
         if context_tag and feature == "general":
@@ -220,31 +217,30 @@ class AIService:
         if user_id:
             cached = AIUsage.find_cached(prompt_hash, feature)
             if cached and cached.cached_response:
-                current_app.logger.info(f"AI cache hit: {feature}")
+                current_app.logger.info("AI cache hit: %s", feature)
                 return cached.cached_response
 
+        generation_config = dict(config or {})
         if system_instruction:
-            genai.configure(api_key=self.api_key)
-            model = genai.GenerativeModel(self.model_name, system_instruction=system_instruction)
-        else:
-            model = self._get_model()
+            generation_config["system_instruction"] = system_instruction
+        response = self._get_client().models.generate_content(
+            model=self.model_name,
+            contents=prompt,
+            config=types.GenerateContentConfig(**generation_config),
+        )
 
-        if config:
-            response = model.generate_content(prompt, generation_config=config)
-        else:
-            response = model.generate_content(prompt)
-
-        result = response.text
+        result = response.text or ""
+        if not result.strip():
+            raise ValueError("The AI provider returned an empty response.")
 
         if user_id:
-            usage = AIUsage(
+            db.session.add(AIUsage(
                 user_id=user_id,
                 feature=feature,
                 prompt_hash=prompt_hash,
                 cached_response=result,
                 requests_used=1,
-            )
-            db.session.add(usage)
+            ))
 
         return result
 
