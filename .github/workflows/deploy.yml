@@ -1,17 +1,13 @@
-name: Test and deploy to PythonAnywhere
+name: Test and deploy to VPS
 
 on:
   push:
     branches: [main]
+  pull_request:
   workflow_dispatch:
-    inputs:
-      full:
-        description: "Upload ALL files instead of only changed ones"
-        type: boolean
-        default: false
 
 concurrency:
-  group: deploy
+  group: deploy-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -34,22 +30,14 @@ jobs:
 
   deploy:
     needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.0.3
         with:
-          fetch-depth: 0
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - run: pip install requests
-      - name: Upload files and reload web app
-        env:
-          PA_USERNAME: ${{ secrets.PA_USERNAME }}
-          PA_API_TOKEN: ${{ secrets.PA_API_TOKEN }}
-          PA_PROJECT_DIR: ${{ vars.PA_PROJECT_DIR }}
-          PA_DOMAIN: ${{ vars.PA_DOMAIN }}
-          PA_HOST: ${{ vars.PA_HOST }}
-          PA_DB_PATH: ${{ vars.PA_DB_PATH }}
-          PA_FORCE_FULL: ${{ inputs.full }}
-        run: python scripts/pa_deploy.py
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_KEY }}
+          script_stop: true
+          script: ~/Cv_Forge/deploy.sh

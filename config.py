@@ -55,7 +55,7 @@ class Config:
     # Google OAuth
     GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID")
     GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET")
-    GOOGLE_REDIRECT_URI = os.environ.get("GOOGLE_REDIRECT_URI") or "https://cvforge.pythonanywhere.com/auth/google/callback"
+    GOOGLE_REDIRECT_URI = os.environ.get("GOOGLE_REDIRECT_URI") or "https://cvforge.site/auth/google/callback"
 
     # Gemini AI
     GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")

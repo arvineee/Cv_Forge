@@ -14,7 +14,7 @@ def test_blank_optional_environment_values_use_safe_defaults(monkeypatch):
         assert loaded.SQLALCHEMY_DATABASE_URI.startswith("sqlite:///")
         assert loaded.SQLALCHEMY_DATABASE_URI.endswith("/instance/cvforge.db")
         assert loaded.GEMINI_MODEL == "gemini-3.5-flash-lite"
-        assert loaded.GOOGLE_REDIRECT_URI.endswith("/auth/google/callback")
+        assert loaded.GOOGLE_REDIRECT_URI == "https://cvforge.site/auth/google/callback"
     importlib.reload(config)
 
 
