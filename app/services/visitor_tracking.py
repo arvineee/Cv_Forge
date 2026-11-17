@@ -121,7 +121,8 @@ def _start_writer(app):
                 # The writer thread is long-lived, so explicitly discard its
                 # scoped session after every batch. This prevents stale identity
                 # map entries from leaking into later batches.
-                db.session.remove()
+                with app.app_context():
+                    db.session.remove()
                 for _ in batch:
                     visits.task_done()
 
