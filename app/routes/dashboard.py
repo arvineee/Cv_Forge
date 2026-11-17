@@ -26,7 +26,7 @@ def index():
     from app.routes.cv import _plan_allows_public_link
     from datetime import datetime, timezone
     return render_template("dashboard/index.html",
-                           now_utc=datetime.now(timezone.utc),
+                           now_utc=datetime.now(timezone.utc).replace(tzinfo=None),  # naive, matches created_at.replace(tzinfo=None) in guide/_prompt.html
                            resumes=resumes,
                            cover_letters=cover_letters,
                            recent_report=recent_report,
