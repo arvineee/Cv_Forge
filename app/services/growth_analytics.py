@@ -7,7 +7,7 @@ currency.
 """
 from datetime import timedelta
 
-from sqlalchemy import func
+from sqlalchemy import func, select
 
 from app.models import ActivityLog, PageVisit, Payment, User, db, utcnow
 
@@ -20,7 +20,7 @@ ACTIVE_ACTIONS = (
 def _distinct_event_users(action, cohort):
     return (db.session.query(func.count(func.distinct(ActivityLog.user_id)))
             .filter(ActivityLog.action == action,
-                    ActivityLog.user_id.in_(cohort)).scalar()) or 0
+                    ActivityLog.user_id.in_(select(cohort.c.id))).scalar()) or 0
 
 
 def build_growth_report(days=30):

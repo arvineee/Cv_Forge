@@ -24,7 +24,7 @@ def index():
                           .first())
     lowest_plan = annotate_plans([cheapest_paid_plan])[0] if cheapest_paid_plan else None
     from app.routes.cv import _plan_allows_public_link
-    from datetime import datetime, timezone
+    from app.models import utcnow
     return render_template("dashboard/index.html",
                            now_utc=datetime.now(timezone.utc).replace(tzinfo=None),  # naive, matches created_at.replace(tzinfo=None) in guide/_prompt.html
                            resumes=resumes,
