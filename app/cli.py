@@ -39,7 +39,7 @@ def send_nudges():
     result = send_pro_upgrade_nudges()
     click.echo(
         f"Nudges: sent={result['sent']} failed={result['failed']} "
-        f"(of {result['total']} candidates)"
+        f"skipped={result.get('skipped', 0)} (of {result['total']} candidates)"
     )
 
 

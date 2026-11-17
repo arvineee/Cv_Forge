@@ -76,10 +76,18 @@
     </div>
     {% endif %}
 
-    <div class="px-6 pb-2">
+    <div class="px-6 pb-2 space-y-4">
       <label class="flex items-start gap-3 text-sm text-gray-700">
         <input type="checkbox" name="email_notifications" class="mt-1 rounded border-gray-300" {% if not current_user.profile or current_user.profile.email_notifications %}checked{% endif %}>
-        <span><strong class="font-semibold">CV progress reminders</strong><span class="block text-xs text-gray-500 mt-0.5">Allow occasional service emails that help you resume an unfinished CV. You can turn these off at any time.</span></span>
+        <span><strong class="font-semibold">CV progress reminders</strong><span class="block text-xs text-gray-500 mt-0.5">Allow occasional service emails that help you resume an unfinished CV. This is separate from product updates.</span></span>
+      </label>
+      <label class="flex items-start gap-3 text-sm text-gray-700">
+        <input type="checkbox" name="email_newsletter" class="mt-1 rounded border-gray-300" {% if current_user.settings and current_user.settings.email_newsletter %}checked{% endif %}>
+        <span><strong class="font-semibold">Product updates and plan emails</strong><span class="block text-xs text-gray-500 mt-0.5">Allow occasional product news and Pro upgrade reminders. Uncheck to opt out of marketing emails.</span></span>
+      </label>
+      <label class="flex items-start gap-3 text-sm text-gray-700">
+        <input type="checkbox" name="allow_analytics" class="mt-1 rounded border-gray-300" {% if not current_user.settings or current_user.settings.allow_analytics %}checked{% endif %}>
+        <span><strong class="font-semibold">Link usage analytics to my account</strong><span class="block text-xs text-gray-500 mt-0.5">Allow page visits and first-touch campaign attribution to be linked to your account. If unchecked, existing account links and signup attribution are removed; anonymous traffic totals remain.</span></span>
       </label>
     </div>
     <div class="p-6 flex gap-3">

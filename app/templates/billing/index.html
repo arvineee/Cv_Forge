@@ -85,7 +85,7 @@
           <td class="px-6 py-3 capitalize text-gray-900 font-medium">
             {{ payment.subscription.plan if payment.subscription else '—' }}
           </td>
-          <td class="px-6 py-3 font-medium">KES {{ payment.amount }}</td>
+          <td class="px-6 py-3 font-medium">{{ payment.currency or 'KES' }} {{ payment.amount }}</td>
           <td class="px-6 py-3">
             <span class="px-2 py-0.5 rounded-full text-xs font-semibold
               {% if payment.status == 'success' %}bg-green-100 text-green-700
@@ -95,7 +95,7 @@
             </span>
           </td>
           <td class="px-6 py-3 text-gray-400 text-xs font-mono">
-            {{ payment.lipana_transaction_id or payment.lipana_checkout_request_id or '—' }}
+            {{ payment.provider_transaction_id or payment.provider_reference or '—' }}
           </td>
         </tr>
         {% endfor %}

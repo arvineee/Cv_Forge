@@ -2,13 +2,18 @@ import os
 from datetime import timedelta
 
 
+PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+DEFAULT_DATABASE_PATH = os.path.join(PROJECT_ROOT, "instance", "cvforge.db")
+
+
 class Config:
     # Core
     SECRET_KEY = os.environ.get("SECRET_KEY")
     DEBUG = os.environ.get("DEBUG", "false").lower() == "true"
 
-    # Database
-    DATABASE_URL = os.environ.get("DATABASE_URL")
+    # Database: DATABASE_URL is the deployment override; local development
+    # gets a predictable SQLite database when the variable is missing or blank.
+    DATABASE_URL = os.environ.get("DATABASE_URL") or f"sqlite:///{DEFAULT_DATABASE_PATH}"
     SQLALCHEMY_DATABASE_URI = DATABASE_URL
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {"pool_pre_ping": True}
@@ -50,24 +55,17 @@ class Config:
     # Google OAuth
     GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID")
     GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET")
-    GOOGLE_REDIRECT_URI = os.environ.get("GOOGLE_REDIRECT_URI", "https://cvforge.pythonanywhere.com/auth/google/callback")
+    GOOGLE_REDIRECT_URI = os.environ.get("GOOGLE_REDIRECT_URI") or "https://cvforge.pythonanywhere.com/auth/google/callback"
 
     # Gemini AI
     GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
     # Keep this model configurable: verify availability and regional access
     # against Google's current model catalogue before production rollout.
-    GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite")
+    GEMINI_MODEL = os.environ.get("GEMINI_MODEL") or "gemini-3.5-flash-lite"
     GEMINI_DAILY_LIMIT = int(os.environ.get("GEMINI_DAILY_LIMIT", 1400))
     GEMINI_FREE_USER_DAILY_LIMIT = int(os.environ.get("GEMINI_FREE_USER_DAILY_LIMIT", 3))
 
-    # Lipana M-Pesa
-    LIPANA_API_KEY = os.environ.get("LIPANA_API_KEY", "")
-    LIPANA_SECRET = os.environ.get("LIPANA_SECRET", "")
-    LIPANA_WEBHOOK_SECRET = os.environ.get("LIPANA_WEBHOOK_SECRET", "")
-    LIPANA_ENV = os.environ.get("LIPANA_ENV", "sandbox")
-
-    # IntaSend — alternative to Lipana, doesn't require your own Daraja
-    # production credentials. Get keys from the IntaSend dashboard.
+    # IntaSend collections. Get keys from the IntaSend dashboard.
     INTASEND_SECRET_KEY = os.environ.get("INTASEND_SECRET_KEY")
     INTASEND_PUBLISHABLE_KEY = os.environ.get("INTASEND_PUBLISHABLE_KEY")
     INTASEND_ENV = os.environ.get("INTASEND_ENV", "production")

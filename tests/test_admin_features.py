@@ -12,7 +12,6 @@ class Cfg:
     UPLOAD_FOLDER = "/tmp/cvforge-test-uploads"
     GEMINI_FREE_USER_DAILY_LIMIT = 50
     GEMINI_DAILY_LIMIT = 1000
-    LIPANA_WEBHOOK_SECRET = "s"
     INTASEND_WEBHOOK_CHALLENGE = "c"
     SESSION_COOKIE_SECURE = False
     MAIL_USERNAME = None
@@ -22,7 +21,7 @@ class Cfg:
 class Base(unittest.TestCase):
     def setUp(self):
         from app import create_app
-        from app.models import db, User, PricingPlan
+        from app.models import db, User, UserSettings, PricingPlan
         self.db = db
         self.app = create_app(Cfg)
         with self.app.app_context():
@@ -32,6 +31,11 @@ class Base(unittest.TestCase):
             for u in (admin, user):
                 u.set_password("password1")
             db.session.add_all([admin, user])
+            db.session.flush()
+            db.session.add_all([
+                UserSettings(user_id=admin.id, email_newsletter=True),
+                UserSettings(user_id=user.id, email_newsletter=True),
+            ])
             db.session.add_all([
                 PricingPlan(slug="free", name="Free", price_kes=0, billing_period="forever"),
                 PricingPlan(slug="basic", name="Basic", price_kes=300, billing_period="month"),
@@ -194,6 +198,22 @@ class BroadcastTests(Base):
             self.assertEqual((row.recipient_count, row.failed_count), (2, 0))
             from app.routes.admin import _broadcast_state
             self.assertEqual(_broadcast_state(row), ("done", 2))
+
+    def test_broadcast_respects_marketing_opt_out(self):
+        import app.services.email_service as es
+        from app.models import User, UserSettings
+        sent_to = []
+        es.send_broadcast_email = lambda user, s, b, conn=None: sent_to.append(user.email) or True
+        with self.app.app_context():
+            opted_out = User(email="optedout@x.com", is_verified=True)
+            opted_out.set_password("password1")
+            self.db.session.add(opted_out)
+            self.db.session.flush()
+            self.db.session.add(UserSettings(user_id=opted_out.id, email_newsletter=False))
+            self.db.session.commit()
+        self.login(self.admin_id)
+        self._post()
+        self.assertEqual(sorted(sent_to), ["admin@x.com", "user@x.com"])
 
     def test_failures_are_counted(self):
         import app.services.email_service as es

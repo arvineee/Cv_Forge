@@ -14,7 +14,7 @@
 
 <section class="max-w-3xl mx-auto px-4 py-16">
   <h1 class="text-3xl font-black text-gray-900 mb-2">Privacy Policy</h1>
-  <p class="text-gray-400 text-sm mb-10">Last updated: {{ updated_date or "18 July 2026" }}</p>
+  <p class="text-gray-400 text-sm mb-10">Last updated: {{ updated_date or "17 November 2026" }}</p>
 
   <div class="prose prose-sm max-w-none text-gray-700 space-y-8">
 
@@ -31,7 +31,7 @@
         <li><strong>Account data:</strong> name, email address, password (stored as a salted hash, never in plain text), and if you sign in with Google, your Google account ID and profile info.</li>
         <li><strong>CV content:</strong> anything you enter or upload into the builder — work history, education, skills, contact details, and any CV/resume file you upload for parsing.</li>
         <li><strong>Payment data:</strong> your phone number (for M-Pesa) or card details (for card payments) are collected and processed by our payment processors, Paystack (cards) and IntaSend (M-Pesa) — we do not see or store your full card number ourselves. We do store payment amounts, references, and status.</li>
-        <li><strong>Usage data:</strong> pages you visit, timestamps, browser type, and a truncated IP address (last segment masked) — used to understand site traffic and diagnose problems. You can opt out of this being linked to your account in your account settings.</li>
+        <li><strong>Usage and acquisition data:</strong> pages you visit, timestamps, browser type, a truncated IP address (last segment masked), referring page host/path, and (when available) first-touch campaign labels such as UTM source/medium/campaign. Query strings and fragments are removed from stored page-visit referrers. Campaign attribution is recorded when you register so we can understand which channels bring people to CVForge; the registration attribution stores campaign labels and a hostname, not the full referrer URL or query string. You can opt out of account-level linkage in your account settings; anonymous site-traffic records may still be retained for up to 90 days.</li>
         <li><strong>Communications:</strong> emails we send you (verification, password reset, payment confirmations, and occasional product updates you can opt out of).</li>
       </ul>
     </div>
@@ -43,7 +43,8 @@
         <li>To process AI features (CV parsing, content improvement, ATS scoring, cover letter generation, and our support chat) — see Section 4 on third parties</li>
         <li>To process payments and manage your subscription</li>
         <li>To send essential account emails (verification, password reset, payment receipts)</li>
-        <li>To send occasional, opt-out-able emails about features or plan upgrades — never more than a few times, and never if you've turned this off</li>
+        <li>To send occasional product updates and plan-upgrade emails according to your account preference; new accounts start opted out, and you can enable or disable these emails in your account settings</li>
+        <li>To send unfinished-CV progress reminders only if you allow those separate service emails in your account settings</li>
         <li>To maintain security, prevent abuse, and enforce fair-use limits on our free plan</li>
       </ul>
     </div>
@@ -76,7 +77,7 @@
         <li>Access the personal data we hold about you</li>
         <li>Correct inaccurate data (most of this you can edit directly in your account)</li>
         <li>Request deletion of your account and data</li>
-        <li>Object to or restrict certain processing (e.g. opt out of marketing emails or usage tracking, both available in account settings)</li>
+        <li>Object to or restrict certain processing (e.g. opt out of product/marketing emails, CV progress reminders or account-linked usage analytics in account settings)</li>
         <li>Request a copy of your data in a portable format</li>
       </ul>
       <p class="mt-2">To exercise any of these, email us at the address in Section 8.</p>

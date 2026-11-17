@@ -33,9 +33,12 @@ def _remember_invoice(reference: str, invoice_id) -> None:
     """Store the IntaSend invoice id so the status poll can check it later."""
     if not invoice_id:
         return
-    payment = Payment.query.filter_by(lipana_checkout_request_id=reference).first()
+    payment = Payment.query.filter_by(provider_reference=reference).first()
     if payment:
-        payment.raw_webhook = {"invoice_id": str(invoice_id)}
+        metadata = dict(payment.raw_webhook) if isinstance(payment.raw_webhook, dict) else {}
+        metadata["invoice_id"] = str(invoice_id)
+        metadata["provider"] = "intasend"
+        payment.raw_webhook = metadata
         db.session.commit()
 
 
@@ -58,7 +61,7 @@ def _reconcile_with_intasend(subscription, reference: str) -> None:
     Covers missed or failed webhook deliveries. Reuses the webhook handlers,
     which are idempotent, so calling this repeatedly is safe.
     """
-    from app.routes.webhooks import _handle_payment_success, _handle_payment_failed
+    from app.routes.webhooks import reconcile_intasend_payment
 
     created = subscription.created_at
     if created.tzinfo is None:
@@ -66,30 +69,12 @@ def _reconcile_with_intasend(subscription, reference: str) -> None:
     if (datetime.now(timezone.utc) - created).total_seconds() < RECONCILE_AFTER_SECONDS:
         return
 
-    payment = Payment.query.filter_by(lipana_checkout_request_id=reference).first()
+    payment = Payment.query.filter_by(provider_reference=reference).first()
     invoice_id = (payment.raw_webhook or {}).get("invoice_id") if payment and isinstance(payment.raw_webhook, dict) else None
     if not invoice_id:
         return  # nothing to check against; the webhook is the only route
 
-    try:
-        from app.services.intasend_service import IntaSendService
-        result = IntaSendService().check_status(invoice_id=invoice_id)
-    except Exception as e:
-        current_app.logger.warning(f"Reconcile skipped for ref={reference}: {e}")
-        return
-    if not result.get("success"):
-        return
-
-    invoice = result.get("invoice") if isinstance(result.get("invoice"), dict) else result
-    state = invoice.get("state")
-    current_app.logger.info(f"Reconcile ref={reference} invoice={invoice_id} state={state}")
-
-    if state == "COMPLETE":
-        _handle_payment_success({"reference": reference, "checkout_request_id": reference,
-                                 "transaction_id": invoice_id})
-    elif state == "FAILED":
-        _handle_payment_failed({"reference": reference, "checkout_request_id": reference,
-                                "failed_reason": invoice.get("failed_reason")})
+    reconcile_intasend_payment(reference, invoice_id)
 
 
 def _abandon_pending(reference: str) -> None:
@@ -100,7 +85,7 @@ def _abandon_pending(reference: str) -> None:
         return
     sub.status = "failed"
     release_redemption(sub.id)
-    payment = Payment.query.filter_by(lipana_checkout_request_id=reference).first()
+    payment = Payment.query.filter_by(provider_reference=reference).first()
     if payment and payment.status == "pending":
         payment.status = "failed"
     db.session.commit()
@@ -108,8 +93,10 @@ def _abandon_pending(reference: str) -> None:
 
 def _create_pending(plan, method, phone=None):
     """Create a pending Subscription + Payment at the server-computed price."""
+    if method not in {"mpesa", "card", "paystack"}:
+        raise ValueError("Unsupported payment method.")
     charged, offer, _saving = checkout_price(plan)
-    reference = f"CVF-{secrets.token_hex(6).upper()}"
+    reference = f"CVF-{secrets.token_hex(12).upper()}"
 
     subscription = Subscription(
         user_id=current_user.id,
@@ -129,8 +116,18 @@ def _create_pending(plan, method, phone=None):
         currency="KES",
         status="pending",
         payment_method=method,
-        lipana_checkout_request_id=reference,
+        provider_reference=reference,
         phone=phone,
+        raw_webhook={
+            "provider": "paystack" if method == "paystack" else "intasend",
+            "order_snapshot": {
+                "plan": plan.slug,
+                "billing_period": plan.billing_period or "month",
+                "amount": str(charged),
+                "currency": "KES",
+                "user_id": current_user.id,
+            },
+        },
     )
     db.session.add(payment)
 
@@ -343,13 +340,14 @@ def subscribe_paystack(plan_slug):
             },
         )
         # Keep the checkout URL and Paystack reference for support/audit.
-        payment = Payment.query.filter_by(lipana_checkout_request_id=reference).first()
+        payment = Payment.query.filter_by(provider_reference=reference).first()
         if payment:
-            payment.raw_webhook = {
+            metadata = dict(payment.raw_webhook) if isinstance(payment.raw_webhook, dict) else {}
+            metadata.update({
                 "provider": "paystack",
                 "checkout_url": result.get("authorization_url"),
-                "access_code": result.get("access_code"),
-            }
+            })
+            payment.raw_webhook = metadata
             db.session.commit()
         return redirect(result["authorization_url"])
     except Exception as exc:
@@ -417,7 +415,7 @@ def payment_status(reference):
 
     status = subscription.status
     if status == "pending":
-        payment = Payment.query.filter_by(lipana_checkout_request_id=reference).first()
+        payment = Payment.query.filter_by(provider_reference=reference).first()
         if payment and payment.payment_method == "paystack":
             created = subscription.created_at
             if created.tzinfo is None:

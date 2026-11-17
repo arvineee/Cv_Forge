@@ -36,13 +36,13 @@ ALLOWED_EXTENSIONS = {"pdf", "docx"}
 
 
 def _check_limit():
-    if current_user.is_premium:
-        return True, ""
-    daily = AIUsage.get_daily_count(current_user.id, "ats_check")
-    limit = current_app.config.get("GEMINI_FREE_USER_DAILY_LIMIT", 3)
-    if daily >= limit:
-        return False, f"Daily ATS limit reached ({limit}/day). Upgrade to Pro for unlimited checks."
-    return True, ""
+    from app.services.entitlements import check_daily_limit
+    allowed, message, _used, _limit = check_daily_limit(
+        current_user, "ats_check",
+        fallback_limit=current_app.config.get("GEMINI_FREE_USER_DAILY_LIMIT", 3),
+        label="ATS check",
+    )
+    return allowed, message
 
 
 def _allowed_file(filename: str) -> bool:

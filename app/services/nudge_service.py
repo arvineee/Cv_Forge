@@ -1,50 +1,29 @@
-"""
-CVForge AI - Pro-upgrade nudge service
+"""Conservative, opt-in Pro upgrade reminders for free-tier users."""
+from datetime import datetime, timedelta, timezone
 
-Single source of truth for "who gets a Pro-upgrade reminder email and
-when." Used by:
-  - the existing `flask send-nudges` CLI command in app/cli.py (wire it
-    to call send_pro_upgrade_nudges() below instead of whatever inline
-    query it currently has, so the CLI and the admin panel can never
-    disagree on who's eligible)
-  - the new manual "Send reminders now" button on /admin/nudges
+from app.models import db, User, UserSettings, Notification, utcnow, _make_aware
 
-Save this as app/services/nudge_service.py.
-"""
-from datetime import timedelta
-from app.models import db, User, UserSettings, Notification, utcnow
-
-# Don't nudge the same free user more than once a week.
+# A user receives no more than four marketing nudges in total.
+MAX_NUDGES = 4
+# Safety cap per scheduled/admin-triggered run; not a per-user limit.
+MAX_NUDGES_PER_RUN = 200
 NUDGE_INTERVAL_DAYS = 7
-
-# Give brand-new signups a few days to explore before pestering them
-# about Pro. Users who registered more recently than this are excluded
-# from candidacy entirely (separate from the "already nudged" cooldown
-# above).
 REGISTERED_GRACE_DAYS = 3
 
-# Safety cap on how many nudge emails a single run/click can send, so
-# a bug (or an unexpectedly large candidate pool) can't blast the full
-# user base at once.
-MAX_NUDGES = 200
-
-# In-app notification copy. Kept as constants so the wording is easy to
-# review and change without touching the sending logic.
 NUDGE_TITLE = "Get more from CVForge with Pro"
 NUDGE_MESSAGE = (
-    "Pro gives you unlimited AI generations, DOCX downloads and version "
-    "history for every CV you create. Pay by card or M-Pesa. Each subscription lasts 30 days and does not renew automatically."
+    "Pro gives you more room to improve your CV, unlock DOCX downloads and use "
+    "version history. Pay by card or M-Pesa. Each subscription lasts for its "
+    "plan period and does not renew automatically."
 )
 
 
-def get_nudge_candidates():
-    """Free-tier users eligible for a Pro-upgrade reminder right now:
-    active, verified, opted in to email_newsletter, registered more
-    than REGISTERED_GRACE_DAYS ago, and either never nudged or not
-    nudged within NUDGE_INTERVAL_DAYS. Capped at MAX_NUDGES."""
+def get_nudge_candidates(limit=MAX_NUDGES_PER_RUN):
+    """Return opted-in, verified free users below the lifetime nudge cap."""
     now = utcnow()
     nudge_cutoff = now - timedelta(days=NUDGE_INTERVAL_DAYS)
     registered_cutoff = now - timedelta(days=REGISTERED_GRACE_DAYS)
+    safe_limit = max(0, min(int(limit or MAX_NUDGES_PER_RUN), MAX_NUDGES_PER_RUN))
     return (
         User.query
         .join(UserSettings, UserSettings.user_id == User.id)
@@ -52,39 +31,54 @@ def get_nudge_candidates():
         .filter(User.is_active.is_(True))
         .filter(User.is_verified.is_(True))
         .filter(UserSettings.email_newsletter.is_(True))
+        .filter(UserSettings.nudge_count < MAX_NUDGES)
         .filter(User.created_at < registered_cutoff)
         .filter(db.or_(
             UserSettings.last_nudge_sent_at.is_(None),
             UserSettings.last_nudge_sent_at < nudge_cutoff,
         ))
         .order_by(User.created_at.desc())
-        .limit(MAX_NUDGES)
+        .limit(safe_limit)
         .all()
     )
 
 
 def send_pro_upgrade_nudges() -> dict:
-    """Email every eligible free-tier user a Pro-upgrade reminder, log an
-    in-app Notification, and stamp last_nudge_sent_at so they aren't
-    nudged again for NUDGE_INTERVAL_DAYS.
+    """Send due nudges and stamp cadence only when the mailer accepts a send.
 
-    Uses the existing app/services/email_service.send_pro_nudge_email(user)
-    helper, which already logs-and-skips instead of raising when mail
-    isn't configured (dev/staging) — so a "sent" count here means
-    "attempted," not "SMTP confirmed delivery."
-
-    Returns {"sent": int, "failed": int} so callers (admin panel, CLI)
-    can report both counts.
+    ``sent`` means handed successfully to Flask-Mail/SMTP, not confirmed
+    inbox delivery. A missing mail configuration is counted as failed and
+    does not consume one of the user's four allowed reminders.
     """
     from app.services.email_service import send_pro_nudge_email
 
-    sent = 0
-    failed = 0
-    for user in get_nudge_candidates():
+    candidates = get_nudge_candidates()
+    result = {"total": len(candidates), "sent": 0, "failed": 0, "skipped": 0}
+    for user in candidates:
+        # Re-check under a row lock so overlapping scheduler/admin runs do
+        # not both send to the same user on databases with row-lock support.
+        settings = (UserSettings.query.filter_by(user_id=user.id)
+                    .with_for_update().first())
+        now = utcnow()
+        cooldown_cutoff = datetime.now(timezone.utc) - timedelta(days=NUDGE_INTERVAL_DAYS)
+        last_nudge = _make_aware(settings.last_nudge_sent_at) if settings else None
+        if (not settings or not user.is_active or not user.is_verified
+                or user.plan != "free" or not settings.email_newsletter
+                or (settings.nudge_count or 0) >= MAX_NUDGES
+                or (last_nudge and last_nudge >= cooldown_cutoff)):
+            db.session.rollback()
+            result["skipped"] += 1
+            continue
+
         try:
-            send_pro_nudge_email(user)
+            delivered = bool(send_pro_nudge_email(user))
         except Exception:
-            failed += 1
+            db.session.rollback()
+            result["failed"] += 1
+            continue
+        if not delivered:
+            db.session.rollback()
+            result["failed"] += 1
             continue
 
         db.session.add(Notification(
@@ -94,8 +88,13 @@ def send_pro_upgrade_nudges() -> dict:
             type="upgrade",
             action_url="/billing/plans",
         ))
-        user.settings.last_nudge_sent_at = utcnow()
-        sent += 1
+        settings.last_nudge_sent_at = now
+        settings.nudge_count = (settings.nudge_count or 0) + 1
+        try:
+            db.session.commit()
+            result["sent"] += 1
+        except Exception:
+            db.session.rollback()
+            result["failed"] += 1
 
-    db.session.commit()
-    return {"sent": sent, "failed": failed}
+    return result

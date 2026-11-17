@@ -41,13 +41,18 @@ venv.bak/
 instance/
 .webassets-cache
 
+# Database migration history is managed on the deployment environment.
+# Keep local/generated migration directories out of Git; the deploy script also
+# explicitly skips these paths, including if they are already tracked.
+migrations/
+app/migrations/
+
 # Database
 *.db
 *.sqlite
 *.sqlite3
 cvforge.db
 *db
-migrations/
 
 # IDE and Editor
 .vscode/

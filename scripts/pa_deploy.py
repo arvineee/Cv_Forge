@@ -8,7 +8,7 @@ What it does, in order:
      any file is changed. If the backup fails, nothing is uploaded.
   3. Uploads the changed files, reloads the web app, then records the deployed commit.
 
-Never uploaded: .env, databases, uploads/, instance/, tests, tools, scripts, caches.
+Never uploaded: .env, databases, uploads/, instance/, tests, tools, scripts, caches, or any migrations/ directory.
 
 Environment:
   PA_USERNAME, PA_API_TOKEN   required
@@ -31,7 +31,7 @@ import requests
 
 SKIP_PREFIXES = (".git", ".github/", "tests/", "tools/", "scripts/", "instance/", "uploads/",
                  "__pycache__/", ".pytest_cache/")
-SKIP_PARTS = ("__pycache__",)
+SKIP_PARTS = ("__pycache__", "migrations")
 SKIP_NAMES = {".env", ".gitignore", ".mannual.diff.swp", "requirements-dev.txt"}
 SKIP_SUFFIXES = (".pyc", ".db", ".sqlite", ".sqlite3", ".swp", ".log")
 

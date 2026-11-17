@@ -9,7 +9,7 @@
     <input type="hidden" name="next" value="{{ next_page }}"/>
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
       {% for t in templates %}
-      {% set locked = t.is_premium and not current_user.is_premium %}
+      {% set locked = t.is_premium and not current_user.has_paid_plan %}
       {% set current = resume.template_id == t.id %}
       <button type="submit" name="template_id" value="{{ t.id }}" {% if locked %}disabled{% endif %}
               class="text-left rounded-lg border-2 overflow-hidden transition {{ 'border-blue-500' if current else 'border-gray-100 hover:border-gray-300' }} {{ 'opacity-50 cursor-not-allowed' if locked }}">

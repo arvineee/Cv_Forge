@@ -48,7 +48,7 @@
          style="background-color:{{ t.accent_color }}">
         Sign up to use
       </a>
-      {% elif t.is_premium and not current_user.is_premium %}
+      {% elif t.is_premium and not current_user.has_paid_plan %}
       <a href="{{ url_for('billing.plans') }}"
          class="block w-full text-center text-xs py-2 rounded-lg font-semibold"
          style="background-color:{{ t.accent_color }}22; color:{{ t.accent_color }}">

@@ -1,11 +1,11 @@
 {% extends "base_dashboard.html" %}
 {% block title %}Growth Dashboard — CVForge{% endblock %}
 {% block page_title %}Growth & Conversion{% endblock %}
-{% block page_subtitle %}Founder metrics from existing registration, CV creation and successful payment records{% endblock %}
+{% block page_subtitle %}Signup cohorts, first-touch acquisition, product activation, repeat usage and gross revenue{% endblock %}
 
 {% block content %}
 <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
-  <p class="text-sm text-gray-500">Reporting window: last {{ days }} days. Counts are based on recorded events.</p>
+  <p class="text-sm text-gray-500">Signup cohort: accounts created in the last {{ days }} days. Paid conversion is measured after signup, to date.</p>
   <div class="flex gap-2">
     {% for d in [7, 30, 90] %}
     <a href="{{ url_for('admin.growth', days=d) }}"
@@ -16,10 +16,14 @@
 
 <div class="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
   {% for label, value, note in [
-    ('New registrations', signups, 'Accounts created in period'),
-    ('Activated users', activated_users, 'Users who created at least one CV'),
-    ('Paying customers', paid_customers, 'Distinct users with successful payments'),
-    ('Activation rate', activation_rate|string + '%', 'Activated users ÷ new registrations')
+    ('New registrations', signups, 'Accounts created in cohort'),
+    ('Started first CV', started_users, 'Unique cohort users who began a CV'),
+    ('Activated users', activated_users, 'Completed a meaningful first CV draft'),
+    ('Downloaded first CV', downloaded_users, 'Reached the first download milestone'),
+    ('Paying customers', paid_customers, 'Cohort users with a successful payment after signup'),
+    ('Activation rate', activation_rate|string + '%', 'First-CV completion ÷ registrations'),
+    ('Paid conversion', paid_conversion|string + '%', 'Paying cohort users ÷ registrations'),
+    ('Active users', active_users, 'Users with a recorded product/login event in period')
   ] %}
   <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
     <p class="text-xs text-gray-500 uppercase tracking-wide">{{ label }}</p>
@@ -29,10 +33,20 @@
   {% endfor %}
 </div>
 
-<div class="grid lg:grid-cols-2 gap-6 mb-6">
+<div class="grid lg:grid-cols-3 gap-6 mb-6">
+  <section class="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+    <h2 class="font-semibold text-gray-900">Repeat usage</h2>
+    <p class="text-4xl font-bold text-gray-900 mt-3">{{ repeat_usage_rate }}%</p>
+    <p class="text-sm text-gray-500 mt-1">Active users who returned on at least two different days in this period.</p>
+    <div class="mt-5 h-2 rounded-full bg-gray-100 overflow-hidden">
+      <div class="h-full bg-blue-600 rounded-full" style="width: {{ [repeat_usage_rate, 100]|min }}%"></div>
+    </div>
+    <p class="text-xs text-gray-400 mt-3">{{ repeat_active_users }} repeat-active users · {{ returning_users }} users registered before this reporting window.</p>
+  </section>
+
   <section class="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
     <h2 class="font-semibold text-gray-900">Revenue by currency</h2>
-    <p class="text-xs text-gray-400 mt-1 mb-4">Successful payments only. Different currencies are intentionally kept separate.</p>
+    <p class="text-xs text-gray-400 mt-1 mb-4">Gross successful payment records received in this period. Currencies are not combined.</p>
     {% for row in revenue_by_currency %}
     <div class="flex items-center justify-between py-3 border-b border-gray-50 last:border-0">
       <span class="text-sm text-gray-600">{{ row.currency }}</span>
@@ -44,13 +58,53 @@
   </section>
 
   <section class="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-    <h2 class="font-semibold text-gray-900">Paid conversion</h2>
-    <p class="text-4xl font-bold text-gray-900 mt-3">{{ paid_conversion }}%</p>
-    <p class="text-sm text-gray-500 mt-1">Paying customers ÷ new registrations in the selected period.</p>
-    <div class="mt-5 h-2 rounded-full bg-gray-100 overflow-hidden">
-      <div class="h-full bg-emerald-500 rounded-full" style="width: {{ [paid_conversion, 100]|min }}%"></div>
+    <h2 class="font-semibold text-gray-900">Revenue by payment provider</h2>
+    <p class="text-xs text-gray-400 mt-1 mb-4">Gross successful payments by provider and currency; fees, refunds and chargebacks are not reconciled here.</p>
+    {% for row in revenue_by_provider %}
+    <div class="flex items-center justify-between gap-3 py-3 border-b border-gray-50 last:border-0">
+      <div>
+        <p class="text-sm font-medium text-gray-700">
+          {% if row.provider == 'paystack' %}Paystack
+          {% elif row.provider == 'mpesa' %}IntaSend · M-Pesa
+          {% elif row.provider == 'card' %}IntaSend · Card
+          {% else %}{{ row.provider|title }}{% endif %}
+        </p>
+        <p class="text-xs text-gray-400">{{ row.payments }} successful payment(s)</p>
+      </div>
+      <span class="text-sm font-bold text-gray-900">{{ row.currency }} {{ '{:,.0f}'.format(row.amount) }}</span>
     </div>
-    <p class="text-xs text-gray-400 mt-3">This is a directional period ratio, not a true signup cohort conversion rate. Existing users who paid during the period may be included.</p>
+    {% else %}
+    <p class="text-sm text-gray-400 py-4">No successful payments recorded in this period.</p>
+    {% endfor %}
+  </section>
+</div>
+
+<div class="grid lg:grid-cols-2 gap-6 mb-6">
+  <section class="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+    <h2 class="font-semibold text-gray-900 mb-1">Acquisition sources</h2>
+    <p class="text-xs text-gray-400 mb-4">First-touch source and medium captured when a user registers. Older signups may be unattributed.</p>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead><tr class="text-left text-xs text-gray-400 border-b border-gray-100"><th class="py-2 pr-3">Source</th><th class="py-2 pr-3">Medium</th><th class="py-2 text-right">Signups</th></tr></thead>
+        <tbody>
+          {% for row in acquisition_sources %}
+          <tr class="border-b border-gray-50 last:border-0"><td class="py-3 pr-3 font-medium text-gray-700">{{ row.source }}</td><td class="py-3 pr-3 text-gray-500">{{ row.medium }}</td><td class="py-3 text-right font-semibold text-gray-900">{{ row.signups }}</td></tr>
+          {% else %}
+          <tr><td colspan="3" class="py-5 text-sm text-gray-400">No attributed registrations yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+    <h2 class="font-semibold text-gray-900 mb-1">Campaign performance</h2>
+    <p class="text-xs text-gray-400 mb-4">Tagged campaign names from first-touch UTM parameters.</p>
+    {% for row in acquisition_campaigns %}
+    <div class="flex items-center justify-between gap-3 py-3 border-b border-gray-50 last:border-0"><span class="text-sm text-gray-700">{{ row.campaign }}</span><strong class="text-sm text-gray-900">{{ row.signups }}</strong></div>
+    {% else %}
+    <p class="text-sm text-gray-400 py-5">No UTM campaign registrations yet. Use tagged links in your campaigns.</p>
+    {% endfor %}
   </section>
 </div>
 
@@ -62,9 +116,7 @@
       {% for day, count in signup_daily %}
       <div class="grid grid-cols-[90px_1fr_40px] items-center gap-3 text-sm">
         <span class="text-gray-500">{{ day }}</span>
-        <div class="h-2 bg-gray-100 rounded-full overflow-hidden">
-          <div class="h-full bg-blue-500 rounded-full" style="width: {{ (count / max_count * 100) if max_count else 0 }}%"></div>
-        </div>
+        <div class="h-2 bg-gray-100 rounded-full overflow-hidden"><div class="h-full bg-blue-500 rounded-full" style="width: {{ (count / max_count * 100) if max_count else 0 }}%"></div></div>
         <span class="text-right font-semibold text-gray-700">{{ count }}</span>
       </div>
       {% endfor %}
@@ -76,6 +128,6 @@
 
 <div class="mt-6 rounded-xl border border-blue-100 bg-blue-50 p-4">
   <p class="text-sm font-semibold text-blue-900">How to use this dashboard</p>
-  <p class="text-sm text-blue-800 mt-1">Watch registration-to-CV activation first. If registrations rise but CV creation does not, improve onboarding before increasing advertising spend. Review payment conversion alongside actual acquisition costs before scaling campaigns.</p>
+  <p class="text-sm text-blue-800 mt-1">Improve first-CV completion before increasing acquisition spend. Compare campaign signups with activation and paid conversion, then prioritize sources that bring users who actually create CVs and pay.</p>
 </div>
 {% endblock %}

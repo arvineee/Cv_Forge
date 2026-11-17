@@ -64,20 +64,22 @@ def _log(action, resource_id=None, details=None):
 
 
 def _check_ai_limit(feature: str) -> tuple:
-    if current_user.is_premium:
-        return True, ""
-    daily = AIUsage.get_daily_count(current_user.id, feature)
-    limit = current_app.config["GEMINI_FREE_USER_DAILY_LIMIT"]
-    if daily >= limit:
-        return False, f"Daily limit reached ({limit}/day). Upgrade to Pro for unlimited access."
+    from app.services.entitlements import check_daily_limit
+    allowed, message, _used, _limit = check_daily_limit(
+        current_user, feature,
+        fallback_limit=current_app.config.get("GEMINI_FREE_USER_DAILY_LIMIT", 3),
+    )
+    if not allowed:
+        return False, message
     if AIUsage.get_total_daily_count() >= current_app.config["GEMINI_DAILY_LIMIT"]:
         return False, "AI service is temporarily busy. Please try again later."
     return True, ""
 
 
 def _current_plan() -> "PricingPlan | None":
-    """Look up the PricingPlan row matching the user's current plan slug."""
-    return PricingPlan.query.filter_by(slug=current_user.plan, is_active=True).first()
+    """Return the user's effective, unexpired plan (or the free plan)."""
+    from app.services.entitlements import get_effective_plan
+    return get_effective_plan(current_user)
 
 
 def _has_active_paid_plan() -> bool:
@@ -106,15 +108,13 @@ def _can_download() -> bool:
 
 
 def _plan_allows_docx() -> bool:
-    if current_user.is_premium:
-        plan = _current_plan()
-        if plan:
-            return bool(plan.allow_docx)
-        # Premium but no matching plan row configured — default to allowing it
-        return True
-    # Free-tier: only allow if explicitly configured on the "free" plan row
     plan = _current_plan()
     return bool(plan and plan.allow_docx)
+
+
+def _plan_allows_version_history() -> bool:
+    plan = _current_plan()
+    return bool(plan and plan.allow_version_history)
 
 
 def _plan_allows_public_link() -> bool:
@@ -149,7 +149,9 @@ def list_cvs():
     resumes = (Resume.query.filter_by(user_id=current_user.id)
                .order_by(Resume.updated_at.desc()).all())
     return render_template("cv/list.html", resumes=resumes,
-                           allow_public_link=_plan_allows_public_link())
+                           allow_public_link=_plan_allows_public_link(),
+                           allow_docx=_plan_allows_docx(),
+                           allow_version_history=_plan_allows_version_history())
 
 
 @cv_bp.route("/start")
@@ -188,7 +190,7 @@ def _usable_template(template_id):
     t = db.session.get(Template, template_id)
     if not t or not t.is_active:
         return None
-    if t.is_premium and not current_user.is_premium:
+    if t.is_premium and not current_user.has_paid_plan:
         return None
     return t
 
@@ -229,7 +231,8 @@ def builder(resume_id=None):
         resume = Resume.query.filter_by(id=resume_id, user_id=current_user.id).first_or_404()
     templates = Template.query.filter_by(is_active=True).order_by(Template.sort_order).all()
     step = request.args.get("step", 1, type=int) or 1
-    return render_template("cv/builder.html", resume=resume, templates=templates, step=step)
+    return render_template("cv/builder.html", resume=resume, templates=templates, step=step,
+                           allow_docx=_plan_allows_docx())
 
 
 @cv_bp.route("/builder/create", methods=["POST"])
@@ -482,7 +485,7 @@ def wizard_step(resume_id, step):
             db.session.commit()
         plan = _current_plan()
         allow_docx = _plan_allows_docx()
-        allow_coach = bool(current_user.is_premium and plan and plan.allow_career_coach)
+        allow_coach = bool(current_user.has_paid_plan and plan and plan.allow_career_coach)
         allow_public_link = _plan_allows_public_link()
         can_download = _can_download()
         coach_feedback, coach_error = None, None
@@ -828,16 +831,17 @@ def revamp(resume_id):
 
         try:
             ai = get_ai_service()
-            version_count = resume.versions.count()
-            version = ResumeVersion(
-                resume_id=resume.id,
-                version_number=version_count + 1,
-                label="Before AI Revamp",
-                snapshot=resume.to_dict(),
-                ats_score=resume.ats_score,
-                created_by="user",
-            )
-            db.session.add(version)
+            keep_history = _plan_allows_version_history()
+            version_count = resume.versions.count() if keep_history else 0
+            if keep_history:
+                db.session.add(ResumeVersion(
+                    resume_id=resume.id,
+                    version_number=version_count + 1,
+                    label="Before AI Revamp",
+                    snapshot=resume.to_dict(),
+                    ats_score=resume.ats_score,
+                    created_by="user",
+                ))
 
             revamped = ai.revamp_resume(resume, user_id=current_user.id)
 
@@ -881,21 +885,24 @@ def revamp(resume_id):
 
             resume.source = "revamp"
 
-            after_version = ResumeVersion(
-                resume_id=resume.id,
-                version_number=version_count + 2,
-                label="After AI Revamp",
-                snapshot=resume.to_dict(),
-                created_by="ai_revamp",
-            )
-            db.session.add(after_version)
+            if keep_history:
+                db.session.add(ResumeVersion(
+                    resume_id=resume.id,
+                    version_number=version_count + 2,
+                    label="After AI Revamp",
+                    snapshot=resume.to_dict(),
+                    created_by="ai_revamp",
+                ))
             # AIUsage.log_usage() removed here — ai.revamp_resume(..., user_id=...)
             # already logs the call inside ai_service._call(). See ai_assist()
             # above for the full explanation of the double-counting bug.
             _log("cv_revamp", resume.id)
             db.session.commit()
-            flash("Resume revamped successfully! Compare versions below.", "success")
-            return redirect(url_for("cv.compare_versions", resume_id=resume_id))
+            if keep_history:
+                flash("Resume revamped successfully! Compare versions below.", "success")
+                return redirect(url_for("cv.compare_versions", resume_id=resume_id))
+            flash("Resume revamped successfully!", "success")
+            return redirect(url_for("cv.list_cvs"))
         except RevampError as e:
             db.session.rollback()
             current_app.logger.warning(f"Revamp rejected: {e}")
@@ -1086,6 +1093,9 @@ def fill_gaps(resume_id):
 @cv_bp.route("/<int:resume_id>/versions")
 @login_required
 def compare_versions(resume_id):
+    if not _plan_allows_version_history():
+        flash("Version history is available on eligible paid plans.", "warning")
+        return redirect(url_for("cv.list_cvs"))
     resume = Resume.query.filter_by(id=resume_id, user_id=current_user.id).first_or_404()
     versions = resume.versions.order_by(ResumeVersion.version_number.desc()).all()
 
@@ -1104,6 +1114,9 @@ def compare_versions(resume_id):
 @login_required
 def restore_version(resume_id, version_id):
     """Restore a previous version's snapshot onto the current resume."""
+    if not _plan_allows_version_history():
+        flash("Version history is available on eligible paid plans.", "warning")
+        return redirect(url_for("cv.list_cvs"))
     resume = Resume.query.filter_by(id=resume_id, user_id=current_user.id).first_or_404()
     version = ResumeVersion.query.filter_by(id=version_id, resume_id=resume_id).first_or_404()
 

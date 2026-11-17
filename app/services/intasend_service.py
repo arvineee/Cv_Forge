@@ -1,13 +1,9 @@
 """
 CVForge AI - IntaSend Payment Service
 
-Drop-in alternative to LipanaService — same public interface
-(`initiate_payment(phone, amount, reference, description)` returning
-`{"success": bool, "message": str}`), so billing.py needs almost no
-changes to switch: just
-    from app.services.intasend_service import IntaSendService as PaymentService
-instead of
-    from app.services.lipana_service import LipanaService as PaymentService
+IntaSend payment adapter used by CVForge for M-Pesa and hosted checkout.
+It exposes the `initiate_payment` and `initiate_card_payment` methods used by
+`app/routes/billing.py`.
 
 Built against IntaSend's actual documented contract
 (developers.intasend.com), not guessed:
@@ -18,7 +14,7 @@ Built against IntaSend's actual documented contract
 - Webhooks are authenticated with a static "challenge" string (set in the
   IntaSend dashboard, echoed back in every webhook payload) — NOT HMAC.
 
-Same retry/rate-limit/dedup patterns as lipana_service.py, adapted: since
+Retry/rate-limit/dedup protections are implemented here; since
 the intasend-python SDK's underlying HTTP client isn't ours to configure
 with a urllib3 Retry adapter, retry is implemented as an explicit manual
 loop around the SDK call instead.
@@ -34,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 
 class _RateLimiter:
-    """Same in-process token bucket as lipana_service.py."""
+    """In-process token bucket for IntaSend requests."""
     def __init__(self, max_requests: int, window_seconds: float):
         self.max_requests = max_requests
         self.window_seconds = window_seconds
@@ -60,7 +56,7 @@ class _RateLimiter:
 
 
 class _InFlightGuard:
-    """Same duplicate-click guard as lipana_service.py."""
+    """Duplicate-click guard for IntaSend requests."""
     def __init__(self, ttl_seconds: float = 30.0):
         self.ttl_seconds = ttl_seconds
         self._pending: Dict[str, float] = {}

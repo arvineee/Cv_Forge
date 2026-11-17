@@ -1,7 +1,7 @@
 {% extends "base_dashboard.html" %}
 {% block title %}Broadcast Email{% endblock %}
 {% block page_title %}Broadcast Email{% endblock %}
-{% block page_subtitle %}Send a plain-text announcement to a filtered set of users. A preview with the exact recipient count is shown before anything is sent.{% endblock %}
+{% block page_subtitle %}Send a product announcement to users who opted in to product emails. Plan filters never bypass the marketing opt-out; preview the exact recipient count before sending.{% endblock %}
 {% block content %}
 <div class="max-w-3xl">
 
@@ -11,11 +11,10 @@
     <div>
       <label class="block text-sm font-medium text-gray-700 mb-1">Audience</label>
       <select name="audience" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
-        <option value="all" {% if audience == 'all' %}selected{% endif %}>All active users</option>
-        <option value="free" {% if audience == 'free' %}selected{% endif %}>Free plan only</option>
-        <option value="paid" {% if audience == 'paid' %}selected{% endif %}>Any paid plan</option>
-        <option value="verified" {% if audience == 'verified' %}selected{% endif %}>Verified emails only</option>
-        <option value="newsletter" {% if audience == 'newsletter' %}selected{% endif %}>Newsletter subscribers only</option>
+        <option value="all" {% if audience == 'all' %}selected{% endif %}>All opted-in users</option>
+        <option value="free" {% if audience == 'free' %}selected{% endif %}>Opted-in free-plan users</option>
+        <option value="paid" {% if audience == 'paid' %}selected{% endif %}>Opted-in paid-plan users</option>
+        <option value="verified" {% if audience == 'verified' %}selected{% endif %}>Opted-in users with verified emails</option>
       </select>
     </div>
 

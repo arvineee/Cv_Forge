@@ -341,7 +341,7 @@ def send_pro_nudge_email(user):
     Mail, Message = _get_mailer()
     if not Mail or not current_app.config.get("MAIL_USERNAME"):
         current_app.logger.info(f"[email stub] Pro nudge email skipped for {user.email}")
-        return
+        return False
 
     content = {}
     try:
@@ -363,8 +363,10 @@ def send_pro_nudge_email(user):
         html, text = _build_nudge_email(user, content, billing_url)
         _send(content["subject"], user.email, html, text)
         current_app.logger.info(f"Pro nudge sent to user {user.id} using {source} copy")
+        return True
     except Exception as e:
         current_app.logger.warning(f"Pro nudge email failed: {e}")
+        return False
 
 
 # ── Admin-triggered transactional emails ─────────────────────────
@@ -393,7 +395,7 @@ def send_broadcast_email(user, subject, body, conn=None):
     html = _render_email(
         preheader=subject,
         body_html=_render_plain_body(user, body),
-        footer_note="You're receiving this because you have a CVForge AI account.",
+        footer_note="You're receiving this because you opted in to CVForge AI product emails. You can turn these off in your account settings.",
     )
     _send(subject, user.email, html, conn=conn)
     return True

@@ -119,7 +119,10 @@ def register():
         db.session.add(user)
         db.session.flush()
         _create_user_profile(user)
-        _log_activity(user.id, "register", {"method": "email", "session_id": session.get("_visit_sid")})
+        from app.services.acquisition_tracking import get_signup_attribution
+        _log_activity(user.id, "register", {
+            "method": "email", **get_signup_attribution()
+        })
         db.session.commit()
 
         try:
@@ -407,7 +410,10 @@ def google_callback():
         db.session.add(user)
         db.session.flush()
         _create_user_profile(user)
-        _log_activity(user.id, "register", {"method": "google", "session_id": session.get("_visit_sid")})
+        from app.services.acquisition_tracking import get_signup_attribution
+        _log_activity(user.id, "register", {
+            "method": "google", **get_signup_attribution()
+        })
 
     user.last_login_at = datetime.now(timezone.utc)
     _log_activity(user.id, "login", {"method": "google"})

@@ -24,13 +24,13 @@ def _log(action, resource_id=None, details=None):
 
 
 def _check_limit():
-    if current_user.is_premium:
-        return True, ""
-    daily = AIUsage.get_daily_count(current_user.id, "cover_letter")
-    limit = current_app.config["GEMINI_FREE_USER_DAILY_LIMIT"]
-    if daily >= limit:
-        return False, f"Daily limit reached ({limit}/day). Upgrade to Pro for unlimited access."
-    return True, ""
+    from app.services.entitlements import check_daily_limit
+    allowed, message, _used, _limit = check_daily_limit(
+        current_user, "cover_letter",
+        fallback_limit=current_app.config.get("GEMINI_FREE_USER_DAILY_LIMIT", 3),
+        label="cover letter",
+    )
+    return allowed, message
 
 
 @cover_letter_bp.route("/")

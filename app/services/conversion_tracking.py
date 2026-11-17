@@ -61,8 +61,8 @@ def send_abandoned_cv_reminders(stage_hours=(24, 72), limit=200, dry_run=False):
     """Send at most one 24h and one 72h reminder per incomplete resume.
 
     Call from a daily scheduled task. Completed resumes and users who disabled
-    account email notifications are excluded. This is a product-use reminder,
-    not a marketing newsletter.
+    the dedicated CV progress reminder preference are excluded. The marketing
+    newsletter opt-out does not suppress this product-service reminder.
     """
     now = datetime.now(timezone.utc)
     eligible_before = now - timedelta(hours=min(stage_hours))
@@ -84,9 +84,11 @@ def send_abandoned_cv_reminders(stage_hours=(24, 72), limit=200, dry_run=False):
         if ActivityLog.query.filter_by(user_id=user.id, action="cv_completed", resource_id=resume.id).first():
             result["skipped"] += 1
             continue
-        email_opt_out = bool(user.settings and not user.settings.email_newsletter)
+        # This is a requested product-service reminder, not marketing.
+        # Respect the dedicated CV progress reminder preference; the
+        # separate newsletter opt-out controls Pro marketing nudges only.
         profile_opt_out = bool(user.profile and not user.profile.email_notifications)
-        if not user.is_active or not user.is_verified or email_opt_out or profile_opt_out:
+        if not user.is_active or not user.is_verified or profile_opt_out:
             result["skipped"] += 1
             continue
         started = start.created_at
@@ -101,25 +103,32 @@ def send_abandoned_cv_reminders(stage_hours=(24, 72), limit=200, dry_run=False):
         if recent_reminder:
             result["skipped"] += 1
             continue
-        for stage in stage_hours:
-            action = f"cv_abandonment_email_{stage}h"
-            if age_hours < stage or _event_exists(user.id, action, resume.id):
+        # If the scheduler was delayed, choose only the most relevant
+        # eligible stage. Never send a stale 24-hour email after a 72-hour
+        # reminder has already been sent (or is due now).
+        eligible_stages = [stage for stage in sorted(stage_hours, reverse=True)
+                           if age_hours >= stage]
+        if not eligible_stages:
+            result["skipped"] += 1
+            continue
+        stage = eligible_stages[0]
+        action = f"cv_abandonment_email_{stage}h"
+        if _event_exists(user.id, action, resume.id):
+            result["skipped"] += 1
+            continue
+        if dry_run:
+            result["would_send"] += 1
+            continue
+        try:
+            from app.services.email_service import send_cv_abandonment_email
+            delivered = send_cv_abandonment_email(user, resume, stage)
+            if not delivered:
+                result["skipped"] += 1
                 continue
-            if dry_run:
-                result["would_send"] += 1
-                break
-            try:
-                from app.services.email_service import send_cv_abandonment_email
-                delivered = send_cv_abandonment_email(user, resume, stage)
-                if not delivered:
-                    result["skipped"] += 1
-                    break
-                record_event(user.id, action, resume.id, {"stage_hours": stage})
-                db.session.commit()
-                result["sent"] += 1
-                break  # one email per resume per daily run
-            except Exception:
-                db.session.rollback()
-                result["failed"] += 1
-                break
+            record_event(user.id, action, resume.id, {"stage_hours": stage})
+            db.session.commit()
+            result["sent"] += 1
+        except Exception:
+            db.session.rollback()
+            result["failed"] += 1
     return result

@@ -20,7 +20,7 @@
       </div>
     </div>
 
-    {% if not current_user.is_premium %}
+    {% if not current_user.has_paid_plan %}
     <div class="mb-4 p-3 bg-yellow-50 border border-yellow-100 rounded-lg text-sm text-yellow-700">
       ⚡ Free plan: 3 AI operations/day.
       <a href="{{ url_for('billing.plans') }}" class="font-semibold underline">Upgrade for unlimited access.</a>

@@ -1,20 +1,18 @@
 # CVForge AI
 
-AI-powered CV and resume builder for job seekers worldwide (built in Kenya) — guided step-by-step CV wizard with inline AI writing help, CV parsing and AI revamp, ATS scoring, cover letter generation, PDF/DOCX export, public CV sharing, and card payments (Paystack) plus M-Pesa for customers in Kenya. Flask, deployed on PythonAnywhere.
+AI-powered CV and resume builder for job seekers worldwide (built in Kenya) — guided step-by-step CV wizard with inline AI writing help, CV parsing and AI revamp, ATS scoring, cover letter generation, PDF/DOCX export, public CV sharing, and payments via Paystack (cards) and IntaSend (M-Pesa in Kenya). Flask, deployed on PythonAnywhere.
 
 ## Quick Setup
 
 ```bash
 pip install -r requirements.txt
-pip install intasend-python   # for M-Pesa / card payments
 cp .env.example .env          # fill in your keys — see Environment Variables below
 
 # Initialize DB and seed default data
 flask db-init
 
-# Apply migrations (required after pulling recent changes —
-# new PageVisit table, new UserSettings/User columns, new
-# PricingPlan.allow_public_link column)
+# Existing installations: run only after the repository's migration history
+# has been initialized and reconciled with the live schema.
 flask db upgrade
 
 # Create your admin account
@@ -24,12 +22,14 @@ flask create-admin
 flask run
 ```
 
+> **Migration status:** this source snapshot does not include a committed `migrations/` history. `flask db upgrade` is therefore not ready to run until a baseline is generated and reconciled with the actual database schema. Use `flask db-init` only for a fresh local database; never use it as a production upgrade strategy.
+
 ## Environment Variables
 
 | Variable | Required for | Notes |
 |---|---|---|
 | `SECRET_KEY` | Everything | Flask session/CSRF signing |
-| `SQLALCHEMY_DATABASE_URI` | Everything | Defaults to local SQLite |
+| `DATABASE_URL` | Everything | Optional locally (defaults to `instance/cvforge.db`); set the production database URL in the hosting environment |
 | `GEMINI_API_KEY` | AI features | CV assist, revamp, ATS, AI Career Coach, support chat |
 | `GEMINI_MODEL` | AI features | Verify against Google's current model list before deploying |
 | `GEMINI_DAILY_LIMIT` / `GEMINI_FREE_USER_DAILY_LIMIT` | AI features | Platform-wide / per-free-user daily caps |
@@ -66,11 +66,11 @@ flask run
 ## Admin Panel Routes
 
 - `/admin/` — Dashboard
-- `/admin/growth` — Founder growth dashboard: registration, CV activation, paid-customer conversion, and successful revenue grouped by currency
+- `/admin/growth` — Founder growth dashboard: registration, CV activation, paid-customer conversion, and successful revenue grouped by currency and payment provider
 - `/admin/users` — User management (includes impersonate, audit-logged)
 - `/admin/pricing` — Edit pricing plans (name, price, features, limits, and per-plan toggles for DOCX export, version history, AI Career Coach, and public CV sharing)
 - `/admin/templates` — Manage CV templates (add/edit/enable/disable)
-- `/admin/payments` — Payment history (M-Pesa + card)
+- `/admin/payments` — Payment history (Paystack and IntaSend)
 - `/admin/visitors` — Site visitor tracking: page views, unique visitors, top pages, per-day breakdown
 - `/admin/nudges` — Manually trigger the free-tier upgrade nudge email batch
 
@@ -84,7 +84,7 @@ flask run
 - **ATS Checker** — score a saved CV, or upload a file directly with no job description required for a general audit; add a job description for a targeted match analysis
 - **Cover Letter Generator** — tone-adjustable, resume-aware
 - **Export** — PDF and DOCX, both gated behind an active paid plan; DOCX is additionally restricted to plans with `allow_docx` set. DOCX generator has full section parity with PDF (certifications, achievements, languages, interests, awards, projects, publications, volunteer, references)
-- **Payments** — M-Pesa (STK Push) via IntaSend; debit/credit cards via Paystack hosted checkout (see `PAYSTACK_SETUP.md`). Prices and charges are in KES; no multi-currency pricing. An IntaSend card route still exists in `billing.py` but is not linked from the pricing pages.
+- **Payments** — M-Pesa (STK Push) via IntaSend; debit/credit cards via Paystack hosted checkout (see `PAYSTACK_SETUP.md`). Prices and charges are in KES; no multi-currency pricing. Paystack and IntaSend are the only configured payment providers. Both providers are verified server-to-server against the stored order before subscription activation.
 - **Email verification gate** — new email/password signups can't log in until they verify their email (`auth.login` blocks unverified users and offers a resend link via `auth.resend_verification`, which is email-based rather than login-gated so a stuck user can still request a new link). Google OAuth signups are pre-verified by Google and skip this gate.
 - **AI Support Chat** — Gemini-powered, grounded in a static product-facts block so it won't invent pricing or features; rate-limited by IP since it's reachable without login
 - **Admin visitor tracking** — lightweight page-view log with truncated IPs, not a full analytics replacement
@@ -92,14 +92,29 @@ flask run
 
 ## Deployment
 
-`deploy_update.sh` pulls the latest code from GitHub onto PythonAnywhere without clobbering your live `.env`, database, or migrations:
+The GitHub Actions deployer (`scripts/pa_deploy.py`) uploads application code to PythonAnywhere while preserving production state. It explicitly skips every directory named `migrations` (including root `migrations/` and `app/migrations/`), even if a migration file is already tracked by Git. `.gitignore` also excludes those directories so new local migration files are not accidentally committed.
+
+**Migration protection is intentional:** production migration history is managed on the deployment environment and must not be overwritten by an ordinary application-code deploy. The deployer does not upload migration files and does not delete files already present on the server. If a schema change is needed, create/review/apply it through a separate, controlled migration procedure after backing up the production database. Do not rely on `.gitignore` alone: Git continues tracking files already in its index, which is why the deploy script has its own migration-directory exclusion.
+
+If you also want to stop tracking a migration directory in the Git repository, run the appropriate command from the repository root (this keeps your local files in place):
 
 ```bash
-./deploy_update.sh                 # pull, restore protected files, migrate, reload
-./deploy_update.sh --restore-only  # emergency rollback to latest backup
+git rm -r --cached --ignore-unmatch migrations app/migrations
+git add .gitignore
+git commit -m "Keep deployment migration history out of Git uploads"
 ```
 
-See the script's header comment for the full backup/restore behavior and configuration variables.
+The command only removes files from Git's index; it does not delete the local migration directory. Confirm the paths match your repository before committing.
+
+## Sprint 005 payment integrity
+
+- Paystack confirmation checks the verified transaction status, reference, amount in minor units, currency, and customer email when supplied.
+- IntaSend completion and failure notifications are challenge-checked, then independently confirmed against the IntaSend invoice-status API. The invoice ID, CVForge reference, amount, currency, state, local payment, and subscription must match before access changes.
+- Checkout stores a compact order snapshot in the existing `Payment.raw_webhook` JSON field, including plan slug, billing period, amount, currency and user ID. The billing period used for activation therefore remains the one purchased even if an administrator edits the plan while checkout is pending.
+- Payment events are idempotent, provider transaction IDs are checked for reuse, and stored event metadata is allow-listed rather than saving the full webhook body or IntaSend challenge.
+- Existing `lipana_*` database column names are retained as legacy storage fields and exposed in Python as provider-neutral aliases. This avoids a production schema migration and preserves historical payment records; it does not enable Lipana as a provider.
+- Plan-specific daily CV, cover-letter and ATS limits now use the existing `PricingPlan` fields. No new database columns or migrations are introduced.
+- Revenue views show gross successful payment records by currency and provider. They are not net settlement reports and do not subtract provider fees, refunds or chargebacks that are not recorded in CVForge.
 
 ## Payment methods on/off
 
@@ -132,7 +147,7 @@ Public marketing copy that is shared between a page and its structured data (FAQ
 
 ## Auto-deploy (GitHub Actions → PythonAnywhere)
 
-Every push to `main` runs the tests, then `scripts/pa_deploy.py` uploads the git-tracked app files through the PythonAnywhere API and reloads the web app (`.github/workflows/deploy.yml`). It never uploads `.env`, databases, `instance/`, `uploads/`, tests or caches, so production data and secrets stay as they are.
+Every push to `main` runs the tests, then `scripts/pa_deploy.py` uploads the git-tracked app files through the PythonAnywhere API and reloads the web app (`.github/workflows/deploy.yml`). It never uploads `.env`, databases, `instance/`, `uploads/`, tests, caches or any `migrations/` directory, so production data, secrets and deployment-managed migration history stay as they are.
 
 One-time setup in GitHub → Settings → Secrets and variables → Actions:
 
@@ -151,3 +166,15 @@ Notes: files deleted from git are not deleted on the server, and new dependencie
 This release adds first-time onboarding, direct guided-CV entry, dashboard draft recovery, debounced wizard autosave, first-CV conversion events, an admin conversion funnel (`/admin/conversion`), and opt-out-aware abandoned-CV email reminders.
 
 No database migration is required. See `SPRINT_003_CHANGELOG.md` for the feature list and validation status, and `SPRINT_003_DEPLOYMENT.md` for backup, staging, credential-rotation and PythonAnywhere scheduled-task instructions. The reminder task is opt-in and must be scheduled deliberately with `flask send-cv-reminders` after staging email verification.
+
+## Sprint 006 growth, conversion and retention
+
+- First-touch UTM attribution is captured for new email and Google registrations using the existing signed browser session and `ActivityLog.details`; no new database fields are required. Stored page-visit referrers drop query strings/fragments and redact secret token paths.
+- `/admin/growth` now reports signup-cohort activation and paid conversion, source/medium and campaign signups, active users, repeat-active users and gross payment records grouped by currency/provider.
+- `/admin/conversion` now uses the same shared cohort report and supports 7-, 30- and 90-day windows. Activation means a user completed a meaningful first CV draft; first download is reported separately.
+- Pro upgrade nudges now enforce a four-successful-send lifetime cap per user, a seven-day cooldown, a three-day signup grace period and the newsletter opt-out. The CLI and scheduler report the same result contract.
+- Profile settings expose separate controls for CV progress service reminders, product/Pro marketing emails and account-linked analytics. New accounts start opted out of product/Pro marketing emails; Pro nudges and admin product broadcasts respect that opt-out. Disabling account-linked analytics removes signup attribution and anonymizes previously linked page-visit rows.
+- Unfinished-CV service reminders respect the dedicated CV progress reminder preference, separate from the marketing newsletter preference.
+- No database schema change or migration is included. See `CVFORGE_SPRINT_006_GROWTH_AUDIT.md`, `SPRINT_006_CHANGELOG.md` and `SPRINT_006_DEPLOYMENT.md`.
+
+**Measurement caveat:** campaign signups are not CAC. CVForge still needs verified campaign-spend records and net contribution reporting (provider fees, refunds, reversals, AI and variable support costs) before it can make reliable profitability or LTV/CAC decisions.

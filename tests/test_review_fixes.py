@@ -12,7 +12,6 @@ class Cfg:
     UPLOAD_FOLDER = "/tmp/cvforge-test-uploads"
     GEMINI_FREE_USER_DAILY_LIMIT = 50
     GEMINI_DAILY_LIMIT = 1000
-    LIPANA_WEBHOOK_SECRET = ""
     INTASEND_WEBHOOK_CHALLENGE = "c"
     SESSION_COOKIE_SECURE = False
     MAIL_USERNAME = None
@@ -50,13 +49,10 @@ class ReviewFixTests(unittest.TestCase):
     def test_reset_password_link_works(self):
         self.assertEqual(self.client.get("/auth/reset-password/tok").status_code, 200)
 
-    def test_lipana_webhook_fails_closed_without_secret(self):
-        from app.models import User
+    def test_unsupported_lipana_webhook_is_not_registered(self):
         resp = self.client.post("/webhooks/lipana", json={
             "event": "payment.success", "data": {"reference": "REF1"}})
-        self.assertEqual(resp.status_code, 503)
-        with self.app.app_context():
-            self.assertEqual(self.db.session.get(User, self.a).plan, "free")
+        self.assertEqual(resp.status_code, 404)
 
     def test_late_failed_webhook_does_not_undo_active_subscription(self):
         from app.models import Subscription

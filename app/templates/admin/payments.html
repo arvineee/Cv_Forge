@@ -29,8 +29,13 @@
           <td class="px-4 py-3 capitalize font-medium text-gray-900">
             {{ p.subscription.plan if p.subscription else '—' }}
           </td>
-          <td class="px-4 py-3 font-semibold">KES {{ p.amount }}</td>
-          <td class="px-4 py-3 text-gray-600 capitalize">{{ p.payment_method or '—' }}</td>
+          <td class="px-4 py-3 font-semibold">{{ p.currency or 'KES' }} {{ p.amount }}</td>
+          <td class="px-4 py-3 text-gray-600">
+            {% if p.payment_method == 'paystack' %}Paystack
+            {% elif p.payment_method == 'mpesa' %}IntaSend · M-Pesa
+            {% elif p.payment_method == 'card' %}IntaSend · Card
+            {% else %}{{ p.payment_method or '—' }}{% endif %}
+          </td>
           <td class="px-4 py-3">
             <span class="px-2 py-0.5 rounded-full text-xs font-semibold
               {% if p.status == 'success' %}bg-green-100 text-green-700
@@ -40,7 +45,7 @@
             </span>
           </td>
           <td class="px-4 py-3 text-xs font-mono text-gray-400">
-            {{ p.lipana_transaction_id or p.lipana_checkout_request_id or '—' }}
+            {{ p.provider_transaction_id or p.provider_reference or '—' }}
           </td>
         </tr>
         {% else %}

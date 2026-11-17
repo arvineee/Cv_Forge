@@ -32,6 +32,11 @@ def create_app(config_object=None):
     from werkzeug.middleware.proxy_fix import ProxyFix
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
+    # Flask-SQLAlchemy resolves relative SQLite paths under instance_path.
+    # Ensure the local-development default has a writable parent directory.
+    import os
+    os.makedirs(app.instance_path, exist_ok=True)
+
     # ── Extensions ────────────────────────────────────────────────
     db.init_app(app)
     migrate.init_app(app, db)
@@ -67,13 +72,9 @@ def create_app(config_object=None):
     app.register_blueprint(billing_bp, url_prefix="/billing")
     app.register_blueprint(admin_bp, url_prefix="/admin")
     app.register_blueprint(webhooks_bp, url_prefix="/webhooks")
-    # FIX: CSRFProtect (initialized above) protects ALL POST routes by
-    # default, including this one. But /webhooks/lipana receives POSTs from
-    # Lipana's servers, not from a browser session — it will never carry a
-    # CSRF token. Without this exemption, real payment webhooks were very
-    # likely being rejected with 400 Bad Request, and subscriptions would
-    # never activate. HMAC signature verification (already implemented in
-    # webhooks.py) is the correct auth mechanism for this endpoint instead.
+    # Payment provider webhooks are server-to-server requests, so they do
+    # not carry browser CSRF tokens. Each supported provider endpoint performs
+    # its own signature/challenge verification and server-side transaction check.
     csrf.exempt(webhooks_bp)
     app.register_blueprint(templates_gallery_bp, url_prefix="/templates")
     app.register_blueprint(api_bp, url_prefix="/api/v1")
@@ -137,8 +138,11 @@ def create_app(config_object=None):
                 with app.app_context():
                     from app.services.nudge_service import send_pro_upgrade_nudges
                     try:
-                        sent = send_pro_upgrade_nudges()
-                        app.logger.info(f"Nudge scheduler: sent {sent} reminder email(s).")
+                        result = send_pro_upgrade_nudges()
+                        app.logger.info(
+                            "Nudge scheduler: sent=%s failed=%s candidates=%s",
+                            result["sent"], result["failed"], result["total"],
+                        )
                     except Exception as e:
                         app.logger.error(f"Nudge scheduler failed: {e}")
 

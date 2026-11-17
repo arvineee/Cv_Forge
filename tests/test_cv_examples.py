@@ -84,7 +84,6 @@ class _Config:
     SESSION_COOKIE_SECURE = False
     DEBUG = False
     GEMINI_API_KEY = ""
-    LIPANA_API_KEY = ""
     INTASEND_SECRET_KEY = ""
     UPLOAD_FOLDER = "/tmp/cvforge-test-uploads"
     SITE_URL = ""

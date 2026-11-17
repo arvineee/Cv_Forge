@@ -8,6 +8,7 @@ try:
     from app.services.conversion_tracking import (
         mark_cv_started, mark_cv_completed, resume_is_complete,
     )
+    from app.services.visitor_tracking import get_analytics_session_id
     APP_AVAILABLE = True
 except ImportError:
     APP_AVAILABLE = False
@@ -21,7 +22,6 @@ class TestConfig:
     SESSION_COOKIE_SECURE = False
     TESTING = True
     GEMINI_API_KEY = ""
-    LIPANA_API_KEY = ""
     INTASEND_SECRET_KEY = ""
     UPLOAD_FOLDER = "/tmp/cvforge-sprint003-test-uploads"
     VISITOR_TRACKING_ASYNC = False
@@ -48,6 +48,15 @@ class Sprint003ConversionTests(unittest.TestCase):
     def tearDown(self):
         db.session.rollback()
         self.ctx.pop()
+
+    def test_analytics_session_id_is_hashed_and_stable(self):
+        import hashlib
+        from flask import session
+        with self.app.test_request_context("/"):
+            session["_visit_sid"] = "known-browser-session"
+            expected = hashlib.sha256(b"known-browser-session").hexdigest()[:32]
+            self.assertEqual(get_analytics_session_id(), expected)
+            self.assertEqual(get_analytics_session_id(), expected)
 
     def test_start_events_are_idempotent(self):
         mark_cv_started(self.user.id, self.resume.id)

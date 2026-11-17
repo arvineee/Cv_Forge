@@ -8,6 +8,7 @@ Adds: ManualPaymentClaim (webhook-missed payment verification) and
 BroadcastEmail (audit log of admin announcements).
 """
 from datetime import datetime, timezone, timedelta
+from sqlalchemy.orm import synonym
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -308,6 +309,8 @@ class Subscription(db.Model):
     status = db.Column(db.String(20), default="pending")
     payment_reference = db.Column(db.String(255), nullable=True, index=True)
     lipana_transaction_id = db.Column(db.String(255), nullable=True)
+    # Generic Python-level alias; keep the legacy DB column to avoid a migration.
+    provider_transaction_id = synonym("lipana_transaction_id")
     start_date = db.Column(db.DateTime(timezone=True), nullable=True)
     end_date = db.Column(db.DateTime(timezone=True), nullable=True)
     created_at = db.Column(db.DateTime(timezone=True), default=utcnow, nullable=False)
@@ -319,7 +322,7 @@ class Subscription(db.Model):
         self.start_date = utcnow()
         self.end_date = self.start_date + timedelta(days=days)
         if transaction_id:
-            self.lipana_transaction_id = transaction_id
+            self.provider_transaction_id = transaction_id
 
     def __repr__(self):
         return f"<Subscription user={self.user_id} plan={self.plan} status={self.status}>"
@@ -338,13 +341,17 @@ class Payment(db.Model):
     lipana_transaction_id = db.Column(db.String(255), unique=True, nullable=True, index=True)
     lipana_checkout_request_id = db.Column(db.String(255), nullable=True)
     lipana_payment_link_id = db.Column(db.String(255), nullable=True)
+    # Generic aliases retain the existing production schema and historical rows.
+    provider_transaction_id = synonym("lipana_transaction_id")
+    provider_reference = synonym("lipana_checkout_request_id")
+    provider_payment_link_id = synonym("lipana_payment_link_id")
     phone = db.Column(db.String(30), nullable=True)
     raw_webhook = db.Column(db.JSON, nullable=True)
     created_at = db.Column(db.DateTime(timezone=True), default=utcnow, nullable=False)
     updated_at = db.Column(db.DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)
 
     def __repr__(self):
-        return f"<Payment {self.lipana_transaction_id} {self.status}>"
+        return f"<Payment {self.provider_transaction_id} {self.status}>"
 
 
 class AIUsage(db.Model):
@@ -483,7 +490,8 @@ class UserSettings(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, unique=True)
     email_on_payment = db.Column(db.Boolean, default=True)
     email_on_expiry = db.Column(db.Boolean, default=True)
-    email_newsletter = db.Column(db.Boolean, default=True)
+    # Marketing email preference is opt-in for newly created settings.
+    email_newsletter = db.Column(db.Boolean, default=False)
     public_profile = db.Column(db.Boolean, default=False)
     allow_analytics = db.Column(db.Boolean, default=True)
     theme = db.Column(db.String(20), default="light")

@@ -1,0 +1,28 @@
+{% extends 'base_dashboard.html' %}
+{% block title %}Unit Economics — CVForge{% endblock %}
+{% block page_title %}Unit Economics{% endblock %}
+{% block content %}
+<div class="max-w-6xl mx-auto space-y-6">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <p class="text-sm text-gray-600">Read-only operating baseline · Last {{ days }} days · All figures use recorded application data.</p>
+    <div class="flex gap-2 text-sm">
+      {% for d in [7,30,90] %}<a class="rounded-lg border px-3 py-2 {% if days == d %}bg-blue-50 border-blue-300{% endif %}" href="{{ url_for('admin.unit_economics', days=d) }}">{{ d }} days</a>{% endfor %}
+    </div>
+  </div>
+  <section class="rounded-xl border bg-white p-5">
+    <h2 class="font-semibold text-gray-900 mb-3">Gross successful payments</h2>
+    {% if gross_by_currency %}<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{% for row in gross_by_currency %}<div class="rounded-lg bg-gray-50 p-4"><div class="text-xs text-gray-500">{{ row.currency }}</div><div class="text-2xl font-bold">{{ '{:,.0f}'.format(row.amount) }}</div><div class="text-xs text-gray-500">{{ row.payments }} successful payments</div></div>{% endfor %}</div>{% else %}<p class="text-sm text-gray-500">No successful payments recorded in this period.</p>{% endif %}
+    <p class="text-xs text-amber-700 mt-3">Gross collections only. Different currencies are deliberately not combined; this is not net revenue or profit.</p>
+  </section>
+  <section class="rounded-xl border bg-white p-5">
+    <h2 class="font-semibold mb-3">Provider and currency breakdown</h2>
+    <div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="text-left text-gray-500"><th class="py-2">Provider / method</th><th>Currency</th><th>Gross</th><th>Payments</th></tr></thead><tbody>{% for row in provider_breakdown %}<tr class="border-t"><td class="py-2">{{ row.provider }}</td><td>{{ row.currency }}</td><td>{{ '{:,.0f}'.format(row.gross) }}</td><td>{{ row.payments }}</td></tr>{% else %}<tr><td colspan="4" class="py-3 text-gray-500">No payment data.</td></tr>{% endfor %}</tbody></table></div>
+  </section>
+  <section class="rounded-xl border bg-white p-5">
+    <h2 class="font-semibold mb-2">AI usage baseline</h2><div class="grid grid-cols-2 gap-3 mb-4"><div class="rounded-lg bg-gray-50 p-4"><div class="text-xs text-gray-500">Recorded requests</div><div class="text-2xl font-bold">{{ '{:,}'.format(ai_requests) }}</div></div><div class="rounded-lg bg-gray-50 p-4"><div class="text-xs text-gray-500">Records with token data</div><div class="text-2xl font-bold">{{ token_coverage_pct }}%</div></div></div>
+    <div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="text-left text-gray-500"><th class="py-2">Feature</th><th>Records</th><th>Requests</th><th>Tokens recorded</th></tr></thead><tbody>{% for row in ai_by_feature %}<tr class="border-t"><td class="py-2">{{ row.feature }}</td><td>{{ row.records }}</td><td>{{ row.requests }}</td><td>{{ '{:,}'.format(row.tokens) }}</td></tr>{% else %}<tr><td colspan="4" class="py-3 text-gray-500">No AI usage recorded.</td></tr>{% endfor %}</tbody></table></div>
+    <p class="text-xs text-amber-700 mt-3">Token coverage is incomplete; do not infer AI provider cost from these totals.</p>
+  </section>
+  <section class="rounded-xl border border-amber-200 bg-amber-50 p-5"><h2 class="font-semibold text-amber-900 mb-2">Still required before profitability can be calculated</h2><ul class="list-disc pl-5 text-sm text-amber-900 space-y-1">{% for item in unknown_costs %}<li>{{ item }}</li>{% endfor %}</ul></section>
+</div>
+{% endblock %}

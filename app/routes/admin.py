@@ -77,46 +77,19 @@ def index():
 @login_required
 @admin_required
 def conversion():
-    """Account-level first-CV funnel metrics from ActivityLog events."""
-    from datetime import datetime, timedelta, timezone
-    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
-    cohort = db.session.query(ActivityLog.user_id).filter(
-        ActivityLog.action == "register", ActivityLog.created_at >= cutoff,
-        ActivityLog.user_id.isnot(None)).distinct().subquery()
-    landing_session_ids = {row[0] for row in db.session.query(PageVisit.session_id).filter(
-        PageVisit.path == "/", PageVisit.created_at >= cutoff,
-        PageVisit.session_id.isnot(None)).distinct().all()}
-    landing_sessions = len(landing_session_ids)
-    registration_events = ActivityLog.query.filter(
-        ActivityLog.action == "register", ActivityLog.created_at >= cutoff,
-        ActivityLog.user_id.isnot(None)).all()
-    converted_sessions = {((event.details or {}).get("session_id")) for event in registration_events}
-    converted_sessions.discard(None)
-    converted_sessions.intersection_update(landing_session_ids)
-    actions = [
-        ("register", "Registrations"),
-        ("first_cv_started", "Started first CV"),
-        ("first_cv_completed", "Completed first CV"),
-        ("first_cv_downloaded", "Downloaded first CV"),
-    ]
-    metrics = [{"label": "Unique landing sessions", "count": landing_sessions}]
-    counts = {}
-    for action, label in actions:
-        query = db.session.query(db.func.count(db.distinct(ActivityLog.user_id))).filter(
-            ActivityLog.action == action, ActivityLog.user_id.in_(cohort))
-        if action == "register":
-            query = query.filter(ActivityLog.created_at >= cutoff)
-        count = query.scalar() or 0
-        counts[action] = count
-        metrics.append({"label": label, "count": count})
-    registrations = counts.get("register", 0)
-    landing_rate = round(len(converted_sessions) * 100 / landing_sessions, 1) if landing_sessions else 0
-    metrics.append({"label": "Landing session → registration", "rate": landing_rate})
-    for key, label in (("first_cv_started", "Registration → first CV start"),
-                       ("first_cv_completed", "Registration → first CV completion"),
-                       ("first_cv_downloaded", "Registration → first CV download")):
-        metrics.append({"label": label, "rate": round(counts.get(key, 0) * 100 / registrations, 1) if registrations else 0})
-    return render_template("admin/conversion.html", metrics=metrics, days=30)
+    """Signup-cohort first-CV funnel and first-touch acquisition sources."""
+    from app.services.growth_analytics import build_growth_report
+
+    days = request.args.get("days", 30, type=int)
+    if days not in (7, 30, 90):
+        days = 30
+    report = build_growth_report(days)
+    metrics = report["funnel"] + report["funnel_rates"]
+    return render_template(
+        "admin/conversion.html", metrics=metrics, days=days,
+        acquisition_sources=report["acquisition_sources"],
+        acquisition_campaigns=report["acquisition_campaigns"],
+    )
 
 
 # ── Users ─────────────────────────────────────────────────────────
@@ -564,59 +537,27 @@ def visitors():
 
 # ── Growth dashboard ──────────────────────────────────────────────
 
+@admin_bp.route("/unit-economics")
+@login_required
+@admin_required
+def unit_economics():
+    """Read-only revenue and variable-usage baseline; never mixes currencies."""
+    from app.services.unit_economics import build_unit_economics_report
+    days = request.args.get("days", 30, type=int)
+    report = build_unit_economics_report(days)
+    return render_template("admin/unit_economics.html", **report)
+
+
 @admin_bp.route("/growth")
 @login_required
 @admin_required
 def growth():
-    """Founder-facing acquisition, activation and revenue snapshot.
-
-    Uses existing User, ActivityLog and Payment records; no schema migration
-    or third-party analytics dependency is required. Revenue is grouped by
-    currency so future multi-currency transactions are never added together.
-    """
-    from datetime import timedelta
-    from sqlalchemy import func
+    """Founder dashboard: signup cohorts, acquisition, activation, retention and gross revenue."""
+    from app.services.growth_analytics import build_growth_report
 
     days = request.args.get("days", 30, type=int)
-    if days not in (7, 30, 90):
-        days = 30
-    cutoff = utcnow() - timedelta(days=days)
-
-    signups = User.query.filter(User.created_at >= cutoff).count()
-    activated_users = (db.session.query(func.count(func.distinct(User.id)))
-        .join(ActivityLog, ActivityLog.user_id == User.id)
-        .filter(User.created_at >= cutoff,
-                ActivityLog.action == "cv_create",
-                ActivityLog.created_at >= cutoff).scalar()) or 0
-
-    paid_customers = (db.session.query(func.count(func.distinct(User.id)))
-        .join(Payment, Payment.user_id == User.id)
-        .filter(User.created_at >= cutoff,
-                Payment.status == "success",
-                Payment.created_at >= cutoff).scalar()) or 0
-
-    revenue_rows = (db.session.query(Payment.currency, func.sum(Payment.amount))
-        .filter(Payment.status == "success", Payment.created_at >= cutoff)
-        .group_by(Payment.currency).all())
-    revenue_by_currency = [
-        {"currency": currency or "KES", "amount": int(amount or 0)}
-        for currency, amount in revenue_rows
-    ]
-
-    signup_daily = (db.session.query(func.date(User.created_at).label("day"),
-                                      func.count(User.id).label("count"))
-        .filter(User.created_at >= cutoff)
-        .group_by("day").order_by("day").all())
-
-    activation_rate = round((activated_users / signups) * 100, 1) if signups else 0
-    paid_conversion = round((paid_customers / signups) * 100, 1) if signups else 0
-
-    return render_template(
-        "admin/growth.html", days=days, signups=signups,
-        activated_users=activated_users, paid_customers=paid_customers,
-        revenue_by_currency=revenue_by_currency, signup_daily=signup_daily,
-        activation_rate=activation_rate, paid_conversion=paid_conversion,
-    )
+    report = build_growth_report(days)
+    return render_template("admin/growth.html", **report)
 
 
 # ── Offers (time-limited discounts) ───────────────────────────────
@@ -1136,18 +1077,19 @@ def broadcast():
         if audience not in ("all", "free", "paid", "verified", "newsletter"):
             audience = "all"
 
-        q = User.query.filter(User.is_active.is_(True))
+        # Broadcasts are product/marketing announcements. Always enforce
+        # the user's newsletter preference, regardless of the plan filter.
+        from app.models import UserSettings
+        q = (User.query.join(UserSettings, UserSettings.user_id == User.id)
+             .filter(User.is_active.is_(True), UserSettings.email_newsletter.is_(True)))
         if audience == "free":
             q = q.filter(User.plan == "free")
         elif audience == "paid":
             q = q.filter(User.plan != "free", User.plan_expires_at > utcnow())
         elif audience == "verified":
             q = q.filter(User.is_verified.is_(True))
-        elif audience == "newsletter":
-            from app.models import UserSettings
-            q = q.join(UserSettings, UserSettings.user_id == User.id).filter(
-                UserSettings.email_newsletter.is_(True)
-            )
+        # `newsletter` remains accepted for old forms/bookmarks; the base
+        # query already limits every broadcast audience to opted-in users.
 
         recipients = q.order_by(User.created_at.asc()).all()
 
