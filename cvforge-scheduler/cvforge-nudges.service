@@ -5,10 +5,10 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-User=www-data
-WorkingDirectory=/var/www/cvforge
-EnvironmentFile=/var/www/cvforge/.env
+User=cvforge
+WorkingDirectory=/home/cvforge/Cv_Forge
+EnvironmentFile=/home/cvforge/Cv_Forge/.env
 Environment=FLASK_APP=run.py
-ExecStart=/var/www/cvforge/venv/bin/flask send-nudges
+ExecStart=/home/cvforge/Cv_Forge/venv/bin/flask send-nudges
 # A oneshot service never overlaps itself, so two runs cannot double-send.
 TimeoutStartSec=15min

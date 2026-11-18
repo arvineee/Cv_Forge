@@ -363,6 +363,8 @@ def google_callback():
                 "redirect_uri": current_app.config["GOOGLE_REDIRECT_URI"],
                 "grant_type": "authorization_code",
             }, timeout=10)
+        if not token_resp.ok:
+            current_app.logger.error("Google token request failed with status %s", token_resp.status_code)
         token_resp.raise_for_status()
         tokens = token_resp.json()
         userinfo_resp = http_requests.get(
