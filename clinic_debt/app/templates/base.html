@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}MedDebt{% endblock %} — Clinic Debt Tracker</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Mono:wght@400;500&family=Outfit:wght@300;400;500;600;700&display=swap');
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#080c18;--surface:#0f1629;--card:#141c35;--border:#1e2a4a;--border2:#263354;
+      --teal:#00d4aa;--teal2:#00b890;--teal-dim:rgba(0,212,170,.12);--teal-glow:rgba(0,212,170,.25);
+      --red:#ff4d6d;--red-dim:rgba(255,77,109,.12);
+      --amber:#ffb703;--amber-dim:rgba(255,183,3,.12);
+      --blue:#4f8ef7;--blue-dim:rgba(79,142,247,.12);
+      --text:#e8edf8;--muted:#6b7da8;--faint:#2c3a60;
+      --radius:12px;--radius-sm:8px;
+    }
+    body{background:var(--bg);color:var(--text);font-family:'Outfit',sans-serif;display:flex;min-height:100vh}
+
+    /* SIDEBAR */
+    .sidebar{width:220px;min-height:100vh;background:var(--surface);border-right:1px solid var(--border);
+      display:flex;flex-direction:column;position:fixed;top:0;left:0;z-index:100}
+    .sb-logo{padding:20px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+    .sb-icon{width:34px;height:34px;background:var(--teal);border-radius:9px;display:flex;align-items:center;
+      justify-content:center;font-size:17px;flex-shrink:0;color:#080c18;font-weight:900}
+    .sb-brand{font-family:'DM Serif Display',serif;font-size:16px}
+    .sb-sub{font-size:9px;color:var(--muted);font-family:'DM Mono',monospace;letter-spacing:1px}
+    .nav{flex:1;padding:12px 10px;display:flex;flex-direction:column;gap:2px}
+    .nav-item{display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:var(--radius-sm);
+      cursor:pointer;color:var(--muted);font-size:13px;font-weight:500;text-decoration:none;transition:all .15s}
+    .nav-item:hover,.nav-item.active{background:var(--teal-dim);color:var(--teal)}
+    .nav-section{font-size:10px;text-transform:uppercase;letter-spacing:1.2px;color:var(--faint);
+      padding:10px 11px 4px;font-family:'DM Mono',monospace}
+    .nav-badge{margin-left:auto;background:var(--red);color:#fff;border-radius:20px;
+      font-size:10px;padding:1px 6px;font-family:'DM Mono',monospace}
+    .sb-footer{padding:12px 10px;border-top:1px solid var(--border)}
+    .sb-stat{font-size:11px;color:var(--muted);margin-bottom:5px}
+    .sb-stat span{color:var(--teal);font-family:'DM Mono',monospace}
+
+    /* MAIN */
+    .main{margin-left:220px;flex:1;display:flex;flex-direction:column}
+    .topbar{position:sticky;top:0;z-index:50;background:rgba(8,12,24,.88);backdrop-filter:blur(16px);
+      border-bottom:1px solid var(--border);padding:13px 24px;display:flex;align-items:center;gap:14px}
+    .topbar-title{font-family:'DM Serif Display',serif;font-size:20px;flex:1}
+    .content{padding:24px;flex:1}
+
+    /* BUTTONS */
+    .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:var(--radius-sm);
+      font-size:13px;font-weight:600;cursor:pointer;border:none;font-family:'Outfit',sans-serif;
+      text-decoration:none;transition:all .15s}
+    .btn-primary{background:var(--teal);color:#080c18}
+    .btn-primary:hover{background:var(--teal2);transform:translateY(-1px);box-shadow:0 4px 14px var(--teal-glow)}
+    .btn-ghost{background:var(--card);color:var(--muted);border:1px solid var(--border)}
+    .btn-ghost:hover{border-color:var(--teal);color:var(--teal)}
+    .btn-danger{background:var(--red-dim);color:var(--red);border:1px solid rgba(255,77,109,.25)}
+    .btn-danger:hover{background:var(--red);color:#fff}
+    .btn-sm{padding:5px 11px;font-size:12px}
+    .btn-xs{padding:3px 8px;font-size:11px}
+
+    /* CARDS */
+    .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px}
+    .card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+    .card-title{font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;
+      letter-spacing:.8px;font-family:'DM Mono',monospace}
+
+    /* STATS */
+    .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px}
+    .stat-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+      padding:18px;position:relative;overflow:hidden}
+    .stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+    .stat-card.teal::before{background:var(--teal)}
+    .stat-card.red::before{background:var(--red)}
+    .stat-card.amber::before{background:var(--amber)}
+    .stat-card.blue::before{background:var(--blue)}
+    .stat-label{font-size:10px;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted);
+      margin-bottom:8px;font-family:'DM Mono',monospace}
+    .stat-value{font-size:24px;font-weight:700;font-family:'DM Mono',monospace;margin-bottom:5px}
+    .stat-value.teal{color:var(--teal)}.stat-value.red{color:var(--red)}
+    .stat-value.amber{color:var(--amber)}.stat-value.blue{color:var(--blue)}
+    .stat-sub{font-size:11px;color:var(--muted)}
+    .stat-icon{position:absolute;right:14px;top:14px;font-size:26px;opacity:.12}
+
+    /* TABLE */
+    .table-wrap{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+    .table-top{padding:14px 18px;border-bottom:1px solid var(--border);
+      display:flex;align-items:center;justify-content:space-between}
+    table{width:100%;border-collapse:collapse}
+    thead th{padding:10px 14px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:1px;
+      color:var(--muted);font-family:'DM Mono',monospace;border-bottom:1px solid var(--border);
+      background:var(--surface);font-weight:500}
+    tbody tr{border-bottom:1px solid var(--border);transition:background .1s;cursor:pointer}
+    tbody tr:last-child{border-bottom:none}
+    tbody tr:hover{background:rgba(255,255,255,.02)}
+    td{padding:12px 14px;font-size:13px;vertical-align:middle}
+    .td-mono{font-family:'DM Mono',monospace}
+
+    /* BADGES */
+    .badge{display:inline-flex;align-items:center;gap:4px;padding:2px 9px;border-radius:20px;
+      font-size:10px;font-weight:600;font-family:'DM Mono',monospace}
+    .badge::before{content:'';width:5px;height:5px;border-radius:50%;display:inline-block}
+    .badge-overdue{background:var(--red-dim);color:var(--red);border:1px solid rgba(255,77,109,.2)}
+    .badge-overdue::before{background:var(--red)}
+    .badge-partial{background:var(--amber-dim);color:var(--amber);border:1px solid rgba(255,183,3,.2)}
+    .badge-partial::before{background:var(--amber)}
+    .badge-pending{background:var(--blue-dim);color:var(--blue);border:1px solid rgba(79,142,247,.2)}
+    .badge-pending::before{background:var(--blue)}
+    .badge-paid{background:var(--teal-dim);color:var(--teal);border:1px solid rgba(0,212,170,.2)}
+    .badge-paid::before{background:var(--teal)}
+
+    /* PROGRESS */
+    .progress-track{height:5px;background:var(--faint);border-radius:3px;overflow:hidden;min-width:80px}
+    .progress-fill{height:100%;border-radius:3px;transition:width .5s ease}
+
+    /* FORM */
+    .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    .form-group{display:flex;flex-direction:column;gap:5px}
+    .form-group.full{grid-column:1/-1}
+    label{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);font-weight:600}
+    .input,.select-field,textarea{background:var(--surface);border:1px solid var(--border);
+      border-radius:var(--radius-sm);padding:9px 13px;color:var(--text);font-size:13px;
+      font-family:'Outfit',sans-serif;transition:all .15s;outline:none;width:100%}
+    .input:focus,.select-field:focus,textarea:focus{border-color:var(--teal);box-shadow:0 0 0 3px var(--teal-glow)}
+    textarea{resize:vertical;min-height:72px}
+
+    /* AVATAR */
+    .avatar{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;
+      justify-content:center;font-weight:700;font-size:12px;flex-shrink:0}
+
+    /* SEARCH BAR */
+    .search-wrap{position:relative}
+    .search-icon{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:14px}
+    .search-input{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm);
+      padding:8px 13px 8px 35px;color:var(--text);font-size:13px;width:240px;
+      font-family:'Outfit',sans-serif;transition:all .2s;outline:none}
+    .search-input:focus{border-color:var(--teal);box-shadow:0 0 0 3px var(--teal-glow)}
+
+    /* FLASH MESSAGES */
+    .flashes{padding:0 24px;margin-top:16px}
+    .alert{padding:10px 16px;border-radius:var(--radius-sm);font-size:13px;margin-bottom:8px;
+      display:flex;align-items:center;gap:8px;border-left:3px solid}
+    .alert-success{background:var(--teal-dim);border-color:var(--teal);color:var(--teal)}
+    .alert-danger{background:var(--red-dim);border-color:var(--red);color:var(--red)}
+    .alert-warning{background:var(--amber-dim);border-color:var(--amber);color:var(--amber)}
+    .alert-info{background:var(--blue-dim);border-color:var(--blue);color:var(--blue)}
+
+    /* MODAL */
+    .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);
+      backdrop-filter:blur(4px);z-index:200;align-items:center;justify-content:center}
+    .modal-overlay.open{display:flex}
+    .modal-box{background:var(--card);border:1px solid var(--border2);border-radius:16px;
+      width:100%;max-width:520px;max-height:90vh;overflow-y:auto;
+      box-shadow:0 24px 64px rgba(0,0,0,.6);animation:slideUp .2s ease}
+    @keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+    .modal-head{padding:20px 20px 0;display:flex;align-items:flex-start;justify-content:space-between;
+      border-bottom:1px solid var(--border);padding-bottom:14px;margin-bottom:20px}
+    .modal-title{font-family:'DM Serif Display',serif;font-size:20px}
+    .modal-body{padding:0 20px 20px}
+    .modal-foot{padding:0 20px 20px;display:flex;gap:8px;justify-content:flex-end}
+    .close-btn{background:var(--surface);border:1px solid var(--border);color:var(--muted);
+      width:30px;height:30px;border-radius:7px;cursor:pointer;font-size:15px;
+      display:flex;align-items:center;justify-content:center}
+
+    /* DIVIDER */
+    .divider{height:1px;background:var(--border);margin:16px 0}
+
+    /* SCROLLBAR */
+    ::-webkit-scrollbar{width:5px;height:5px}
+    ::-webkit-scrollbar-track{background:transparent}
+    ::-webkit-scrollbar-thumb{background:var(--faint);border-radius:3px}
+
+    /* MISC */
+    .empty{text-align:center;padding:48px 24px;color:var(--muted)}
+    .empty-icon{font-size:40px;opacity:.35;margin-bottom:12px}
+    .text-teal{color:var(--teal)}.text-red{color:var(--red)}.text-amber{color:var(--amber)}
+    .text-muted{color:var(--muted)}.text-mono{font-family:'DM Mono',monospace}
+    .flex{display:flex;align-items:center}.gap-2{gap:8px}.gap-3{gap:12px}
+    .ml-auto{margin-left:auto}
+    @media(max-width:900px){.sidebar{display:none}.main{margin-left:0}.stats-grid{grid-template-columns:1fr 1fr}}
+  </style>
+  {% block extra_css %}{% endblock %}
+</head>
+<body>
+
+{% if current_user.is_authenticated %}
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sb-logo">
+    <div class="sb-icon">✚</div>
+    <div>
+      <div class="sb-brand">MedDebt</div>
+      <div class="sb-sub">TRACKER PRO</div>
+    </div>
+  </div>
+  <nav class="nav">
+    <a href="{{ url_for('main.dashboard') }}"  class="nav-item {% if request.endpoint == 'main.dashboard' %}active{% endif %}">⬡ Dashboard</a>
+    <a href="{{ url_for('main.debtors') }}"    class="nav-item {% if request.endpoint == 'main.debtors' %}active{% endif %}">⊙ All Patients</a>
+
+    <div class="nav-section">Filters</div>
+    <a href="{{ url_for('main.debtors', status='overdue') }}" class="nav-item">⚠ Overdue</a>
+    <a href="{{ url_for('main.debtors', status='partial') }}" class="nav-item">◑ Partial</a>
+    <a href="{{ url_for('main.debtors', status='pending') }}" class="nav-item">○ Pending</a>
+    <a href="{{ url_for('main.debtors', status='paid') }}"    class="nav-item">✓ Cleared</a>
+
+    {% if current_user.is_admin %}
+    <div class="nav-section">Admin</div>
+    <a href="{{ url_for('admin.panel') }}"    class="nav-item {% if 'admin' in request.endpoint %}active{% endif %}">⚙ Admin Panel</a>
+    <a href="{{ url_for('admin.users') }}"    class="nav-item">👥 Users</a>
+    <a href="{{ url_for('admin.ledger') }}"   class="nav-item">📋 Full Ledger</a>
+    <a href="{{ url_for('admin.payments') }}" class="nav-item">💳 Payments Log</a>
+    <a href="{{ url_for('auth.register') }}"  class="nav-item">➕ New User</a>
+    {% endif %}
+  </nav>
+  <div class="sb-footer">
+    <div class="sb-stat">Logged in as: <span>{{ current_user.name }}</span></div>
+    <div class="sb-stat">Role: <span>{{ current_user.role }}</span></div>
+    <a href="{{ url_for('auth.logout') }}" class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;margin-top:8px">Sign Out</a>
+  </div>
+</aside>
+{% endif %}
+
+<!-- MAIN -->
+<div class="main">
+  <header class="topbar">
+    <div class="topbar-title">{% block page_title %}Dashboard{% endblock %}</div>
+    {% block topbar_actions %}{% endblock %}
+  </header>
+
+  <!-- FLASH MESSAGES -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="flashes">
+        {% for cat, msg in messages %}
+          <div class="alert alert-{{ cat }}">
+            <span>{{ '✓' if cat == 'success' else '✕' if cat == 'danger' else '⚠' }}</span>
+            {{ msg }}
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  <div class="content">
+    {% block content %}{% endblock %}
+  </div>
+</div>
+
+<script>
+// AJAX search helper
+function debounce(fn, ms) {
+  let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
+}
+
+// Auto-dismiss flash messages
+setTimeout(() => {
+  document.querySelectorAll('.alert').forEach(el => {
+    el.style.transition = 'opacity .5s';
+    el.style.opacity = '0';
+    setTimeout(() => el.remove(), 500);
+  });
+}, 4000);
+
+// Close modal on overlay click
+document.addEventListener('click', e => {
+  if (e.target.classList.contains('modal-overlay')) closeModal(e.target.id);
+});
+
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+</script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

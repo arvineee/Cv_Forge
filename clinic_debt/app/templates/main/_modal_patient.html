@@ -1,0 +1,51 @@
+<div class="modal-overlay" id="modal-add-patient">
+  <div class="modal-box">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title">New Patient</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px">Fill in patient information</div>
+      </div>
+      <button class="close-btn" onclick="closeModal('modal-add-patient')">✕</button>
+    </div>
+    <form method="POST" action="{{ url_for('main.add_patient') }}" class="modal-body">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Full Name *</label>
+          <input class="input" type="text" name="name" placeholder="John Kamau" required>
+        </div>
+        <div class="form-group">
+          <label>Phone *</label>
+          <input class="input" type="text" name="phone" placeholder="+254 7xx xxx xxx" required>
+        </div>
+        <div class="form-group">
+          <label>Email</label>
+          <input class="input" type="email" name="email" placeholder="patient@mail.com">
+        </div>
+        <div class="form-group">
+          <label>National ID / Passport</label>
+          <input class="input" type="text" name="id_number" placeholder="12345678">
+        </div>
+        <div class="form-group">
+          <label>Gender</label>
+          <select class="select-field" name="gender">
+            <option value="">— Select —</option>
+            <option>Male</option><option>Female</option><option>Other</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Address</label>
+          <input class="input" type="text" name="address" placeholder="Nairobi, Kenya">
+        </div>
+        <div class="form-group full">
+          <label>Notes</label>
+          <textarea class="input" name="notes" placeholder="Optional notes..."></textarea>
+        </div>
+      </div>
+      <div class="modal-foot" style="padding:16px 0 0">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('modal-add-patient')">Cancel</button>
+        <button type="submit" class="btn btn-primary">➕ Add Patient</button>
+      </div>
+    </form>
+  </div>
+</div>

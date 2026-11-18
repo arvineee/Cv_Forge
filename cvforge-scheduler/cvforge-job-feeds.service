@@ -1,0 +1,14 @@
+[Unit]
+Description=CVForge job feed sync
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=www-data
+WorkingDirectory=/var/www/cvforge
+EnvironmentFile=/var/www/cvforge/.env
+Environment=FLASK_APP=run.py
+ExecStart=/var/www/cvforge/venv/bin/flask sync-job-feeds
+# A oneshot service never overlaps itself.
+TimeoutStartSec=15min

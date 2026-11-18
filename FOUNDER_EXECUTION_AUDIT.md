@@ -134,3 +134,47 @@ Do not deploy the SDK migration or other changes until:
 Implemented `/admin/growth` using existing `User`, `ActivityLog`, and `Payment` tables. It reports new registrations, same-period CV activation among the new signup cohort, same-period paying customers among that cohort, successful revenue grouped by currency, and daily registration counts. It adds no database tables or migration requirement. The dashboard is restricted by the existing `admin_required` decorator.
 
 Validation: Python source compilation passed. Full Flask integration tests and a production database smoke test remain required in a dependency-complete staging environment.
+
+
+## Sprint 003 — Activation and first-CV completion
+
+Implemented distinct `cv_completed` and `cv_first_download` activity events using the existing `ActivityLog` table. A CV completion milestone is recorded only when the user reaches the review step and the CV has a name, work experience or education, and at least one skill. First download is recorded only after PDF/DOCX generation succeeds. The user dashboard now displays a getting-started checklist for the most recently updated CV.
+
+No database schema changes or migrations were introduced. No automated follow-up emails were added; existing email-newsletter preferences and consent should be respected before any lifecycle campaign is introduced.
+
+Validation: Python compilation passed and the two changed Jinja templates parsed successfully. The selected Flask integration tests could not run because Flask is not installed in this execution environment (`ModuleNotFoundError: flask`). A dependency-complete staging test and production database smoke test remain required.
+
+## Sprint 004 — Career insights and repeat-use loop
+
+Extended the member dashboard with a career-insights panel sourced only from the signed-in user's saved ATS reports. It shows the latest score, point change versus the preceding report, missing keywords from the latest analysis, up to three improvement suggestions, and a compact recent-score history. The panel links directly to the ATS checker so users can run a new job-specific analysis and measure progress.
+
+The keyword guidance explicitly tells users to include terms only when they reflect genuine skills or experience. This is a product guidance panel, not a promise of hiring outcomes or a claim that keyword matching alone predicts ATS results. It reuses existing `ATSReport` data and introduces no database migration or external service.
+
+Validation: Python compilation passed for the application and all 83 Jinja templates parsed successfully. Full Flask integration tests, browser/mobile checks, and production database tests remain required in a dependency-complete staging environment.
+
+
+## Sprint 006 — Job Match workspace (18 November 2026)
+
+- Added authenticated `/career/match` GET/POST flow to compare a user's own saved CV against a pasted vacancy description.
+- Uses the existing `get_ai_service().ats_check(...)` service and existing ATS daily usage cap; job description is capped at 8,000 characters.
+- Persists analysis to the pre-existing `JobMatch` model and records an `ActivityLog` event.
+- Displays match estimate, ATS score, matched/missing keywords, potential skills gaps, recommendations and recent analysis history.
+- Adds a CSRF-protected action to save an analysed opportunity into the existing `JobApplication` tracker.
+- Adds Job Match to the dashboard navigation.
+- No new table, migration, dependency, external job-board scraper or third-party integration.
+- Updated deployment documentation for the user's stated VPS deployment at `https://cvforge.site`; historical PythonAnywhere helper scripts are explicitly marked as not applicable to production.
+- Validation in this environment: Python syntax and Jinja parsing; full Flask integration tests and live VPS tests remain to be run in the production-equivalent environment.
+
+
+## Sprint 007 — Job Discovery (18 November 2026)
+
+- Added authenticated `/career/jobs` vacancy search with keyword, country and location filters.
+- Added RSS/Atom ingestion through `flask sync-job-feeds`; feeds must be configured by the operator and their HTTPS hostnames must be explicitly allow-listed.
+- Added a `JobOpportunity` catalogue model and manual SQLite/PostgreSQL migration scripts.
+- Added deduplication using a stable SHA-256 key based on feed source name and GUID/ID (or link); entries no longer present in a successfully fetched feed are deactivated.
+- Added CSRF-protected save-to-Career-Workspace action and direct CV Match prefill from a discovered vacancy.
+- Added Ubuntu VPS feed configuration, manual verification and cron instructions. No sample feed URL is represented as a verified source; `.env.example` values are placeholders.
+- Security controls: HTTPS only for feed fetches, hostname allow-list, reject redirects, public-DNS-address check, 2 MB feed response cap, bounded item count and network timeouts.
+- No AI usage is triggered by browsing/syncing jobs and no email alerts are sent.
+- Requires migration `002_create_job_opportunities_*` matching the production database engine. Existing Sprint 005 `job_applications` migration remains a prerequisite.
+- Validation performed in this environment: Python compilation, Jinja template parsing, SQL migration syntax review, archive hygiene. Full Flask/database integration tests, real feed verification, browser tests and live Ubuntu VPS tests remain outstanding.

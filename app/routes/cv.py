@@ -63,6 +63,29 @@ def _log(action, resource_id=None, details=None):
     ))
 
 
+def _log_once(action, resource_id=None, details=None):
+    """Queue an activity event once per user/resource pair."""
+    existing = ActivityLog.query.filter_by(
+        user_id=current_user.id,
+        action=action,
+        resource_type="resume",
+        resource_id=resource_id,
+    ).first()
+    if not existing:
+        _log(action, resource_id, details)
+
+
+def _resume_meets_completion_criteria(resume):
+    """A practical first-CV milestone, not a claim of editorial perfection."""
+    personal = resume.personal_info or {}
+    has_name = bool((personal.get("full_name") or "").strip())
+    has_career_content = bool(
+        (resume.work_experience or []) or (resume.education or [])
+    )
+    has_skills = bool(resume.skills or [])
+    return has_name and has_career_content and has_skills
+
+
 def _check_ai_limit(feature: str) -> tuple:
     from app.services.entitlements import check_daily_limit
     allowed, message, _used, _limit = check_daily_limit(
@@ -481,7 +504,16 @@ def wizard_step(resume_id, step):
 
     if step == "review":
         from app.services.conversion_tracking import mark_cv_completed
-        if mark_cv_completed(current_user.id, resume):
+        completed_now = mark_cv_completed(current_user.id, resume)
+        # Sprint 004 milestone (read by the dashboard checklist); _log_once dedupes against
+        # the cv_completed event written above, so nothing is double counted.
+        if _resume_meets_completion_criteria(resume):
+            _log_once("cv_completed", resume.id, {
+                "milestone": "first_review_with_core_sections",
+                "criteria": ["full_name", "work_or_education", "skills"],
+            })
+            completed_now = True
+        if completed_now:
             db.session.commit()
         plan = _current_plan()
         allow_docx = _plan_allows_docx()
@@ -1202,6 +1234,8 @@ def download(resume_id, fmt):
         mark_cv_completed(current_user.id, resume)
         if not ActivityLog.query.filter_by(user_id=current_user.id, action="first_cv_downloaded").first():
             record_event(current_user.id, "first_cv_downloaded", details={"resume_id": resume.id, "format": fmt})
+        # Dashboard onboarding checklist reads this per-resume event.
+        _log_once("cv_first_download", resume.id, {"format": fmt})
         db.session.commit()
 
         _cleanup_after_send(file_path)

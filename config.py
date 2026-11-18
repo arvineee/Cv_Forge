@@ -1,5 +1,8 @@
 import os
 from datetime import timedelta
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -79,6 +82,11 @@ class Config:
     PAYSTACK_PUBLIC_KEY = os.environ.get("PAYSTACK_PUBLIC_KEY", "")
     PAYSTACK_WEBHOOK_SECRET = os.environ.get("PAYSTACK_WEBHOOK_SECRET", "")
     PAYSTACK_BASE_URL = os.environ.get("PAYSTACK_BASE_URL", "https://api.paystack.co")
+
+    # Job discovery: only fetch operator-configured HTTPS RSS/Atom feeds.
+    # Keep JOB_FEEDS_JSON and JOB_FEED_ALLOWED_DOMAINS in the VPS environment.
+    JOB_FEEDS_JSON = os.environ.get("JOB_FEEDS_JSON", "")
+    JOB_FEED_ALLOWED_DOMAINS = os.environ.get("JOB_FEED_ALLOWED_DOMAINS", "")
 
     # Uploads — absolute path so PythonAnywhere can find it
     UPLOAD_FOLDER = os.environ.get(

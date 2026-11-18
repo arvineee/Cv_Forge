@@ -1,6 +1,6 @@
 # CVForge AI
 
-AI-powered CV and resume builder for job seekers worldwide (built in Kenya) — guided step-by-step CV wizard with inline AI writing help, CV parsing and AI revamp, ATS scoring, cover letter generation, PDF/DOCX export, public CV sharing, and payments via Paystack (cards) and IntaSend (M-Pesa in Kenya). Flask, deployed on PythonAnywhere.
+AI-powered CV and resume builder for job seekers worldwide (built in Kenya) — guided step-by-step CV wizard with inline AI writing help, CV parsing and AI revamp, ATS scoring, cover letter generation, PDF/DOCX export, public CV sharing, and card payments (Paystack) plus M-Pesa for customers in Kenya. Flask, deployed on a VPS at https://cvforge.site.
 
 ## Quick Setup
 
@@ -60,6 +60,10 @@ flask run
 | `flask stats` | Print platform stats |
 | `flask send-nudges` | Email free-tier users an occasional Pro-upgrade reminder (capped, opt-out respected) — schedule daily via PythonAnywhere Tasks |
 | `flask prune-visits` | Delete visitor-tracking rows older than 90 days |
+| `flask send-cv-reminders [--limit N] [--dry-run]` | Send the 24h/72h unfinished-CV reminder emails (respects the CV-progress reminder preference) |
+| `flask cv-conversion-report [--days N]` | Print first-CV funnel counts (register → started → completed → downloaded) for the window |
+| `flask sync-job-feeds` | Import vacancies from the operator-configured, allow-listed RSS/Atom feeds (Sprint 007) |
+| `flask process-job-alerts [--dry-run] [--limit N]` | Create idempotent in-app notifications for newly matching vacancies (Sprint 008) |
 
 > **Note on plan slugs:** there is currently no `"free"` plan row in the pricing table — the live catalog starts at `basic` (KES 50/month), then `pro`, then `premium`. New users still default to the string `"free"` on `User.plan` at signup, but since no plan row resolves for that slug, they simply have no active paid plan until they subscribe. Access to the dashboard and CV wizard is unrestricted either way — see **Pay-to-Download Model** below for what's actually gated.
 
@@ -73,6 +77,8 @@ flask run
 - `/admin/payments` — Payment history (Paystack and IntaSend)
 - `/admin/visitors` — Site visitor tracking: page views, unique visitors, top pages, per-day breakdown
 - `/admin/nudges` — Manually trigger the free-tier upgrade nudge email batch
+- `/admin/conversion` — First-CV conversion funnel (7/30/90-day windows)
+- `/admin/unit-economics` — Unit-economics report (see `CVFORGE_SPRINT_007_UNIT_ECONOMICS_AUDIT.md`)
 
 ## Key Features
 
@@ -90,21 +96,23 @@ flask run
 - **Admin visitor tracking** — lightweight page-view log with truncated IPs, not a full analytics replacement
 - **Free-tier nudge emails** — capped, respects newsletter opt-out, run via scheduled CLI command
 
-## Deployment
+## Production deployment (VPS)
 
-The GitHub Actions deployer (`scripts/pa_deploy.py`) uploads application code to PythonAnywhere while preserving production state. It explicitly skips every directory named `migrations` (including root `migrations/` and `app/migrations/`), even if a migration file is already tracked by Git. `.gitignore` also excludes those directories so new local migration files are not accidentally committed.
+The production site runs on your VPS at **https://cvforge.site**. Keep the current VPS service layout, virtual environment, reverse proxy and process manager; do not copy PythonAnywhere deployment instructions into production. The application is designed to run as a Flask app behind Gunicorn and Nginx (or the equivalent reverse proxy already configured on the server).
 
-**Migration protection is intentional:** production migration history is managed on the deployment environment and must not be overwritten by an ordinary application-code deploy. The deployer does not upload migration files and does not delete files already present on the server. If a schema change is needed, create/review/apply it through a separate, controlled migration procedure after backing up the production database. Do not rely on `.gitignore` alone: Git continues tracking files already in its index, which is why the deploy script has its own migration-directory exclusion.
+Before deploying a release:
 
-If you also want to stop tracking a migration directory in the Git repository, run the appropriate command from the repository root (this keeps your local files in place):
+1. Back up the production database and the complete uploads directory.
+2. Confirm the target Git commit and inspect the release diff.
+3. Deploy application code without replacing `.env`, `instance/`, the production database, user uploads, or persistent payment settings.
+4. Activate the existing virtual environment and install only the reviewed dependency changes from `requirements.txt`.
+5. Run database migrations only when a release explicitly includes one. Sprint 006 adds no database schema changes.
+6. Restart the existing Gunicorn/systemd service and verify `https://cvforge.site`, login, CV creation, ATS analysis, payments and webhooks.
+7. Check Nginx/Gunicorn logs and keep the previous release available for rollback.
 
-```bash
-git rm -r --cached --ignore-unmatch migrations app/migrations
-git add .gitignore
-git commit -m "Keep deployment migration history out of Git uploads"
-```
+Set `SITE_URL=https://cvforge.site` in the VPS environment. Keep `SECRET_KEY`, payment credentials, Gemini credentials, SMTP credentials and OAuth secrets outside Git. Use HTTPS and ensure the reverse proxy forwards the original host and scheme correctly.
 
-The command only removes files from Git's index; it does not delete the local migration directory. Confirm the paths match your repository before committing.
+A generic VPS runbook is included in `VPS_DEPLOYMENT.md`. Paths and service names are intentionally placeholders: confirm the actual VPS configuration before running commands. No changes in this archive have been deployed to the live server.
 
 ## Sprint 005 payment integrity
 
@@ -122,7 +130,7 @@ Admin -> **Payment methods** switches Paystack and IntaSend on or off for *new* 
 
 ## Known Issues / Caveats
 
-- **PythonAnywhere free tier blocks outbound SMTP** — verification, password reset, and nudge emails will fail with `Network is unreachable` until you either upgrade your PythonAnywhere plan or switch `email_service.py` to an HTTP-based email API.
+- **Email delivery depends on VPS/network configuration** — verify outbound SMTP access, provider credentials, SPF, DKIM and DMARC for `cvforge.site`; use an authenticated email API if outbound SMTP is restricted.
 - **SQLite strips tzinfo on read-back**, even on `DateTime(timezone=True)` columns. The app's convention is naive UTC via `models.utcnow()` on write, and `models._make_aware()` before any comparison against a DB-read datetime. Follow this pattern for any new expiry/timestamp field, or you'll hit `TypeError: can't compare offset-naive and offset-aware datetimes`.
 - **`with_for_update()` row locking in the webhook handler is a no-op on SQLite** — it only actually prevents concurrent double-processing on Postgres/MySQL. The `status == "active"` idempotency check still helps in the meantime.
 - **IntaSend sandbox and live are separate accounts** (`sandbox.intasend.com` vs `payment.intasend.com`), not a dashboard toggle. Mismatched keys/env produce a confusing `authentication_failed: Invalid token for sandbox environment` error rather than a clear "wrong account" message — `IntaSendService` logs its resolved mode (`SANDBOX`/`LIVE`) on every init to make this easier to catch.
@@ -145,29 +153,65 @@ Set `SITE_URL` (for example `https://cvforgeai.com`) in the environment so canon
 
 Public marketing copy that is shared between a page and its structured data (FAQs, default title/description/keywords) lives in `app/services/site_content.py`. Sitemap pages and robots rules are in `app/routes/seo.py`.
 
-## Auto-deploy (GitHub Actions → PythonAnywhere)
+## Deployment automation
+
+The repository contains historical PythonAnywhere deployment helpers. They are not the production deployment path for `cvforge.site`. Do not run `scripts/pa_deploy.py` against the live VPS. Configure VPS-specific CI/CD only after confirming the server's deployment user, project directory, service unit, backup policy and rollback procedure.
+
+**Historical PythonAnywhere behaviour (kept for reference only):**
+
+The GitHub Actions deployer (`scripts/pa_deploy.py`) uploads application code to PythonAnywhere while preserving production state. It explicitly skips every directory named `migrations` (including root `migrations/` and `app/migrations/`), even if a migration file is already tracked by Git. `.gitignore` also excludes those directories so new local migration files are not accidentally committed.
+
+**Migration protection is intentional:** production migration history is managed on the deployment environment and must not be overwritten by an ordinary application-code deploy. The deployer does not upload migration files and does not delete files already present on the server. If a schema change is needed, create/review/apply it through a separate, controlled migration procedure after backing up the production database. Do not rely on `.gitignore` alone: Git continues tracking files already in its index, which is why the deploy script has its own migration-directory exclusion.
+
+If you also want to stop tracking a migration directory in the Git repository, run the appropriate command from the repository root (this keeps your local files in place):
+
+```bash
+git rm -r --cached --ignore-unmatch migrations app/migrations
+git add .gitignore
+git commit -m "Keep deployment migration history out of Git uploads"
+```
+
+The command only removes files from Git's index; it does not delete the local migration directory. Confirm the paths match your repository before committing.
 
 Every push to `main` runs the tests, then `scripts/pa_deploy.py` uploads the git-tracked app files through the PythonAnywhere API and reloads the web app (`.github/workflows/deploy.yml`). It never uploads `.env`, databases, `instance/`, `uploads/`, tests, caches or any `migrations/` directory, so production data, secrets and deployment-managed migration history stay as they are.
 
-One-time setup in GitHub → Settings → Secrets and variables → Actions:
 
-| Type | Name | Example |
-|---|---|---|
-| Secret | `PA_USERNAME` | your PythonAnywhere username |
-| Secret | `PA_API_TOKEN` | PythonAnywhere → Account → API token |
-| Variable | `PA_PROJECT_DIR` | `/home/<username>/<project folder>` |
-| Variable | `PA_DOMAIN` | `cvforge.pythonanywhere.com` (or your custom domain) |
-| Variable | `PA_HOST` | only for EU accounts: `eu.pythonanywhere.com` |
+## Sprint 003 (career track) — Activation and first-value tracking
 
-Notes: files deleted from git are not deleted on the server, and new dependencies in `requirements.txt` still need `pip install` in a PythonAnywhere console. Preview what would upload with `python scripts/pa_deploy.py --dry-run`.
+The CV wizard now records a distinct `cv_completed` milestone when a user opens the review step with the minimum useful CV content present: a full name, at least one work or education entry, and at least one skill. This is a product activation milestone, not a guarantee that the CV is error-free or ready for every job application.
 
-## Sprint 003 — First CV conversion
+The first successful PDF/DOCX generation for a resume is recorded separately as `cv_first_download`; ordinary downloads continue to be recorded as `cv_download`. The dashboard includes a getting-started checklist that guides users from starting a CV to completing its core sections and downloading the file.
+
+These events reuse `ActivityLog`; no database migration is required. The checklist focuses on the most recently updated CV. Follow-up marketing emails are intentionally not sent by this sprint.
+
+## Sprint 004 — Career insights
+
+The member dashboard includes a career-insights panel based on the user's own ATS report history. It displays the latest score, change from the previous report, missing keywords, improvement suggestions, and recent score history. Users can return to the ATS checker to run another job-specific analysis. No database migration is required. Missing keywords are prompts to review, not skills users should claim unless accurate.
+
+
+## Sprint 006 (career track) — Job Match workspace
+
+The Career Workspace now includes a private CV-to-job comparison flow at `/career/match`. A signed-in user selects one of their own saved CVs, enters optional role/company labels, and pastes a job description. The existing ATS analysis service returns a match estimate, ATS score, matched/missing keywords, potential skills gaps and recommendations. Each analysis is saved to the existing `JobMatch` model and appears in recent analysis history. A user can save an analysed opportunity into their existing Career Workspace application tracker.
+
+The feature does not scrape job boards or claim that a score predicts an employer's decision. It does not add a database table or migration. Job descriptions are limited to 8,000 characters and analysis uses the existing ATS usage limit.
+
+
+## Job Discovery (Sprint 007)
+
+CVForge includes an authenticated job discovery page at `/career/jobs`. Listings are imported only from operator-configured RSS/Atom feeds; no HTML scraping or automatic third-party job-board integration is assumed. See `JOB_DISCOVERY_SETUP.md` for the database migration, Ubuntu cron setup, feed allow-list and editorial/security requirements.
+
+Production deployment target: Ubuntu VPS at `https://cvforge.site`. See `VPS_DEPLOYMENT.md` and preserve the live environment file, database, uploads and persistent instance data during releases.
+
+
+Historical PythonAnywhere note: files deleted from git are not deleted on the server, and new dependencies in `requirements.txt` still need `pip install` in a PythonAnywhere console. On the VPS, install reviewed dependency changes in the existing virtual environment instead. Preview what would upload with `python scripts/pa_deploy.py --dry-run`.
+
+## Sprint 003 (conversion track) — First CV conversion
 
 This release adds first-time onboarding, direct guided-CV entry, dashboard draft recovery, debounced wizard autosave, first-CV conversion events, an admin conversion funnel (`/admin/conversion`), and opt-out-aware abandoned-CV email reminders.
 
-No database migration is required. See `SPRINT_003_CHANGELOG.md` for the feature list and validation status, and `SPRINT_003_DEPLOYMENT.md` for backup, staging, credential-rotation and PythonAnywhere scheduled-task instructions. The reminder task is opt-in and must be scheduled deliberately with `flask send-cv-reminders` after staging email verification.
+No database migration is required. See `SPRINT_003_CHANGELOG.md` for the feature list and validation status, and `SPRINT_003_DEPLOYMENT.md` for backup, staging, credential-rotation and scheduled-task instructions (written for PythonAnywhere; `cvforge-scheduler/` has systemd timers that suit the VPS). The reminder task is opt-in and must be scheduled deliberately with `flask send-cv-reminders` after staging email verification.
 
-## Sprint 006 growth, conversion and retention
+## Sprint 006 (growth track) — Growth, conversion and retention
 
 - First-touch UTM attribution is captured for new email and Google registrations using the existing signed browser session and `ActivityLog.details`; no new database fields are required. Stored page-visit referrers drop query strings/fragments and redact secret token paths.
 - `/admin/growth` now reports signup-cohort activation and paid conversion, source/medium and campaign signups, active users, repeat-active users and gross payment records grouped by currency/provider.
@@ -178,3 +222,6 @@ No database migration is required. See `SPRINT_003_CHANGELOG.md` for the feature
 - No database schema change or migration is included. See `CVFORGE_SPRINT_006_GROWTH_AUDIT.md`, `SPRINT_006_CHANGELOG.md` and `SPRINT_006_DEPLOYMENT.md`.
 
 **Measurement caveat:** campaign signups are not CAC. CVForge still needs verified campaign-spend records and net contribution reporting (provider fees, refunds, reversals, AI and variable support costs) before it can make reliable profitability or LTV/CAC decisions.
+
+## Sprint 008: Personalised Job Alerts
+See `SPRINT_008_JOB_ALERTS.md` for saved searches, migration and Ubuntu deployment steps.

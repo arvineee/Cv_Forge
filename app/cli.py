@@ -71,8 +71,8 @@ def register_cli(app):
     app.cli.add_command(prune_visits)
     app.cli.add_command(send_cv_reminders_cmd)
     app.cli.add_command(cv_conversion_report_cmd)
-
-
+    app.cli.add_command(sync_job_feeds_cmd)
+    app.cli.add_command(process_job_alerts_cmd)
 
 
 @click.command("send-cv-reminders")
@@ -107,3 +107,22 @@ def cv_conversion_report_cmd(days):
         count = query.scalar() or 0
         click.echo(f"{action}: {count}")
 
+
+@click.command("sync-job-feeds")
+@with_appcontext
+def sync_job_feeds_cmd():
+    """Import vacancies from explicitly configured, allow-listed RSS/Atom feeds."""
+    from app.services.job_discovery import sync_job_feeds
+    result = sync_job_feeds()
+    click.echo("Job feeds: " + ", ".join(f"{key}={value}" for key, value in result.items()))
+
+
+@click.command("process-job-alerts")
+@click.option("--dry-run", is_flag=True, help="Show matches without creating notifications.")
+@click.option("--limit", default=500, show_default=True, help="Maximum listings evaluated per saved alert.")
+@with_appcontext
+def process_job_alerts_cmd(dry_run, limit):
+    """Create idempotent in-app notifications for newly matching vacancies."""
+    from app.services.job_alerts import process_job_alerts
+    result = process_job_alerts(dry_run=dry_run, limit=limit)
+    click.echo("Job alerts: " + ", ".join(f"{key}={value}" for key, value in result.items()))

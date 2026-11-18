@@ -1,0 +1,50 @@
+{% extends "base_dashboard.html" %}
+{% block title %}Career Workspace | CVForge{% endblock %}
+{% block content %}
+<div class="max-w-7xl mx-auto space-y-6">
+  <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+    <div><p class="text-sm font-semibold text-blue-600">YOUR JOB SEARCH</p><h1 class="text-2xl sm:text-3xl font-bold text-gray-900">Career workspace</h1><p class="text-gray-500 mt-1">Keep opportunities, applications and interviews organised in one place.</p></div>
+    <a href="#add-application" class="inline-flex justify-center px-4 py-2.5 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700">+ Add opportunity</a>
+  </div>
+  <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+    {% for key,label in [('saved','Saved'),('applied','Applied'),('interview','Interview'),('offer','Offers'),('rejected','Rejected'),('withdrawn','Withdrawn')] %}
+    <a href="{{ url_for('dashboard.applications', status=key) }}" class="rounded-xl border p-4 bg-white hover:border-blue-300 {% if active_status == key %}border-blue-500 ring-1 ring-blue-200{% else %}border-gray-200{% endif %}"><p class="text-xs text-gray-500">{{ label }}</p><p class="text-2xl font-bold text-gray-900">{{ counts[key] }}</p></a>
+    {% endfor %}
+  </div>
+  <div class="bg-white border border-gray-200 rounded-2xl p-5 sm:p-6" id="add-application">
+    <h2 class="font-bold text-lg text-gray-900">Add a job opportunity</h2><p class="text-sm text-gray-500 mb-4">Save a vacancy now and update its progress as you apply.</p>
+    <form method="POST" action="{{ url_for('dashboard.create_application') }}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label class="text-sm font-medium text-gray-700">Job title *<input required maxlength="180" name="job_title" class="mt-1 w-full rounded-lg border-gray-300" placeholder="e.g. Product Designer"></label>
+      <label class="text-sm font-medium text-gray-700">Company *<input required maxlength="180" name="company_name" class="mt-1 w-full rounded-lg border-gray-300" placeholder="Company name"></label>
+      <label class="text-sm font-medium text-gray-700">Job link<input type="url" name="job_url" class="mt-1 w-full rounded-lg border-gray-300" placeholder="https://..."></label>
+      <label class="text-sm font-medium text-gray-700">Location<input name="location" maxlength="180" class="mt-1 w-full rounded-lg border-gray-300" placeholder="Remote / Nairobi"></label>
+      <label class="text-sm font-medium text-gray-700">Employment type<select name="employment_type" class="mt-1 w-full rounded-lg border-gray-300"><option value="">Choose</option><option>Full-time</option><option>Part-time</option><option>Contract</option><option>Internship</option><option>Freelance</option></select></label>
+      <label class="text-sm font-medium text-gray-700">Salary range<input name="salary_range" maxlength="120" class="mt-1 w-full rounded-lg border-gray-300" placeholder="Optional"></label>
+      <label class="text-sm font-medium text-gray-700">Status<select name="status" class="mt-1 w-full rounded-lg border-gray-300">{% for st in statuses %}<option value="{{ st }}">{{ st|title }}</option>{% endfor %}</select></label>
+      <label class="text-sm font-medium text-gray-700">Application deadline<input type="date" name="deadline" class="mt-1 w-full rounded-lg border-gray-300"></label>
+      <label class="text-sm font-medium text-gray-700">CV to use<select name="resume_id" class="mt-1 w-full rounded-lg border-gray-300"><option value="">Not selected</option>{% for cv in resumes %}<option value="{{ cv.id }}">{{ cv.title }}</option>{% endfor %}</select></label>
+      <label class="text-sm font-medium text-gray-700 sm:col-span-2 lg:col-span-3">Notes<textarea name="notes" rows="2" maxlength="10000" class="mt-1 w-full rounded-lg border-gray-300" placeholder="Recruiter contact, requirements, follow-up reminders..."></textarea></label>
+      <div class="sm:col-span-2 lg:col-span-3"><button class="px-5 py-2.5 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700">Save opportunity</button></div>
+    </form>
+  </div>
+  <div class="space-y-3">
+    <div class="flex items-center justify-between"><h2 class="text-lg font-bold text-gray-900">{{ 'Filtered opportunities' if active_status else 'Your opportunities' }}</h2>{% if active_status %}<a class="text-sm text-blue-600" href="{{ url_for('dashboard.applications') }}">Clear filter</a>{% endif %}</div>
+    {% for item in applications %}
+    <article class="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5">
+      <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+        <div class="min-w-0"><div class="flex flex-wrap items-center gap-2"><h3 class="font-bold text-gray-900 text-lg">{{ item.job_title }}</h3><span class="text-xs px-2.5 py-1 rounded-full bg-blue-50 text-blue-700">{{ item.status|title }}</span></div><p class="text-gray-600">{{ item.company_name }}{% if item.location %} · {{ item.location }}{% endif %}</p><div class="text-xs text-gray-500 mt-2 flex flex-wrap gap-3">{% if item.employment_type %}<span>{{ item.employment_type }}</span>{% endif %}{% if item.salary_range %}<span>{{ item.salary_range }}</span>{% endif %}{% if item.deadline %}<span>Deadline: {{ item.deadline.strftime('%d %b %Y') }}</span>{% endif %}{% if item.resume %}<span>CV: {{ item.resume.title }}</span>{% endif %}</div>{% if item.notes %}<p class="text-sm text-gray-600 mt-3 whitespace-pre-line">{{ item.notes }}</p>{% endif %}{% if item.job_url %}<a class="inline-block text-sm text-blue-600 mt-2 break-all" href="{{ item.job_url }}" target="_blank" rel="noopener noreferrer">Open job posting ↗</a>{% endif %}</div>
+        <div class="flex flex-wrap gap-2 shrink-0">
+          <form method="POST" action="{{ url_for('dashboard.update_application', application_id=item.id) }}" class="flex flex-wrap items-center gap-2">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="date" name="date_applied" aria-label="Date applied" title="Date applied" value="{{ item.date_applied.isoformat() if item.date_applied else '' }}" class="text-sm rounded-lg border-gray-300"><input type="date" name="deadline" aria-label="Deadline" title="Deadline" value="{{ item.deadline.isoformat() if item.deadline else '' }}" class="text-sm rounded-lg border-gray-300"><input type="datetime-local" name="interview_at" aria-label="Interview date and time" title="Interview date and time" value="{{ item.interview_at.strftime('%Y-%m-%dT%H:%M') if item.interview_at else '' }}" class="text-sm rounded-lg border-gray-300">
+            <select name="resume_id" aria-label="CV for this application" class="text-sm rounded-lg border-gray-300"><option value="">No CV</option>{% for cv in resumes %}<option value="{{ cv.id }}" {% if item.resume_id == cv.id %}selected{% endif %}>{{ cv.title|truncate(22) }}</option>{% endfor %}</select><select name="status" aria-label="Update application status" class="text-sm rounded-lg border-gray-300">{% for st in statuses %}<option value="{{ st }}" {% if item.status == st %}selected{% endif %}>{{ st|title }}</option>{% endfor %}</select><button class="px-3 py-2 rounded-lg border border-gray-300 text-sm font-medium hover:bg-gray-50">Update</button>
+          </form>
+          <details class="w-full"><summary class="text-xs text-blue-600 cursor-pointer">Edit notes</summary><form method="POST" action="{{ url_for('dashboard.update_application', application_id=item.id) }}" class="mt-2 flex gap-2"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="status" value="{{ item.status }}"><textarea name="notes" rows="2" maxlength="10000" class="w-full text-sm rounded-lg border-gray-300" placeholder="Add notes">{{ item.notes or '' }}</textarea><button class="px-3 py-2 rounded-lg border text-sm">Save</button></form></details>
+          <form method="POST" action="{{ url_for('dashboard.delete_application', application_id=item.id) }}" onsubmit="return confirm('Remove this application?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="px-3 py-2 rounded-lg text-sm text-red-600 border border-red-200 hover:bg-red-50">Delete</button></form>
+        </div>
+      </div>
+    </article>
+    {% else %}<div class="text-center bg-white border border-dashed border-gray-300 rounded-2xl p-10"><div class="text-3xl mb-2">📋</div><h3 class="font-semibold text-gray-900">No opportunities here yet</h3><p class="text-sm text-gray-500 mt-1">Add a vacancy above to start organising your job search.</p></div>{% endfor %}
+  </div>
+</div>
+{% endblock %}

@@ -698,3 +698,84 @@ class BroadcastEmail(db.Model):
 
     def __repr__(self):
         return f"<BroadcastEmail '{self.subject}' to {self.recipient_count}>"
+
+
+class JobApplication(db.Model):
+    """A user's private job-search application tracker."""
+    __tablename__ = "job_applications"
+
+    STATUSES = ("saved", "applied", "interview", "offer", "rejected", "withdrawn")
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    resume_id = db.Column(db.Integer, db.ForeignKey("resumes.id"), nullable=True)
+    company_name = db.Column(db.String(180), nullable=False)
+    job_title = db.Column(db.String(180), nullable=False)
+    job_url = db.Column(db.String(1000), nullable=True)
+    location = db.Column(db.String(180), nullable=True)
+    employment_type = db.Column(db.String(60), nullable=True)
+    salary_range = db.Column(db.String(120), nullable=True)
+    status = db.Column(db.String(20), nullable=False, default="saved", index=True)
+    date_applied = db.Column(db.Date, nullable=True)
+    deadline = db.Column(db.Date, nullable=True)
+    interview_at = db.Column(db.DateTime, nullable=True)
+    notes = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime(timezone=True), default=utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)
+
+    user = db.relationship("User", backref=db.backref("job_applications", lazy="dynamic", cascade="all, delete-orphan"))
+    resume = db.relationship("Resume", backref=db.backref("job_applications", lazy="dynamic"))
+
+    def __repr__(self):
+        return f"<JobApplication {self.job_title!r} at {self.company_name!r}>"
+
+
+class JobOpportunity(db.Model):
+    """Public vacancy imported from an operator-approved RSS/Atom source."""
+    __tablename__ = "job_opportunities"
+
+    id = db.Column(db.Integer, primary_key=True)
+    external_key = db.Column(db.String(64), nullable=False, unique=True, index=True)
+    title = db.Column(db.String(255), nullable=False, index=True)
+    company_name = db.Column(db.String(180), nullable=False, default="See original listing")
+    description = db.Column(db.Text, nullable=False)
+    url = db.Column(db.String(1000), nullable=False)
+    source_name = db.Column(db.String(120), nullable=False)
+    source_url = db.Column(db.String(1000), nullable=False)
+    country = db.Column(db.String(80), nullable=False, default="International", index=True)
+    location = db.Column(db.String(180), nullable=True, index=True)
+    employment_type = db.Column(db.String(60), nullable=True)
+    published_at = db.Column(db.DateTime, nullable=True, index=True)
+    last_seen_at = db.Column(db.DateTime, nullable=False, default=utcnow)
+    is_active = db.Column(db.Boolean, nullable=False, default=True, index=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=utcnow)
+
+    def __repr__(self):
+        return f"<JobOpportunity {self.title!r} from {self.source_name!r}>"
+
+
+class JobAlertPreference(db.Model):
+    """A user's explicit in-app job alert search."""
+    __tablename__ = "job_alert_preferences"
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    name = db.Column(db.String(100), nullable=False, default="My job alert")
+    keywords = db.Column(db.String(500), nullable=False)
+    country = db.Column(db.String(80), nullable=True)
+    location = db.Column(db.String(180), nullable=True)
+    is_active = db.Column(db.Boolean, nullable=False, default=True, server_default="true")
+    created_at = db.Column(db.DateTime, nullable=False, default=utcnow)
+    user = db.relationship("User", backref=db.backref("job_alert_preferences", lazy="dynamic", cascade="all, delete-orphan"))
+
+
+class JobAlertDelivery(db.Model):
+    """Idempotency record: a given listing is alerted once per saved search."""
+    __tablename__ = "job_alert_deliveries"
+    id = db.Column(db.Integer, primary_key=True)
+    preference_id = db.Column(db.Integer, db.ForeignKey("job_alert_preferences.id"), nullable=False, index=True)
+    job_opportunity_id = db.Column(db.Integer, db.ForeignKey("job_opportunities.id"), nullable=False, index=True)
+    notification_id = db.Column(db.Integer, db.ForeignKey("notifications.id"), nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=utcnow)
+    __table_args__ = (db.UniqueConstraint("preference_id", "job_opportunity_id", name="uq_job_alert_preference_job"),)
+    preference = db.relationship("JobAlertPreference", backref=db.backref("deliveries", lazy="dynamic", cascade="all, delete-orphan"))
+    job = db.relationship("JobOpportunity")

@@ -1,0 +1,6 @@
+-- CVForge Sprint 008: opt-in in-app job alerts
+CREATE TABLE IF NOT EXISTS job_alert_preferences (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, name VARCHAR(100) NOT NULL DEFAULT 'My job alert', keywords VARCHAR(500) NOT NULL, country VARCHAR(80), location VARCHAR(180), is_active BOOLEAN NOT NULL DEFAULT TRUE, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE INDEX IF NOT EXISTS ix_job_alert_preferences_user_id ON job_alert_preferences(user_id);
+CREATE TABLE IF NOT EXISTS job_alert_deliveries (id SERIAL PRIMARY KEY, preference_id INTEGER NOT NULL REFERENCES job_alert_preferences(id) ON DELETE CASCADE, job_opportunity_id INTEGER NOT NULL REFERENCES job_opportunities(id) ON DELETE CASCADE, notification_id INTEGER REFERENCES notifications(id) ON DELETE SET NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT uq_job_alert_preference_job UNIQUE (preference_id, job_opportunity_id));
+CREATE INDEX IF NOT EXISTS ix_job_alert_deliveries_preference_id ON job_alert_deliveries(preference_id);
+CREATE INDEX IF NOT EXISTS ix_job_alert_deliveries_job_opportunity_id ON job_alert_deliveries(job_opportunity_id);

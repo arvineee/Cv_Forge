@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+{% block topbar_actions %}
+  <a href="{{ url_for('main.debtors') }}" class="btn btn-ghost btn-sm">View All Patients</a>
+  <button class="btn btn-primary btn-sm" onclick="openModal('modal-add-patient')">➕ New Patient</button>
+{% endblock %}
+
+{% block content %}
+<!-- STATS -->
+<div class="stats-grid">
+  <div class="stat-card teal">
+    <div class="stat-label">Total Outstanding</div>
+    <div class="stat-value teal">KES {{ "{:,.0f}".format(stats.total_owed) }}</div>
+    <div class="stat-sub">Across all active debts</div>
+    <div class="stat-icon">💰</div>
+  </div>
+  <div class="stat-card red">
+    <div class="stat-label">Overdue Balance</div>
+    <div class="stat-value red">KES {{ "{:,.0f}".format(stats.overdue_amount) }}</div>
+    <div class="stat-sub">{{ stats.overdue_count }} overdue accounts</div>
+    <div class="stat-icon">⚠</div>
+  </div>
+  <div class="stat-card amber">
+    <div class="stat-label">Collected (All Time)</div>
+    <div class="stat-value amber">KES {{ "{:,.0f}".format(stats.total_paid) }}</div>
+    <div class="stat-sub">{{ stats.recovery_rate }}% recovery rate</div>
+    <div class="stat-icon">✓</div>
+  </div>
+  <div class="stat-card blue">
+    <div class="stat-label">Total Patients</div>
+    <div class="stat-value blue">{{ stats.patient_count }}</div>
+    <div class="stat-sub">{{ stats.cleared_count }} fully cleared</div>
+    <div class="stat-icon">🏥</div>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+  <!-- OVERDUE -->
+  <div class="table-wrap">
+    <div class="table-top">
+      <span class="card-title">🚨 Critical Overdue</span>
+      <a href="{{ url_for('main.debtors', status='overdue') }}" class="btn btn-ghost btn-xs">View All</a>
+    </div>
+    {% if critical %}
+    <table>
+      <thead><tr><th>Patient</th><th>Balance</th><th>Days Late</th></tr></thead>
+      <tbody>
+        {% for d in critical %}
+        <tr onclick="location.href='{{ url_for('main.patient_detail', pid=d.patient_id) }}'">
+          <td><div style="font-weight:600">{{ d.patient.name }}</div><div style="font-size:11px;color:var(--muted)">{{ d.service[:30] }}…</div></td>
+          <td class="td-mono text-red">KES {{ "{:,.0f}".format(d.balance) }}</td>
+          <td><span class="badge badge-overdue">{{ d.days_left|abs }}d late</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty"><div class="empty-icon">✓</div>No overdue accounts</div>
+    {% endif %}
+  </div>
+
+  <!-- RECENT PAYMENTS -->
+  <div class="table-wrap">
+    <div class="table-top">
+      <span class="card-title">💳 Recent Payments</span>
+      {% if current_user.is_admin %}<a href="{{ url_for('admin.payments') }}" class="btn btn-ghost btn-xs">View All</a>{% endif %}
+    </div>
+    {% if recent_payments %}
+    <table>
+      <thead><tr><th>Patient</th><th>Amount</th><th>Method</th></tr></thead>
+      <tbody>
+        {% for p in recent_payments %}
+        <tr onclick="location.href='{{ url_for('main.patient_detail', pid=p.debt.patient_id) }}'">
+          <td><div style="font-weight:600">{{ p.debt.patient.name }}</div><div style="font-size:11px;color:var(--muted)">{{ p.date }}</div></td>
+          <td class="td-mono text-teal">KES {{ "{:,.0f}".format(p.amount) }}</td>
+          <td style="font-size:12px;color:var(--muted)">{{ p.method }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty"><div class="empty-icon">💳</div>No payments yet</div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ADD PATIENT MODAL -->
+{% include "main/_modal_patient.html" %}
+{% endblock %}
+

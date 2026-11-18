@@ -43,6 +43,38 @@
   </div>
 </section>
 {% endif %}
+
+
+{# Activation checklist: keep the next useful action obvious. #}
+{% set first_resume = resumes[0] if resumes else none %}
+{% if resumes and ((first_resume.id not in completed_cv_ids) or (first_resume.id not in first_downloaded_cv_ids)) %}
+<section class="mb-8 rounded-xl border border-blue-100 bg-blue-50/60 p-5" aria-labelledby="getting-started-heading">
+  <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+    <div>
+      <h2 id="getting-started-heading" class="font-semibold text-gray-900">Your CVForge getting-started checklist</h2>
+      <p class="text-sm text-gray-600 mt-1">A few clear steps to get from account creation to a CV you can use.</p>
+    </div>
+    <a href="{% if not resumes %}{{ url_for('cv.start') }}{% elif first_resume.id not in completed_cv_ids %}{{ url_for('cv.wizard_start', resume_id=first_resume.id) }}{% else %}{{ url_for('cv.wizard_step', resume_id=first_resume.id, step='review') }}{% endif %}"
+       class="inline-flex items-center justify-center px-4 min-h-[42px] rounded-lg gradient-brand text-white text-sm font-semibold">
+      {% if not resumes %}Start your first CV{% elif first_resume.id not in completed_cv_ids %}Continue your CV{% else %}Get your CV file{% endif %}
+    </a>
+  </div>
+  <ol class="mt-4 grid sm:grid-cols-3 gap-3 text-sm">
+    <li class="flex items-center gap-2">
+      <span class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold {{ 'bg-green-100 text-green-700' if resumes else 'bg-white text-gray-500 border border-gray-200' }}">{{ '✓' if resumes else '1' }}</span>
+      <span class="{{ 'text-green-800' if resumes else 'text-gray-700' }}">Create a CV</span>
+    </li>
+    <li class="flex items-center gap-2">
+      <span class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold {{ 'bg-green-100 text-green-700' if first_resume and first_resume.id in completed_cv_ids else 'bg-white text-gray-500 border border-gray-200' }}">{{ '✓' if first_resume and first_resume.id in completed_cv_ids else '2' }}</span>
+      <span class="{{ 'text-green-800' if first_resume and first_resume.id in completed_cv_ids else 'text-gray-700' }}">Complete the core sections</span>
+    </li>
+    <li class="flex items-center gap-2">
+      <span class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold {{ 'bg-green-100 text-green-700' if first_resume and first_resume.id in first_downloaded_cv_ids else 'bg-white text-gray-500 border border-gray-200' }}">{{ '✓' if first_resume and first_resume.id in first_downloaded_cv_ids else '3' }}</span>
+      <span class="{{ 'text-green-800' if first_resume and first_resume.id in first_downloaded_cv_ids else 'text-gray-700' }}">Download your CV</span>
+    </li>
+  </ol>
+</section>
+{% endif %}
 <!-- Stats row -->
 <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
   {% set stats = [
@@ -69,6 +101,60 @@
   </div>
   {% endfor %}
 </div>
+
+{# Career intelligence: summarize the user's own ATS history and next actions. #}
+<section class="mb-8 rounded-xl border border-gray-100 bg-white p-5 shadow-sm" aria-labelledby="career-insights-heading">
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+    <div>
+      <h2 id="career-insights-heading" class="font-semibold text-gray-900">Your career insights</h2>
+      <p class="text-sm text-gray-500 mt-1">Practical next steps based on your latest CV analysis.</p>
+    </div>
+    <a href="{{ url_for('ats.index') }}" class="inline-flex items-center justify-center min-h-[40px] px-4 rounded-lg border border-blue-200 text-blue-700 text-sm font-semibold hover:bg-blue-50">Run a new CV check</a>
+  </div>
+  {% if recent_report %}
+  <div class="grid md:grid-cols-3 gap-4 mt-5">
+    <div class="rounded-lg bg-gray-50 p-4">
+      <p class="text-xs font-medium uppercase tracking-wide text-gray-500">Latest ATS score</p>
+      <p class="text-2xl font-bold text-gray-900 mt-1">{{ recent_report.score }}%</p>
+      {% if score_change is not none %}
+      <p class="text-xs mt-1 {{ 'text-green-700' if score_change > 0 else 'text-red-600' if score_change < 0 else 'text-gray-500' }}">
+        {% if score_change > 0 %}+{% endif %}{{ score_change }} points compared with your previous check
+      </p>
+      {% else %}<p class="text-xs text-gray-500 mt-1">Run another check to track progress.</p>{% endif %}
+    </div>
+    <div class="rounded-lg bg-gray-50 p-4 md:col-span-2">
+      <p class="text-xs font-medium uppercase tracking-wide text-gray-500">Keywords to review</p>
+      {% if keyword_gaps %}
+      <div class="flex flex-wrap gap-2 mt-3">
+        {% for keyword in keyword_gaps %}<span class="rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800">{{ keyword }}</span>{% endfor %}
+      </div>
+      <p class="text-xs text-gray-500 mt-3">Only include a keyword if it accurately reflects your skills or experience.</p>
+      {% else %}<p class="text-sm text-gray-600 mt-2">No missing keywords were recorded in your latest report. Try a job-specific check for more targeted feedback.</p>{% endif %}
+    </div>
+  </div>
+  {% if insight_suggestions %}
+  <div class="mt-4">
+    <h3 class="text-sm font-semibold text-gray-800 mb-2">Recommended improvements</h3>
+    <ul class="grid md:grid-cols-3 gap-2">
+      {% for suggestion in insight_suggestions %}
+      <li class="rounded-lg border border-gray-100 p-3 text-sm text-gray-700">{{ suggestion.get('text', suggestion) if suggestion is mapping else suggestion }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+  {% if recent_reports|length > 1 %}
+  <div class="mt-4 border-t border-gray-100 pt-3">
+    <p class="text-xs text-gray-500">Your last {{ recent_reports|length }} analyses: {% for item in recent_reports %}<span class="font-semibold text-gray-700">{{ item.score }}%</span>{% if not loop.last %} · {% endif %}{% endfor %}</p>
+  </div>
+  {% endif %}
+  {% else %}
+  <div class="mt-5 rounded-lg border border-dashed border-gray-200 bg-gray-50 p-5 text-center">
+    <p class="font-medium text-gray-800">Your first career insight starts with a CV check.</p>
+    <p class="text-sm text-gray-500 mt-1">Paste a job description to see how your CV aligns with a specific opportunity.</p>
+    <a href="{{ url_for('ats.index') }}" class="inline-flex mt-3 items-center justify-center min-h-[40px] px-4 rounded-lg gradient-brand text-white text-sm font-semibold">Analyze my CV</a>
+  </div>
+  {% endif %}
+</section>
 
 {% if not current_user.has_paid_plan %}
 <div class="mb-8 p-5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4">

@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% block title %}Patients{% endblock %}
+{% block page_title %}Patients
+  <span style="font-size:13px;color:var(--muted);font-family:'DM Mono',monospace;font-weight:400;margin-left:8px">({{ patients|length }})</span>
+{% endblock %}
+
+{% block topbar_actions %}
+  <div class="search-wrap">
+    <span class="search-icon">⌕</span>
+    <input class="search-input" id="live-search" type="text" placeholder="Search name, phone, ID…"
+           value="{{ q }}" autocomplete="off">
+  </div>
+  <div>
+    {% for val, lbl in [('all','All'),('overdue','Overdue'),('partial','Partial'),('pending','Pending'),('paid','Cleared')] %}
+      <a href="{{ url_for('main.debtors', status=val, q=q) }}"
+         style="display:inline-flex;align-items:center;padding:6px 12px;border-radius:20px;font-size:12px;
+                font-weight:600;margin:0 2px;text-decoration:none;font-family:'DM Mono',monospace;
+                border:1px solid {{ 'var(--teal)' if status==val else 'var(--border)' }};
+                background:{{ 'var(--teal-dim)' if status==val else 'var(--card)' }};
+                color:{{ 'var(--teal)' if status==val else 'var(--muted)' }}">{{ lbl }}</a>
+    {% endfor %}
+  </div>
+  <button class="btn btn-primary btn-sm" onclick="openModal('modal-add-patient')">➕ New Patient</button>
+{% endblock %}
+
+{% block content %}
+<div class="table-wrap" id="patients-table">
+  <div class="table-top">
+    <span class="card-title">PATIENT DEBT RECORDS</span>
+    <span style="font-size:11px;color:var(--muted);font-family:'DM Mono',monospace" id="count-label">{{ patients|length }} records</span>
+  </div>
+  {% if patients %}
+  <table>
+    <thead>
+      <tr>
+        <th>Patient</th>
+        <th>Contact</th>
+        <th>Total Billed</th>
+        <th>Paid</th>
+        <th>Balance</th>
+        <th>Status</th>
+        <th>Progress</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="patient-rows">
+      {% for p in patients %}
+      {% set owed = p.total_owed %}
+      {% set paid = p.total_paid %}
+      {% set total = p.debts.with_entities.count if false else namespace(v=0) %}
+      {% set worst = namespace(status='pending') %}
+      {% for d in p.debts %}
+        {% if d.status == 'overdue' %}{% set worst.status = 'overdue' %}
+        {% elif d.status == 'partial' and worst.status != 'overdue' %}{% set worst.status = 'partial' %}
+        {% elif d.status == 'paid' and worst.status == 'pending' %}{% set worst.status = 'paid' %}
+        {% endif %}
+      {% endfor %}
+      {% set all_billed = namespace(v=0) %}
+      {% for d in p.debts %}{% set all_billed.v = all_billed.v + d.total_amount %}{% endfor %}
+      {% set pct = ((paid / all_billed.v * 100)|round|int) if all_billed.v > 0 else 0 %}
+      {% set bar_color = 'var(--teal)' if pct >= 100 else ('var(--amber)' if pct > 40 else 'var(--red)') %}
+      {% set colors = ['#00d4aa','#4f8ef7','#ffb703','#ff6b6b','#a78bfa','#fb923c'] %}
+      {% set ac = colors[loop.index0 % 6] %}
+      <tr onclick="location.href='{{ url_for('main.patient_detail', pid=p.id) }}'">
+        <td>
+          <div style="display:flex;align-items:center;gap:9px">
+            <div class="avatar" style="background:{{ ac }}22;color:{{ ac }}">
+              {{ p.name.split()|map('first')|list|join('')|upper|truncate(2,true,'') }}
+            </div>
+            <div>
+              <div style="font-weight:600">{{ p.name }}</div>
+              <div style="font-size:11px;color:var(--muted)">ID: {{ p.id_number or '—' }}</div>
+            </div>
+          </div>
+        </td>
+        <td>
+          <div style="font-size:12px">{{ p.phone }}</div>
+          <div style="font-size:11px;color:var(--muted)">{{ p.email or '—' }}</div>
+        </td>
+        <td class="td-mono">KES {{ "{:,.0f}".format(all_billed.v) }}</td>
+        <td class="td-mono text-teal">KES {{ "{:,.0f}".format(paid) }}</td>
+        <td class="td-mono" style="color:{{ 'var(--red)' if owed > 0 else 'var(--teal)' }};font-weight:600">
+          KES {{ "{:,.0f}".format(owed) }}
+        </td>
+        <td><span class="badge badge-{{ worst.status }}">{{ worst.status|capitalize }}</span></td>
+        <td>
+          <div class="progress-track">
+            <div class="progress-fill" style="width:{{ pct }}%;background:{{ bar_color }}"></div>
+          </div>
+          <div style="font-size:10px;color:var(--muted);margin-top:3px;font-family:'DM Mono',monospace">{{ pct }}%</div>
+        </td>
+        <td onclick="event.stopPropagation()">
+          <div style="display:flex;gap:5px;opacity:0;transition:.15s" class="row-actions">
+            <a href="{{ url_for('main.patient_detail', pid=p.id) }}" class="btn btn-ghost btn-xs">View</a>
+            {% if current_user.is_admin %}
+            <form method="POST" action="{{ url_for('main.delete_patient', pid=p.id) }}"
+                  onsubmit="return confirm('Delete {{ p.name }} and all records?')">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-danger btn-xs">🗑</button>
+            </form>
+            {% endif %}
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty">
+    <div class="empty-icon">🔍</div>
+    <div>No patients found{% if q %} for "{{ q }}"{% endif %}</div>
+  </div>
+  {% endif %}
+</div>
+
+{% include "main/_modal_patient.html" %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// AJAX live search
+const searchInput = document.getElementById('live-search');
+const rows = document.querySelectorAll('#patient-rows tr');
+const countLabel = document.getElementById('count-label');
+
+searchInput && searchInput.addEventListener('input', debounce(function() {
+  const q = this.value.toLowerCase();
+  let visible = 0;
+  rows.forEach(row => {
+    const text = row.textContent.toLowerCase();
+    const show = !q || text.includes(q);
+    row.style.display = show ? '' : 'none';
+    if (show) visible++;
+  });
+  countLabel.textContent = `${visible} records`;
+}, 200));
+
+// Show row actions on hover
+document.querySelectorAll('#patient-rows tr').forEach(row => {
+  const actions = row.querySelector('.row-actions');
+  if (!actions) return;
+  row.addEventListener('mouseenter', () => actions.style.opacity = '1');
+  row.addEventListener('mouseleave', () => actions.style.opacity = '0');
+});
+</script>
+{% endblock %}
