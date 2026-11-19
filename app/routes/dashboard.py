@@ -94,19 +94,7 @@ def index():
                    .order_by(JobOpportunity.published_at.desc().nullslast(), JobOpportunity.created_at.desc())
                    .limit(3).all())
     active_jobs_total = JobOpportunity.query.filter_by(is_active=True).count()
-    # Lifetime workspace totals (the lists above are intentionally capped for speed).
-    workspace_totals = {
-        "resume_count": Resume.query.filter_by(user_id=current_user.id).count(),
-        "cover_letter_count": CoverLetter.query.filter_by(user_id=current_user.id, is_archived=False).count(),
-        "ats_report_count": ATSReport.query.filter_by(user_id=current_user.id).count(),
-        "job_match_count": JobMatch.query.filter_by(user_id=current_user.id).count(),
-        "active_alert_count": JobAlertPreference.query.filter_by(user_id=current_user.id, is_active=True).count(),
-        "application_count": JobApplication.query.filter_by(user_id=current_user.id).count(),
-    }
-    from app.services.ai_credits import balance_for
-    ai_credit_balance = balance_for(current_user.id)
     return render_template("dashboard/index.html",
-                           ai_credit_balance=ai_credit_balance,
                            pipeline=pipeline, pipeline_total=sum(pipeline.values()),
                            upcoming_deadlines=upcoming, latest_jobs=latest_jobs,
                            active_jobs_total=active_jobs_total,
@@ -123,8 +111,7 @@ def index():
                            lowest_plan=lowest_plan,
                            completed_cv_ids=completed_cv_ids,
                            first_downloaded_cv_ids=first_downloaded_cv_ids,
-                           allow_public_link=_plan_allows_public_link(),
-                           **workspace_totals)
+                           allow_public_link=_plan_allows_public_link())
 
 
 @dashboard_bp.route("/dashboard/profile")
@@ -239,16 +226,9 @@ def career_match():
             return redirect(url_for("dashboard.career_match"))
         if len(description) > 8000:
             description = description[:8000]
-        # Job matching uses the same ATS analysis engine and entitlement bucket
-        # as the ATS Checker. Keep both entry points on one plan-aware limit.
-        from app.services.entitlements import check_daily_limit
-        allowed, limit_message, _used, _limit = check_daily_limit(
-            current_user, "ats_check",
-            fallback_limit=current_app.config.get("GEMINI_FREE_USER_DAILY_LIMIT", 3),
-            label="job match analysis",
-        )
-        if not allowed:
-            flash(limit_message, "warning")
+        limit = current_app.config.get("GEMINI_FREE_USER_DAILY_LIMIT", 3)
+        if not current_user.is_premium and AIUsage.get_daily_count(current_user.id, "ats_check") >= limit:
+            flash(f"Daily analysis limit reached ({limit}/day). Upgrade your plan or try again tomorrow.", "warning")
             return redirect(url_for("dashboard.career_match"))
         try:
             report = get_ai_service().ats_check(resume=resume, job_description=description, user_id=current_user.id)
@@ -311,6 +291,9 @@ def save_match_as_application(match_id):
 
 
 # ── Job discovery ─────────────────────────────────────────────────
+PUBLIC_JOB_PREVIEW = 6  # listings shown to visitors who are not signed in
+
+
 @dashboard_bp.route("/career/jobs")
 def job_discovery():
     term = (request.args.get("q") or "").strip()[:100]
@@ -324,8 +307,16 @@ def job_discovery():
         query = query.filter(JobOpportunity.country.ilike(f"%{country}%"))
     if location:
         query = query.filter(JobOpportunity.location.ilike(f"%{location}%"))
-    jobs = query.order_by(JobOpportunity.published_at.desc().nullslast(), JobOpportunity.created_at.desc()).limit(60).all()
+    is_member = current_user.is_authenticated
+    ordered = query.order_by(JobOpportunity.published_at.desc().nullslast(), JobOpportunity.created_at.desc())
     countries = [row[0] for row in db.session.query(JobOpportunity.country).filter_by(is_active=True).distinct().order_by(JobOpportunity.country).limit(80).all()]
+    if not is_member:
+        total = query.count()
+        jobs = ordered.limit(PUBLIC_JOB_PREVIEW).all()
+        next_url = request.full_path.rstrip("?")
+        return render_template("career/jobs_public.html", jobs=jobs, total=total, hidden=max(total - len(jobs), 0),
+                               term=term, country=country, location=location, countries=countries, next_url=next_url)
+    jobs = ordered.limit(60).all()
     return render_template("career/jobs.html", jobs=jobs, term=term, country=country, location=location, countries=countries)
 
 

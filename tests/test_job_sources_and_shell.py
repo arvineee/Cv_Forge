@@ -177,6 +177,25 @@ class JobSourcesTests(unittest.TestCase):
         for path in ("/career/jobs", "/career/applications", "/career/job-alerts", "/admin/", "/admin/job-sources"):
             self.assertEqual(client.get(path).status_code, 200, path)
 
+    def test_job_board_is_public_preview_with_login_wall(self):
+        with self.app.app_context():
+            for i in range(9):
+                db.session.add(JobOpportunity(title=f"Role {i}", company_name="Acme", url=f"https://careers.example.org/p{i}",
+                                              external_key=f"p{i}", source_url="https://careers.example.org", source_name="Example", country="Kenya", description="d", is_active=True))
+            db.session.commit()
+        client = self.app.test_client()
+        resp = client.get("/career/jobs")
+        self.assertEqual(resp.status_code, 200)
+        html = resp.get_data(as_text=True)
+        self.assertEqual(html.count("<article"), 6)
+        self.assertIn("See 3 more", html)
+        self.assertIn("/auth/register?next=/career/jobs", html)
+        self.assertNotIn("careers.example.org/p", html)  # original links stay behind sign-up
+        self.assertEqual(client.post("/career/jobs/1/save").status_code, 302)  # actions still need login
+        self.assertIn("Allow: /career/jobs$", client.get("/robots.txt").get_data(as_text=True))
+        self.assertIn("/career/jobs", client.get("/sitemap.xml").get_data(as_text=True))
+        self.assertGreater(len(self.login().get("/career/jobs").get_data(as_text=True).split("<article")), 7)
+
     def test_dashboard_pages_are_noindex(self):
         html = self.login().get("/dashboard").get_data(as_text=True)
         self.assertIn('content="noindex, nofollow"', html)

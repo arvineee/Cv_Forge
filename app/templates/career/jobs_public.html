@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Find Jobs in Kenya & Africa: Latest Vacancies in One Place | CVForge{% endblock %}
+{% block meta_description %}Browse the latest job vacancies from trusted sources pooled in one place. Search by title, country or city, then match your CV and track every application. Free to join.{% endblock %}
+{% block robots %}{% if term or country or location %}noindex, follow{% else %}index, follow, max-image-preview:large{% endif %}{% endblock %}
+{% block canonical %}{{ site_url }}/career/jobs{% endblock %}
+{% block body %}
+{% include "_public_nav.html" %}
+
+{% set login_url = url_for('auth.login', next=next_url) %}
+{% set signup_url = url_for('auth.register', next=next_url) %}
+
+<section style="background: var(--navy-900, #0f172a); color: #fff;">
+  <div class="wrap py-12 sm:py-16" style="max-width: 72rem; margin: 0 auto; padding-left: 16px; padding-right: 16px;">
+    <p class="text-xs font-bold uppercase tracking-widest text-blue-300">CVForge job discovery</p>
+    <h1 class="text-3xl sm:text-4xl font-black mt-2">Every vacancy, one place.</h1>
+    <p class="text-slate-300 mt-3 max-w-2xl">Openings from trusted sources, pooled and searchable. Preview them here, then create a free account to open listings, match your CV and track applications.</p>
+    <form method="GET" class="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-6 form-grid">
+      <input name="q" value="{{ term }}" maxlength="100" placeholder="Job title, employer or keyword" class="rounded-xl text-gray-900 border-0 sm:col-span-2" aria-label="Keyword">
+      <select name="country" class="rounded-xl text-gray-900 border-0" aria-label="Country"><option value="">All countries</option>{% for item in countries %}<option value="{{ item }}" {% if country == item %}selected{% endif %}>{{ item }}</option>{% endfor %}</select>
+      <input name="location" value="{{ location }}" maxlength="100" placeholder="City or remote" class="rounded-xl text-gray-900 border-0" aria-label="City">
+      <button class="btn btn-primary sm:col-span-2 lg:col-span-4 justify-self-start">Search vacancies</button>
+    </form>
+  </div>
+</section>
+
+<section class="py-10 px-4 bg-gray-50">
+  <div style="max-width: 72rem; margin: 0 auto;" class="space-y-5">
+    <div class="flex items-center justify-between gap-3">
+      <h2 class="font-bold text-lg text-gray-900">Latest listings</h2>
+      <span class="text-sm text-gray-500">{{ total }} vacanc{{ 'y' if total == 1 else 'ies' }}</span>
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-4">
+      {% for job in jobs %}
+      <article class="bg-white border border-gray-200 rounded-2xl p-5 flex flex-col gap-3">
+        <div class="flex items-start justify-between gap-3">
+          <div class="min-w-0">
+            <p class="text-xs font-semibold text-blue-600">{{ job.source_name }} · {{ job.country }}</p>
+            <h3 class="font-bold text-lg text-gray-900 mt-1">{{ job.title }}</h3>
+            <p class="text-sm text-gray-600">{{ job.company_name }}{% if job.location %} · {{ job.location }}{% endif %}</p>
+          </div>
+          {% if job.published_at %}<span class="text-xs text-gray-400 whitespace-nowrap">{{ job.published_at.strftime('%d %b %Y') }}</span>{% endif %}
+        </div>
+        <p class="text-sm text-gray-600 leading-relaxed">{{ job.description|truncate(160) }}</p>
+        <div class="flex flex-wrap items-center gap-2 mt-auto pt-2">
+          <a href="{{ signup_url }}" class="btn btn-primary btn-sm">Sign up to view &amp; apply</a>
+          <a href="{{ signup_url }}" class="btn btn-soft btn-sm">Match my CV</a>
+        </div>
+      </article>
+      {% else %}
+      <div class="md:col-span-2 text-center bg-white border border-dashed border-gray-300 rounded-2xl p-10">
+        <h3 class="font-semibold text-gray-900">No vacancies found</h3>
+        <p class="text-sm text-gray-500 mt-2">Try a broader search, or check back soon. New listings are added regularly.</p>
+      </div>
+      {% endfor %}
+    </div>
+
+    {% if hidden or jobs %}
+    <div class="rounded-2xl p-6 sm:p-8 text-center" style="background: var(--navy-900, #0f172a); color: #fff;">
+      <h2 class="text-xl sm:text-2xl font-black">{% if hidden %}See {{ hidden }} more vacanc{{ 'y' if hidden == 1 else 'ies' }} and open every listing{% else %}Open listings, match your CV and track applications{% endif %}</h2>
+      <p class="text-slate-300 mt-2 text-sm max-w-xl mx-auto">Free account. Build your CV, check your ATS score, get job alerts and keep every application in one workspace.</p>
+      <div class="flex flex-wrap justify-center gap-3 mt-5">
+        <a href="{{ signup_url }}" class="btn btn-primary">Create free account</a>
+        <a href="{{ login_url }}" class="btn btn-soft">I already have an account</a>
+      </div>
+    </div>
+    {% endif %}
+
+    <p class="text-xs text-gray-400">CVForge lists basic details from approved sources for discovery. The original publisher controls the vacancy, eligibility, deadline and application process, and CVForge does not guarantee that a listing is still open.</p>
+  </div>
+</section>
+
+{% include "_public_footer.html" %}
+{% endblock %}

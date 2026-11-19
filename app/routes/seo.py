@@ -93,8 +93,8 @@ PUBLIC_PAGES = [
     ("main.pricing", "weekly", "0.9"),
     ("templates_gallery.index", "weekly", "0.8"),
     ("cv_examples.index", "weekly", "0.7"),
-    ("dashboard.job_discovery", "daily", "0.9"),
     ("free_ats.checker", "monthly", "0.8"),
+    ("dashboard.job_discovery", "daily", "0.8"),
     ("auth.register", "monthly", "0.6"),
     ("guide.index", "monthly", "0.6"),
     ("main.about", "monthly", "0.5"),
@@ -108,9 +108,7 @@ PUBLIC_PAGES = [
 # future noindex audit can reference the same list.
 DISALLOWED_PREFIXES = [
     "/dashboard",
-    "/career/applications",
-    "/career/job-alerts",
-    "/career/match",
+    "/career/",
     "/cv/",
     "/cover-letter/",
     "/ats/",
@@ -169,8 +167,8 @@ def robots():
         "Allow: /cv-examples",
         "Allow: /free-ats-checker",
         "Allow: /pricing",
-        "Allow: /career/jobs",
         "Allow: /about",
+        "Allow: /career/jobs$",
         "",
         f"Sitemap: {_absolute('seo.sitemap')}",
     ]
@@ -214,27 +212,6 @@ def sitemap():
     # If you later add public, shareable pages (e.g. a public CV link or
     # a template detail page), append them here the same way — loop over
     # the DB rows and build a <url> block per row, same as above.
-
-    # Public job detail pages are crawlable; private career workspace routes are not.
-    try:
-        from app.models import JobOpportunity
-        active_jobs = (JobOpportunity.query.filter_by(is_active=True)
-                       .order_by(JobOpportunity.updated_at.desc() if hasattr(JobOpportunity, "updated_at") else JobOpportunity.created_at.desc())
-                       .limit(5000).all())
-        for job in active_jobs:
-            try:
-                loc = _absolute("dashboard.public_job_detail", job_id=job.id)
-            except BuildError:
-                continue
-            urls.append(
-                "  <url>\n"
-                f"    <loc>{loc}</loc>\n"
-                "    <changefreq>daily</changefreq>\n"
-                "    <priority>0.7</priority>\n"
-                "  </url>"
-            )
-    except Exception:
-        current_app.logger.exception("sitemap: could not include public job pages")
 
     xml = (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
