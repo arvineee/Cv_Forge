@@ -1,77 +1,5 @@
 {% extends "base_dashboard.html" %}
 {% block title %}AI Credits · CVForge{% endblock %}
-{% block extra_head %}
-<style>
-  .cr { max-width: 64rem; margin: 0 auto; display: grid; gap: 28px; color: var(--ink); }
-  .cr h1, .cr h2, .cr h3 { font-family: var(--font-display); color: var(--navy-800); margin: 0; letter-spacing: -.01em; }
-  .cr p { margin: 0; }
-  .cr-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
-  .cr-eyebrow { font-size: .72rem; font-weight: 700; letter-spacing: .12em; color: var(--orange-500); text-transform: uppercase; }
-  .cr-head h1 { font-size: clamp(1.6rem, 4vw, 2.1rem); font-weight: 800; margin-top: 4px; }
-  .cr-head p.sub { color: var(--ink-2); margin-top: 6px; max-width: 38rem; }
-  .cr-back { white-space: nowrap; font-weight: 600; font-size: .9rem; color: var(--blue-700); min-height: 44px; display: inline-flex; align-items: center; }
-  .cr-back:hover { text-decoration: underline; }
-
-  .cr-balance { position: relative; overflow: hidden; border-radius: var(--radius-lg); padding: 28px; color: #fff;
-    background: radial-gradient(120% 140% at 100% 0%, #1d6fb8 0%, rgba(29,111,184,0) 55%), var(--navy-900);
-    display: flex; align-items: center; justify-content: space-between; gap: 20px; box-shadow: var(--shadow-lg); }
-  .cr-balance .lbl { font-size: .72rem; font-weight: 700; letter-spacing: .12em; color: #9fc3e6; text-transform: uppercase; }
-  .cr-balance strong { display: block; font-family: var(--font-display); font-size: clamp(2.4rem, 8vw, 3.4rem); line-height: 1.05; margin-top: 6px; font-weight: 800; }
-  .cr-balance strong small { font-size: 1rem; font-weight: 600; color: #cfe2f4; }
-  .cr-balance p.note { color: #cfe2f4; font-size: .9rem; margin-top: 8px; max-width: 30rem; }
-  .cr-mark { flex: none; width: 64px; height: 64px; border-radius: 18px; display: grid; place-items: center; font-size: 1.8rem;
-    background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.2); color: var(--orange-400); }
-
-  .cr-sec { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-  .cr-sec h2 { font-size: 1.25rem; font-weight: 800; }
-  .cr-sec p { color: var(--ink-2); font-size: .9rem; margin-top: 2px; }
-  .cr-secure { font-size: .8rem; font-weight: 600; color: var(--ok); background: #e8f6ee; padding: 6px 12px; border-radius: 999px; }
-
-  .cr-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); align-items: stretch; }
-  .cr-pack { position: relative; display: flex; flex-direction: column; gap: 6px; background: var(--paper); border: 1px solid var(--line);
-    border-radius: var(--radius-lg); padding: 24px 22px; box-shadow: var(--shadow-sm); transition: box-shadow .2s, transform .2s; }
-  .cr-pack:hover { box-shadow: var(--shadow); transform: translateY(-2px); }
-  .cr-pack.featured { border: 2px solid var(--orange-500); box-shadow: var(--shadow); }
-  .cr-pop { position: absolute; top: -12px; left: 22px; background: var(--orange-500); color: #fff; font-size: .68rem; font-weight: 800; letter-spacing: .08em; padding: 4px 10px; border-radius: 999px; }
-  .cr-pack .name { font-weight: 700; color: var(--ink-2); font-size: .9rem; }
-  .cr-pack .amt { font-family: var(--font-display); font-size: 2.2rem; font-weight: 800; color: var(--navy-800); line-height: 1.1; }
-  .cr-pack .amt small { font-size: .9rem; font-weight: 600; color: var(--ink-3); }
-  .cr-pack .price { font-family: var(--font-display); font-size: 1.15rem; font-weight: 700; color: var(--ink); }
-  .cr-pack .desc { color: var(--ink-2); font-size: .88rem; flex: 1; }
-  .cr-form { display: grid; gap: 10px; margin-top: 14px; padding-top: 16px; border-top: 1px dashed var(--line); }
-  .cr-form label { display: grid; gap: 6px; font-size: .78rem; font-weight: 600; color: var(--ink-2); }
-  .cr-form input { width: 100%; min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); font: inherit; color: var(--ink); background: #fff; }
-  .cr-form input:focus { outline: none; border-color: var(--blue-600); box-shadow: var(--ring); }
-  .cr-btn { min-height: 46px; width: 100%; border: 0; border-radius: var(--radius-sm); font: inherit; font-weight: 700; cursor: pointer; background: var(--navy-800); color: #fff; transition: background .15s; }
-  .cr-btn:hover { background: var(--navy-900); }
-  .cr-btn.alt { background: var(--ok); }
-  .cr-btn.alt:hover { background: #12703f; }
-  .cr-pack.featured .cr-btn:not(.alt) { background: var(--orange-500); }
-  .cr-pack.featured .cr-btn:not(.alt):hover { background: #d97a00; }
-  .cr-link { background: none; border: 0; cursor: pointer; min-height: 40px; font: inherit; font-size: .85rem; font-weight: 600; color: var(--blue-700); }
-  .cr-link:hover { text-decoration: underline; }
-  .cr-off { font-size: .85rem; color: var(--bad); background: #fdeeec; padding: 10px 12px; border-radius: var(--radius-sm); }
-
-  .cr-hist { background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 22px; box-shadow: var(--shadow-sm); }
-  .cr-hist h2 { font-size: 1.1rem; font-weight: 800; }
-  .cr-hist .hint { color: var(--ink-2); font-size: .88rem; margin-top: 2px; }
-  .cr-ledger { margin-top: 14px; }
-  .cr-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); }
-  .cr-row b { display: block; font-weight: 600; font-size: .92rem; }
-  .cr-row small { color: var(--ink-3); font-size: .78rem; }
-  .cr-row strong { font-family: var(--font-display); font-size: 1rem; padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
-  .cr-row .pos { color: var(--ok); background: #e8f6ee; }
-  .cr-row .neg { color: var(--bad); background: #fdeeec; }
-  .cr-empty { text-align: center; color: var(--ink-3); padding: 28px 0 8px; }
-  .cr-foot { font-size: .8rem; color: var(--ink-3); max-width: 44rem; }
-
-  @media (max-width: 560px) {
-    .cr-head { flex-direction: column; gap: 4px; }
-    .cr-balance { padding: 22px; }
-    .cr-mark { display: none; }
-  }
-</style>
-{% endblock %}
 {% block content %}
 <div class="cr">
   <div class="cr-head">
@@ -140,4 +68,3 @@
   <p class="cr-foot">Credits are added only after the payment provider confirms your transaction. Never share your PIN, OTP, card number or CVV with anyone.</p>
 </div>
 {% endblock %}
-
