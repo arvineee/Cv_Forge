@@ -1,0 +1,36 @@
+{# Shared split-screen layout for every auth page.
+   Child templates fill: auth_heading, auth_sub, auth_form (and may set robots/meta blocks as usual). #}
+{% extends "base.html" %}
+{% block robots %}noindex, follow{% endblock %}
+{% block theme_color %}#082c4e{% endblock %}
+{% block body %}
+<div class="auth-grid">
+  <aside class="auth-brand" aria-label="About CVForge">
+    <a href="{{ url_for('main.index') }}" class="inline-flex items-center gap-3" aria-label="CVForge home">
+      <img src="{{ url_for('static', filename='icon-192.png') }}" alt="" width="40" height="40" class="rounded-xl"/>
+      <span class="display" style="font-weight: 800; font-size: 22px; color: #fff;">CVForge<span style="color: var(--orange-500);">.</span></span>
+    </a>
+    <div>
+      <h2 class="display">Your whole job search, in one place.</h2>
+      <ul style="margin-top: 28px; display: grid; gap: 16px; padding: 0; list-style: none;">
+        <li>Build an ATS-friendly CV or resume and preview it free</li>
+        <li>Match your CV to a job and write the cover letter</li>
+        <li>Find vacancies, get alerts and track every application</li>
+      </ul>
+    </div>
+    <p style="font-size: 14px; color: #8fa8c1;">Built in Kenya, for job seekers worldwide. Pay by M-Pesa or card.</p>
+  </aside>
+
+  <main id="main-content" class="auth-main">
+    <div class="auth-box settle">
+      <a href="{{ url_for('main.index') }}" class="lg:hidden inline-flex items-center gap-2 mb-8" aria-label="CVForge home">
+        <img src="{{ url_for('static', filename='icon-192.png') }}" alt="" width="36" height="36" class="rounded-lg"/>
+        <span class="display" style="font-weight: 800; font-size: 20px; color: var(--navy-800);">CVForge<span style="color: var(--orange-500);">.</span></span>
+      </a>
+      <h1 class="display">{% block auth_heading %}{% endblock %}</h1>
+      <p style="color: var(--ink-2); margin: 8px 0 28px; line-height: 1.55;">{% block auth_sub %}{% endblock %}</p>
+      {% block auth_form %}{% endblock %}
+    </div>
+  </main>
+</div>
+{% endblock %}
