@@ -976,7 +976,9 @@ def claim_approve(claim_id):
         db.session.add(Notification(
             user_id=claim.user_id,
             title="Payment confirmed",
-            message="We verified your payment and activated your plan."
+            message=("We verified your payment and added your AI credits to your wallet."
+                     if claim.subscription and claim.subscription.plan == "credits"
+                     else "We verified your payment and activated your plan.")
                     + (f" {note}" if note else ""),
             type="success", action_url="/billing/",
         ))
@@ -992,7 +994,7 @@ def claim_approve(claim_id):
             current_app.logger.warning(f"Claim-approved email failed for claim {claim.id}: {e}")
 
     if activated:
-        flash("Claim approved and plan activated.", "success")
+        flash("Claim approved and payment fulfilled.", "success")
     else:
         flash("Claim marked approved, but no pending subscription matched the reference. "
               "You may need to set the plan manually via Manual Plan.", "warning")

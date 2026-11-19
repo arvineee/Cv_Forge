@@ -372,7 +372,10 @@ class AIUsage(db.Model):
 
     @classmethod
     def log_usage(cls, user_id: int, feature: str, prompt: str = ""):
-        """Add a usage record. Caller must commit the session."""
+        """Add usage and debit one prepaid credit beyond the included daily limit."""
+        from app.services.ai_credits import spend_credit_if_over_limit
+        if not spend_credit_if_over_limit(user_id, feature):
+            raise RuntimeError("Your included AI allowance and prepaid credits are exhausted.")
         db.session.add(cls(
             user_id=user_id,
             feature=feature,
@@ -406,6 +409,28 @@ class AIUsage(db.Model):
 
     def __repr__(self):
         return f"<AIUsage user={self.user_id} feature={self.feature}>"
+
+
+class AICreditWallet(db.Model):
+    """Prepaid AI credit balance; one credit funds one eligible AI request."""
+    __tablename__ = "ai_credit_wallets"
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), unique=True, nullable=False, index=True)
+    balance = db.Column(db.Integer, nullable=False, default=0)
+    updated_at = db.Column(db.DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)
+
+
+class AICreditTransaction(db.Model):
+    """Immutable credit ledger. Reference uniqueness makes fulfilment idempotent."""
+    __tablename__ = "ai_credit_transactions"
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    reference = db.Column(db.String(100), unique=True, nullable=False, index=True)
+    kind = db.Column(db.String(20), nullable=False)  # purchase or usage
+    amount = db.Column(db.Integer, nullable=False)  # positive grant, negative spend
+    balance_after = db.Column(db.Integer, nullable=False)
+    description = db.Column(db.String(255), nullable=True)
+    created_at = db.Column(db.DateTime(timezone=True), default=utcnow, nullable=False)
 
 
 class JobMatch(db.Model):

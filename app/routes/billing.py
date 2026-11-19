@@ -138,6 +138,85 @@ def _create_pending(plan, method, phone=None):
     return reference, charged, plan.price_kes
 
 
+@billing_bp.route("/credits")
+@login_required
+def credits():
+    from app.services.ai_credits import CREDIT_PACKAGES, balance_for
+    from app.models import AICreditTransaction
+    wallet_balance = balance_for(current_user.id)
+    history = (AICreditTransaction.query.filter_by(user_id=current_user.id)
+               .order_by(AICreditTransaction.created_at.desc()).limit(20).all())
+    from app.services.payment_settings import all_status
+    return render_template("billing/credits.html", packages=CREDIT_PACKAGES,
+                           wallet_balance=wallet_balance, history=history, providers=all_status())
+
+
+@billing_bp.route("/credits/buy/<package_key>", methods=["POST"])
+@login_required
+def buy_credits(package_key):
+    from app.services.ai_credits import CREDIT_PACKAGES
+    from app.services.payment_settings import is_enabled
+    package = CREDIT_PACKAGES.get(package_key)
+    if not package:
+        return jsonify({"error": "Unknown credit package."}), 404
+    method = (request.form.get("method") or "paystack").lower()
+    provider = "paystack" if method == "paystack" else "intasend"
+    if method not in {"paystack", "mpesa", "card"}:
+        flash("Choose a supported payment method.", "error")
+        return redirect(url_for("billing.credits"))
+    if not is_enabled(provider):
+        flash("That payment method is temporarily unavailable. Please choose another.", "warning")
+        return redirect(url_for("billing.credits"))
+    phone = (request.form.get("phone") or "").strip()
+    if method == "mpesa" and not phone:
+        flash("Enter your M-Pesa phone number before continuing.", "error")
+        return redirect(url_for("billing.credits"))
+    reference = f"CVC-{secrets.token_hex(12).upper()}"
+    amount = int(package["price_kes"])
+    sub = Subscription(user_id=current_user.id, plan="credits", amount=amount, currency="KES",
+                       status="pending", payment_reference=reference)
+    db.session.add(sub); db.session.flush()
+    payment = Payment(user_id=current_user.id, subscription_id=sub.id, amount=amount, currency="KES",
+                      status="pending", payment_method=method, provider_reference=reference,
+                      raw_webhook={"provider": provider, "order_snapshot": {
+                          "product": "ai_credits", "plan": "credits", "credits": package["credits"],
+                          "amount": str(amount), "currency": "KES", "user_id": current_user.id,
+                          "billing_period": "month", "package": package_key}})
+    db.session.add(payment); db.session.commit()
+    try:
+        if method == "paystack":
+            from app.services.paystack_service import PaystackService
+            result = PaystackService().initialize(email=current_user.email, amount_kes=amount,
+                reference=reference, callback_url=url_for("billing.paystack_callback", _external=True),
+                metadata={"user_id": current_user.id, "product": "ai_credits", "credits": package["credits"], "reference": reference})
+            meta = dict(payment.raw_webhook or {}); meta["checkout_url"] = result.get("authorization_url")
+            payment.raw_webhook = meta; db.session.commit()
+            return redirect(result["authorization_url"])
+        from app.services.intasend_service import IntaSendService
+        service = IntaSendService()
+        if method == "mpesa":
+            result = service.initiate_payment(phone=phone, amount=amount, reference=reference,
+                description=f"CVForge {package['name']} AI credits", email=current_user.email)
+        else:
+            result = service.initiate_card_payment(email=current_user.email,
+                first_name=current_user.first_name or "", last_name=current_user.last_name or "",
+                amount=amount, reference=reference, currency="KES",
+                redirect_url=url_for("billing.payment_pending", reference=reference, _external=True),
+                comment=f"CVForge {package['name']} AI credits")
+        if not result.get("success"):
+            raise RuntimeError(result.get("message") or "Could not start checkout")
+        invoice_id = _invoice_id_from(result)
+        if invoice_id: _remember_invoice(reference, invoice_id)
+        if method == "card": return redirect(result["checkout_url"])
+        flash("M-Pesa payment request sent. Check your phone to complete it.", "success")
+        return redirect(url_for("billing.payment_pending", reference=reference))
+    except Exception as exc:
+        current_app.logger.exception("AI credit checkout failed: %s", reference)
+        db.session.rollback(); _abandon_pending(reference)
+        flash("Could not start payment. Please try again or contact support.", "error")
+        return redirect(url_for("billing.credits"))
+
+
 @billing_bp.route("/")
 @login_required
 def index():
@@ -382,6 +461,9 @@ def paystack_callback():
         confirmed = False
 
     if confirmed:
+        if subscription.plan == "credits":
+            flash("Payment confirmed. Your AI credits have been added to your wallet.", "success")
+            return redirect(url_for("billing.credits"))
         flash("Payment confirmed. Your CVForge plan is now active.", "success")
         return redirect(url_for("billing.success"))
 
@@ -459,7 +541,7 @@ def payment_status(reference):
         "status": status,
         "plan": subscription.plan,
         "reference": reference,
-        "redirect": url_for("billing.success") if status == "active" else None,
+        "redirect": (url_for("billing.credits") if subscription.plan == "credits" else url_for("billing.success")) if status == "active" else None,
     })
 
 

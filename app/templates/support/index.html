@@ -3,11 +3,18 @@
 {% block meta_description %}Get help with your CVForge account, CV or resume, downloads and payments. Ask the support assistant or read the answers to common questions.{% endblock %}
 {% block body %}
 <section class="max-w-2xl mx-auto px-4 py-16">
-  <h1 class="text-3xl font-black text-gray-900 mb-2">How can we help?</h1>
-  <p class="text-gray-500 mb-8">Ask our AI assistant, available 24/7. For account-specific or billing issues, use the contact form below instead.</p>
+  <p class="text-xs font-bold uppercase tracking-widest text-blue-700 mb-3">CVForge help centre</p>
+  <h1 class="text-3xl sm:text-4xl font-black text-gray-900 mb-3">Support for your whole career workspace.</h1>
+  <p class="text-gray-500 mb-8">Ask about CV creation, ATS checks, cover letters, job matching, job alerts, applications, plans or checkout. For payment disputes and account-specific issues, contact the support team.</p>
 
   <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-6">
-    <div id="chat-log" class="space-y-4 mb-4 max-h-96 overflow-y-auto"></div>
+    <div class="flex flex-wrap gap-2 mb-4" aria-label="Suggested questions">
+      <button type="button" class="support-prompt rounded-full border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-blue-50" data-question="How do I find jobs and save a vacancy?">Finding and saving jobs</button>
+      <button type="button" class="support-prompt rounded-full border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-blue-50" data-question="How do job alerts work?">Job alerts</button>
+      <button type="button" class="support-prompt rounded-full border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-blue-50" data-question="Which features are included in my plan?">Plans and features</button>
+      <button type="button" class="support-prompt rounded-full border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-blue-50" data-question="My payment is pending. What should I do?">Payment help</button>
+    </div>
+    <div id="chat-log" class="space-y-4 mb-4 max-h-96 overflow-y-auto" aria-live="polite"></div>
 
     <form id="ask-form" class="flex gap-2">
       <input type="hidden" id="csrf-token" value="{{ csrf_token() }}"/>
@@ -24,7 +31,7 @@
 
   <div class="bg-gray-50 rounded-xl border border-dashed border-gray-200 p-6 text-center">
     <p class="text-sm text-gray-500">Need a human, or something account-specific (billing, refunds, a bug)?</p>
-    <a href="mailto:support@cvforge.app" class="text-blue-600 font-semibold text-sm">Email kiruifelix03@gmail.com</a>
+    <a href="mailto:kiruifelix03@gmail.com" class="text-blue-600 font-semibold text-sm">Email kiruifelix03@gmail.com</a>
   </div>
 </section>
 
@@ -45,9 +52,8 @@ function addMessage(text, isUser) {
   log.scrollTop = log.scrollHeight;
 }
 
-form.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const question = input.value.trim();
+async function askQuestion(rawQuestion) {
+  const question = (rawQuestion || '').trim();
   if (!question) return;
 
   errorEl.classList.add('hidden');
@@ -79,6 +85,16 @@ form.addEventListener('submit', async (e) => {
     askBtn.disabled = false;
     askBtn.textContent = 'Ask';
   }
+}
+
+form.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const question = input.value;
+  input.value = '';
+  askQuestion(question);
+});
+document.querySelectorAll('.support-prompt').forEach((button) => {
+  button.addEventListener('click', () => askQuestion(button.dataset.question));
 });
 </script>
 {% endblock %}

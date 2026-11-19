@@ -234,6 +234,11 @@ class AIService:
             raise ValueError("The AI provider returned an empty response.")
 
         if user_id:
+            # Beyond the included daily allowance, consume one prepaid credit.
+            # Routes perform the matching entitlement check before generation.
+            from app.services.ai_credits import spend_credit_if_over_limit
+            if not spend_credit_if_over_limit(user_id, feature):
+                raise RuntimeError("Your included AI allowance and prepaid credits are exhausted. Please add credits or upgrade your plan.")
             db.session.add(AIUsage(
                 user_id=user_id,
                 feature=feature,
@@ -655,17 +660,47 @@ Return JSON with exactly these keys:
     # limits, or features change; it's the single source of truth the AI
     # is told to defer to.
     SUPPORT_KNOWLEDGE = """
-CVForge AI — Product Facts (use these, don't invent anything not listed here):
-- CV/resume builder with AI-assisted writing, ATS scoring, and cover letter generation
-- Upload an existing CV (PDF/DOCX) to auto-fill the builder, or start from scratch
-- AI Revamp rewrites your professional summary, work experience bullets, and skills
-- ATS Checker: analyze a saved CV or upload a file directly, with or without a job description
-- Download as PDF (all plans) or DOCX (Pro only)
-- Free plan: limited daily AI generations, limited templates, no DOCX export
-- Pro plan: unlimited AI generations, all templates, DOCX export, version history, AI career coach
-- Payment: debit or credit card via Paystack (international cards accepted, charged in KES), or M-Pesa (STK Push) in Kenya
-- Subscriptions run for the period paid for (weekly, monthly or yearly, starting from payment) and do not auto-renew
-- Support contact: use the in-app support page; there is no phone support
+CVForge — Product Facts (use these facts; do not invent features, prices or limits):
+
+CAREER PROFILE AND DOCUMENTS
+- CVForge is a career development and job-search workspace, not only a CV revamp tool.
+- Users can create a professional CV/resume from scratch or upload an existing PDF/DOCX to prefill the builder.
+- The guided CV builder supports personal information, professional summary, work experience, education, skills, certifications, projects, languages, awards, references and custom sections.
+- AI CV assistance and AI Revamp help draft or improve CV content.
+- Users can manage saved CVs and use available templates from the templates gallery.
+- PDF downloads are available on all plans; DOCX export depends on the user's plan entitlement.
+- Version history and public CV links depend on the user's plan entitlement/settings.
+
+JOB SEARCH AND CAREER TOOLS
+- ATS Checker can analyze a saved CV or an uploaded PDF/DOCX, with or without a job description.
+- Job Match compares a user's CV with a job description and provides match feedback, keyword gaps and suggestions.
+- Cover Letter tools generate, save, edit and download tailored cover letters.
+- Find Jobs displays vacancies imported from approved RSS/Atom job feeds; users should verify details and apply on the original employer/job-board listing.
+- Job Alerts let users save keyword, country and location preferences and receive in-app notifications when matching vacancies are imported.
+- Career Workspace includes a private application tracker with saved, applied, interview, offer, rejected and withdrawn stages, plus notes and dates.
+- The dashboard brings together CVs, cover letters, ATS history, job matches, job alerts, vacancies and application progress.
+- The AI Career Coach is available only when enabled by the user's plan.
+
+PLANS, USAGE AND BILLING
+- Plan names, prices, billing periods, feature entitlements and daily limits are configured in CVForge and may change. Never quote a price or numeric limit unless it is supplied in the current account context or the live pricing page.
+- Free accounts have configured daily AI allowances. Paid plan entitlements are determined by the active plan; expired plans fall back to the free plan.
+- Users can buy optional prepaid AI credit packs from Billing → AI Credits. One credit covers one eligible AI generation after the included daily allowance is used.
+- AI credit packs are one-time purchases, not subscriptions. Credits are added only after the payment provider verifies the transaction.
+- The credit wallet and its transaction history are visible from the AI Credits page. Never promise a credit grant while a payment is pending.
+- Subscriptions are paid for the displayed period (weekly, monthly or yearly where offered) and do not automatically renew.
+- Checkout prices and active discounts are calculated server-side. A user should use the displayed checkout total, not a price from an old message.
+- Payment methods can be enabled or disabled by an administrator. CVForge supports IntaSend (M-Pesa STK push and hosted card checkout) and Paystack hosted checkout where enabled. Availability depends on the live Payment methods settings.
+- Payments are processed in KES in the current checkout flow. Do not promise multi-currency billing.
+- A payment redirect alone does not prove payment. Provider verification/webhooks confirm payment and activate the subscription.
+- Users can review plan and payment information from Billing. For a pending, failed, duplicate or disputed payment, do not promise activation or a refund; direct the user to human support with the payment reference and transaction details.
+- Offers/discounts may apply to eligible plans while active. The checkout page is authoritative.
+
+SUPPORT AND SAFETY
+- The in-app Support page provides this assistant and a route to human support.
+- Do not claim phone support.
+- Never ask users to share passwords, card numbers, CVV, PINs, OTPs or API keys.
+- Never claim a job is guaranteed, a CV is guaranteed to pass ATS, or an employer has verified a listing.
+- If a question is account-specific, concerns a payment/refund/dispute, reports a bug, or is not covered by these facts, say you cannot verify it and direct the user to human support. Do not guess.
 """
 
     def support_answer(self, question: str, user=None, user_id: int = None) -> str:
@@ -681,9 +716,49 @@ CVForge AI — Product Facts (use these, don't invent anything not listed here):
         user_context = ""
         if user:
             plan = getattr(user, "plan", "free")
-            user_context = f"\nThis user is on the '{plan}' plan."
+            user_context = f"\\nSigned-in account context: plan='{plan}', paid_plan_active={bool(getattr(user, 'has_paid_plan', False))}."
+            try:
+                from app.models import (AIUsage, Resume, ATSReport, CoverLetter,
+                                        JobApplication, JobAlertPreference)
+                from app.services.entitlements import get_daily_limit, get_effective_plan
+                effective_plan = get_effective_plan(user)
+                if effective_plan:
+                    flags = {
+                        "DOCX export": bool(effective_plan.allow_docx),
+                        "version history": bool(effective_plan.allow_version_history),
+                        "AI Career Coach": bool(effective_plan.allow_career_coach),
+                        "public CV link": bool(effective_plan.allow_public_link),
+                    }
+                    user_context += "\nCurrent plan entitlements: " + ", ".join(
+                        f"{name}={'included' if enabled else 'not included'}"
+                        for name, enabled in flags.items()
+                    )
+                features = ("cv_generate", "cv_revamp", "ats_check", "cover_letter", "career_coach")
+                usage = []
+                for feature in features:
+                    limit = get_daily_limit(user, feature, fallback_limit=3)
+                    used = AIUsage.get_daily_count(user.id, feature)
+                    usage.append(f"{feature}: {used} used today / {limit} allowed today")
+                counts = {
+                    "CVs": Resume.query.filter_by(user_id=user.id).count(),
+                    "cover letters": CoverLetter.query.filter_by(user_id=user.id, is_archived=False).count(),
+                    "ATS reports": ATSReport.query.filter_by(user_id=user.id).count(),
+                    "job applications": JobApplication.query.filter_by(user_id=user.id).count(),
+                    "active job alerts": JobAlertPreference.query.filter_by(user_id=user.id, is_active=True).count(),
+                }
+                user_context += "\\nAccount workspace totals: " + ", ".join(f"{k}={v}" for k, v in counts.items())
+                user_context += "\\nToday's feature usage: " + "; ".join(usage)
+            except Exception as exc:
+                # A failed optional context lookup must not poison the request's
+                # SQLAlchemy session or prevent the public support reply.
+                try:
+                    from app.models import db
+                    db.session.rollback()
+                except Exception:
+                    pass
+                current_app.logger.debug("Could not build support account context: %s", exc)
 
-        system_instruction = f"""You are the support assistant for CVForge AI, a CV/resume builder.
+        system_instruction = f"""You are the support assistant for CVForge, a career development and job-search platform.
 {self.SUPPORT_KNOWLEDGE}
 
 RULES:

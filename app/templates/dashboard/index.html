@@ -5,10 +5,10 @@
 
 <section class="hero-card p-6 sm:p-8 mb-6" aria-labelledby="dash-hello">
   <div class="max-w-2xl">
-    <p class="text-xs font-bold uppercase tracking-widest" style="color: var(--orange-400);">Your career workspace</p>
+    <p class="text-xs font-bold uppercase tracking-widest" style="color: var(--orange-400);">Your career command centre</p>
     <h1 id="dash-hello" class="text-2xl sm:text-3xl font-extrabold mt-2" style="color:#fff;">Welcome back, {{ current_user.first_name or 'there' }}</h1>
     <p class="mt-2 text-sm sm:text-base" style="color: #cfe0f0;">
-      {% if pipeline_total %}You are tracking {{ pipeline_total }} opportunit{{ 'y' if pipeline_total == 1 else 'ies' }}{% if pipeline.interview %}, with {{ pipeline.interview }} at interview stage{% endif %}.{% elif resumes %}Pick up where you left off, or find your next opportunity.{% else %}Create your first CV to get started.{% endif %}
+      {% if pipeline_total %}You are tracking {{ pipeline_total }} opportunit{{ 'y' if pipeline_total == 1 else 'ies' }}{% if pipeline.interview %}, with {{ pipeline.interview }} at interview stage{% endif %}.{% elif resumes %}Pick up where you left off, improve your applications and discover your next opportunity.{% else %}Create your first CV to get started.{% endif %}
     </p>
     <div class="flex flex-wrap gap-3 mt-5">
       <a href="{{ url_for('cv.start') }}" class="btn btn-accent">+ New CV</a>
@@ -16,6 +16,10 @@
       <a href="{{ url_for('ats.index') }}" class="btn" style="color:#fff;border-color:rgba(255,255,255,.35);">Check ATS score</a>
     </div>
   </div>
+</section>
+<section class="wallet-strip mb-6" aria-label="AI credit wallet">
+  <div><span class="wallet-kicker">AI CREDIT WALLET</span><strong>{{ ai_credit_balance }} <small>credits</small></strong><p>Extra AI actions when you need them.</p></div>
+  <a href="{{ url_for('billing.credits') }}" class="wallet-action">Manage credits <span aria-hidden="true">↗</span></a>
 </section>
 {% if not resumes %}
 <section class="mb-8 rounded-2xl border border-blue-100 bg-blue-50 p-5 sm:p-7" aria-labelledby="first-cv-heading">
@@ -78,16 +82,20 @@
 </section>
 {% endif %}
 <!-- Stats row -->
-<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+<div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4 mb-8">
   {% set stats = [
-    ('My CVs', resumes|length, 'text-blue-600', 'bg-blue-50',
+    ('CVs created', resume_count, 'text-blue-600', 'bg-blue-50',
       'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z'),
-    ('Cover letters', cover_letters|length, 'text-purple-600', 'bg-purple-50',
+    ('Cover letters', cover_letter_count, 'text-purple-600', 'bg-purple-50',
       'M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z'),
-    ('Latest ATS score', (recent_report.score ~ '%') if recent_report else '—', 'text-green-600', 'bg-green-50',
+    ('ATS checks', ats_report_count, 'text-green-600', 'bg-green-50',
       'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z'),
-    ('AI uses today', daily_ai_used, 'text-orange-600', 'bg-orange-50',
+    ('Job matches', job_match_count, 'text-orange-600', 'bg-orange-50',
       'M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z'),
+    ('Applications', application_count, 'text-indigo-600', 'bg-indigo-50',
+      'M8 7h12M8 12h12M8 17h12M4 7h.01M4 12h.01M4 17h.01'),
+    ('Active job alerts', active_alert_count, 'text-rose-600', 'bg-rose-50',
+      'M18 8a6 6 0 00-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9m-8 12a2 2 0 004 0'),
   ] %}
   {% for label, value, text_cls, bg_cls, icon in stats %}
   <div class="tile">

@@ -353,8 +353,38 @@ def _handle_payment_success(data: dict):
             db.session.rollback()
         return True
 
-    from app.services.pricing import period_days, confirm_redemption, resolve_plan_change
     metadata = _payment_metadata(payment) if payment else {}
+    snapshot = metadata.get("order_snapshot") if isinstance(metadata, dict) else {}
+    if subscription.plan == "credits" or (isinstance(snapshot, dict) and snapshot.get("product") == "ai_credits"):
+        # Credit packs are fulfilled as a separate product, never as a plan change.
+        credits = int(snapshot.get("credits") or 0) if isinstance(snapshot, dict) else 0
+        if credits <= 0 or credits > 10000:
+            current_app.logger.error("Invalid AI credit quantity for reference=%s", reference)
+            db.session.rollback()
+            return False
+        user = db.session.get(User, subscription.user_id)
+        if not user:
+            db.session.rollback()
+            return False
+        from app.services.ai_credits import grant_purchase
+        grant_purchase(user.id, reference, credits, f"AI credit pack ({credits} credits)")
+        subscription.status = "active"
+        subscription.start_date = subscription.start_date or datetime.utcnow()
+        subscription.end_date = subscription.start_date
+        if transaction_id:
+            subscription.provider_transaction_id = str(transaction_id)
+        if payment:
+            payment.status = "success"
+            if transaction_id:
+                payment.provider_transaction_id = str(transaction_id)
+            event = data.get("provider_event")
+            metadata.update({"provider": provider, "last_verified_event": event if isinstance(event, dict) else _safe_provider_event(data, provider)})
+            payment.raw_webhook = metadata
+        db.session.commit()
+        current_app.logger.info("AI credits granted: user=%s credits=%s ref=%s", user.id, credits, reference)
+        return True
+
+    from app.services.pricing import period_days, confirm_redemption, resolve_plan_change
     snapshot = metadata.get("order_snapshot") if isinstance(metadata, dict) else None
     snapshot_period = snapshot.get("billing_period") if isinstance(snapshot, dict) else None
     plan_row = PricingPlan.query.filter_by(slug=subscription.plan).first()

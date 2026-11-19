@@ -1,0 +1,25 @@
+{% extends "base_dashboard.html" %}
+{% block title %}AI Credits · CVForge{% endblock %}
+{% block content %}
+<div class="credits-page">
+  <div class="credits-heading"><div><p class="credits-eyebrow">FLEXIBLE AI USAGE</p><h1>AI credits</h1><p>Top up when you need more AI actions. Your plan's included daily allowance is always used first.</p></div><a href="{{ url_for('billing.index') }}" class="credits-back">← Billing</a></div>
+  <section class="credits-balance"><div><span>YOUR AVAILABLE BALANCE</span><strong>{{ wallet_balance }} <small>credits</small></strong><p>One credit covers one eligible AI generation beyond your included daily limit.</p></div><div class="credits-balance-mark">✦</div></section>
+  <div class="credits-section-title"><div><h2>Choose a credit pack</h2><p>One-time payment · No automatic renewal</p></div><span class="credits-secure">⌑ Secure checkout</span></div>
+  <div class="credits-pack-grid">
+    {% for key, pack in packages.items() %}
+    <article class="credits-pack {% if key == 'plus' %}credits-pack-featured{% endif %}">
+      {% if key == 'plus' %}<span class="credits-popular">MOST POPULAR</span>{% endif %}
+      <p>{{ pack.name }}</p><strong>{{ pack.credits }} <small>credits</small></strong><h3>KES {{ '{:,}'.format(pack.price_kes) }}</h3><span>{{ pack.description }}</span>
+      <form method="POST" action="{{ url_for('billing.buy_credits', package_key=key) }}" class="credits-buy-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {% if providers.paystack %}<button name="method" value="paystack" class="credits-buy">Pay by card <span>↗</span></button>{% endif %}
+        {% if providers.intasend %}<label class="credits-phone-label">M-Pesa phone number<input name="phone" type="tel" inputmode="tel" placeholder="2547XXXXXXXX" autocomplete="tel"></label><button name="method" value="mpesa" class="credits-buy credits-buy-alt">Pay by M-Pesa</button><button name="method" value="card" class="credits-text-link">Other card checkout</button>{% endif %}
+        {% if not providers.paystack and not providers.intasend %}<p class="credits-unavailable">Checkout is temporarily unavailable.</p>{% endif %}
+      </form>
+    </article>
+    {% endfor %}
+  </div>
+  <section class="credits-history"><div><h2>Credit activity</h2><p>Your purchases and AI usage deductions.</p></div>{% if history %}<div class="credits-ledger">{% for item in history %}<div class="credits-ledger-row"><div><b>{{ item.description or ('AI credit ' ~ item.kind) }}</b><small>{{ item.created_at.strftime('%d %b %Y · %H:%M UTC') }}</small></div><strong class="{{ 'credit-positive' if item.amount > 0 else 'credit-negative' }}">{{ '+' if item.amount > 0 else '' }}{{ item.amount }}</strong></div>{% endfor %}</div>{% else %}<p class="credits-empty">Your credit activity will appear here.</p>{% endif %}</section>
+  <p class="credits-note">Credits are added only after the payment provider confirms your transaction. Never share your PIN, OTP, card number or CVV with anyone.</p>
+</div>
+{% endblock %}

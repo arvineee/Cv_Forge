@@ -1,6 +1,6 @@
 {% extends "base.html" %}
-{% block title %}CVForge: CV Builder, Resume Maker, ATS Checker & Job Search{% endblock %}
-{% block meta_description %}Build an ATS-friendly CV with AI, check your score, write cover letters, find jobs and track every application. Free to start. Pay by M-Pesa or card.{% endblock %}
+{% block title %}CVForge | Your Career, CVs and Job Search in One Workspace{% endblock %}
+{% block meta_description %}Build and improve your CV, check ATS compatibility, write cover letters, discover jobs, set alerts and manage applications in one career workspace.{% endblock %}
 {% block structured_data %}
 <script type="application/ld+json">
 {{ jsonld|tojson }}
@@ -17,52 +17,45 @@
 <main id="main-content">
 
 <!-- HERO -->
-<section class="hero-bg" style="overflow: hidden;">
-  <div class="wrap grid lg:grid-cols-[1.05fr_1fr] gap-12 items-center" style="padding-top: 56px; padding-bottom: 72px;">
-    <div>
-      <p class="eyebrow">CV builder · Job search · Career tools</p>
-      <h1 class="h-display h-xl" style="margin-top: 16px;">
-        Your whole job search, <span class="underline-accent">in one place.</span>
-      </h1>
-      <p class="lead" style="max-width: 32em; margin-top: 22px;">
-        Build an ATS-friendly CV or resume, check it against the job, write a tailored cover letter, find vacancies and keep every application on track. Download as PDF or Word.
-      </p>
-      <ul style="margin-top: 22px; display: grid; gap: 9px; padding: 0; list-style: none; font-size: 16px; color: var(--ink);">
-        {% for item in ['Professional CV and resume creation with AI help', 'Job matching, ATS checks and cover letters', 'Job discovery, alerts and an application tracker'] %}
-        <li class="flex items-start gap-3"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none" style="flex:none; margin-top: 2px;"><circle cx="10" cy="10" r="10" fill="#FDEBD0"/><path d="M5.5 10.5l3 3 6-6.5" stroke="#0B3D6B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>{{ item }}</span></li>
-        {% endfor %}
-      </ul>
-      <div class="flex flex-col sm:flex-row gap-3" style="margin-top: 32px;">
-        <a href="{{ url_for('auth.register') }}" class="btn btn-accent btn-lg">Build my CV free</a>
-        <a href="{{ url_for('free_ats.checker') }}" class="btn btn-ghost btn-lg">Try the free ATS checker</a>
+<section class="forge-hero">
+  <div class="forge-orb forge-orb-one"></div><div class="forge-orb forge-orb-two"></div>
+  <div class="wrap forge-hero-grid">
+    <div class="forge-hero-copy">
+      <div class="forge-eyebrow"><span class="forge-pulse"></span> YOUR CAREER, IN MOTION</div>
+      <h1>Make your next<br><em>move your best.</em></h1>
+      <p class="forge-hero-lead">One intelligent workspace to shape your story, discover better opportunities and move every application forward.</p>
+      <div class="forge-hero-actions">
+        <a href="{{ url_for('auth.register') }}" class="forge-btn-primary">Build your career profile <span>↗</span></a>
+        <a href="{{ url_for('free_ats.checker') }}" class="forge-btn-secondary">Explore free ATS check</a>
       </div>
-      <p style="margin-top: 16px; font-size: 14px; color: var(--ink-2);">Build and preview free. Choose a plan when you want to download. Pay by debit or credit card (Paystack), or M-Pesa in Kenya.</p>
+      <div class="forge-proof"><div class="forge-proof-avatars"><span>A</span><span>C</span><span>M</span><b>+</b></div><p><strong>Built for ambitious people.</strong><br>From first CV to next opportunity.</p></div>
     </div>
-
-    <div class="collage settle" aria-hidden="false">
-      <img class="c1" src="{{ url_for('static', filename='templates/modern-blue.webp') }}" alt="" width="480" height="372"/>
-      <img class="c2" src="{{ url_for('static', filename='templates/timeline-teal.webp') }}" alt="" width="480" height="372"/>
-      <img class="c3" src="{{ url_for('static', filename='templates/sidebar-navy.webp') }}" alt="Example CV made with the Sidebar Navy template" width="480" height="372" fetchpriority="high"/>
-      <div class="float-chip" style="top: 6%; right: 2%;" aria-hidden="true">
-        <span class="icon-tile tone-green" style="width: 32px; height: 32px; border-radius: 10px;">{{ icon('M5 13l4 4L19 7') }}</span>
-        <span>ATS match example<br><small style="font-weight: 500; color: var(--ink-2);">Strong · 86 / 100</small></span>
+    <div class="forge-product-stage" aria-label="Preview of the CVForge career workspace">
+      <div class="forge-window">
+        <div class="forge-window-top"><span class="forge-dots"><i></i><i></i><i></i></span><span>CVFORGE / CAREER SPACE</span><span class="forge-live">● LIVE WORKSPACE</span></div>
+        <div class="forge-window-body">
+          <div class="forge-mini-side"><b>cf.</b><i class="active">⌂</i><i>▤</i><i>⌕</i><i>◷</i><i>⚙</i></div>
+          <div class="forge-mini-main"><div class="forge-mini-greeting"><div><small>YOUR OVERVIEW</small><h3>Your next chapter<br>starts here.</h3></div><span class="forge-mini-avatar">{{ 'A' }}</span></div>
+            <div class="forge-mini-stats"><div><small>PROFILE STRENGTH</small><strong>86<span>/100</span></strong><b class="forge-progress"><i style="width:86%"></i></b></div><div><small>APPLICATIONS</small><strong>12</strong><span class="forge-up">↗ 3 this week</span></div><div><small>JOB MATCHES</small><strong>08</strong><span class="forge-match">New matches</span></div></div>
+            <div class="forge-mini-bottom"><div class="forge-mini-panel"><div class="forge-panel-head"><b>Career activity</b><small>THIS MONTH</small></div><div class="forge-bars"><i style="height:34%"></i><i style="height:48%"></i><i style="height:40%"></i><i style="height:68%"></i><i style="height:54%"></i><i style="height:86%"></i><i style="height:72%"></i><i style="height:100%"></i></div><div class="forge-days"><span>01</span><span>07</span><span>14</span><span>21</span><span>30</span></div></div><div class="forge-mini-panel forge-opportunity"><span>✦ NEW OPPORTUNITY</span><b>Product Designer</b><small>Remote · Full time</small><strong>94% match</strong></div></div>
+          </div>
+        </div>
       </div>
-      <div class="float-chip" style="bottom: 4%; left: -2%;" aria-hidden="true">
-        <span class="icon-tile tone-orange" style="width: 32px; height: 32px; border-radius: 10px;">{{ icon('M18 8a6 6 0 00-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9m-8 12a2 2 0 004 0') }}</span>
-        <span>Job alerts<br><small style="font-weight: 500; color: var(--ink-2);">Matching vacancies, in your inbox</small></span>
-      </div>
+      <div class="forge-float forge-float-top"><span>✦</span><div><b>ATS ready</b><small>Stronger applications</small></div></div>
+      <div class="forge-float forge-float-bottom"><span>↗</span><div><b>One clear direction</b><small>Your career, organised</small></div></div>
     </div>
   </div>
+  <div class="forge-hero-foot"><div class="wrap"><span>CREATE WITH PURPOSE</span><span>DISCOVER WITH CLARITY</span><span>MOVE WITH CONFIDENCE</span><span>ALL IN ONE PLACE</span></div></div>
 </section>
 
 <!-- STAT STRIP -->
 <section aria-label="Highlights" style="margin-top: -8px;">
   <div class="wrap">
     <div class="stat-strip">
-      <div><b>20</b><span>ATS-friendly CV &amp; resume templates</span></div>
-      <div><b>PDF + Word</b><span>Downloads, Word on eligible plans</span></div>
-      <div><b>Free to start</b><span>Build and preview before you pay</span></div>
-      <div><b>M-Pesa &amp; cards</b><span>Secure checkout, prices in KES</span></div>
+      <div><b>20+</b><span>Professional CV templates</span></div>
+      <div><b>PDF + DOCX</b><span>Flexible document exports</span></div>
+      <div><b>Start free</b><span>Build before choosing a plan</span></div>
+      <div><b>Secure checkout</b><span>Supported local and card payments</span></div>
     </div>
   </div>
 </section>
@@ -73,7 +66,7 @@
     <div style="max-width: 40em;">
       <p class="eyebrow">What you can do</p>
       <h2 class="h-display h-lg" style="margin-top: 14px;">Everything between &ldquo;I need a new job&rdquo; and &ldquo;Application sent&rdquo;</h2>
-      <p class="lead" style="margin-top: 16px;">One account covers the document, the match, the vacancy and the follow-up, so you stop juggling tabs and spreadsheets.</p>
+      <p class="lead" style="margin-top: 16px;">One account covers your professional profile, documents, job discovery, matching, alerts and application follow-up, so you can manage the full journey without juggling tabs and spreadsheets.</p>
     </div>
 
     <div class="bento reveal" style="margin-top: 44px;">
@@ -319,10 +312,10 @@
 <!-- FINAL CTA -->
 <section class="cta-band" style="padding: 88px 0;">
   <div class="wrap">
-    <h2 class="h-display" style="font-size: clamp(2.1rem, 5vw, 3.3rem); color: #fff; max-width: 14em;">The closing date won't move. Your CV can be ready today.</h2>
-    <p style="margin-top: 16px; font-size: 18px; color: #d6e4f2; max-width: 32em;">Create your account, build and preview your CV for free, and choose a plan only when you are ready to download.</p>
+    <h2 class="h-display" style="font-size: clamp(2.1rem, 5vw, 3.3rem); color: #fff; max-width: 14em;">Your next opportunity won't wait. Make your move today.</h2>
+    <p style="margin-top: 16px; font-size: 18px; color: #d6e4f2; max-width: 32em;">Create your account, organise your career documents, discover opportunities and build momentum. Start free and choose a plan when you need more.</p>
     <div class="flex flex-col sm:flex-row gap-3" style="margin-top: 30px;">
-      <a href="{{ url_for('auth.register') }}" class="btn btn-accent btn-lg">Build my CV free</a>
+      <a href="{{ url_for('auth.register') }}" class="btn btn-accent btn-lg">Start my career workspace</a>
       <a href="{{ url_for('templates_gallery.index') }}" class="btn btn-lg" style="color: #fff; border-color: rgba(255,255,255,.35);">Browse templates</a>
     </div>
   </div>

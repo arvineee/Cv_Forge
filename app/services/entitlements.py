@@ -49,6 +49,12 @@ def check_daily_limit(user, feature, fallback_limit=3, *, label=None):
     limit = get_daily_limit(user, feature, fallback_limit)
     if used < limit:
         return True, "", used, limit
+    try:
+        from app.services.ai_credits import can_use_credit
+        if can_use_credit(user.id):
+            return True, "", used, limit
+    except Exception:
+        pass
     feature_label = label or {
         "cv_generate": "CV AI assistance",
         "cv_parse": "CV parsing",
@@ -57,4 +63,4 @@ def check_daily_limit(user, feature, fallback_limit=3, *, label=None):
         "cover_letter": "cover letter generation",
         "ats_check": "ATS checks",
     }.get(feature, feature.replace("_", " "))
-    return False, f"Daily {feature_label} limit reached ({limit}/day). Upgrade your plan for more access.", used, limit
+    return False, f"Daily {feature_label} limit reached ({limit}/day). upgrade your plan or add AI credits for more access.", used, limit

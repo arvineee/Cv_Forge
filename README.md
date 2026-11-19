@@ -225,3 +225,10 @@ No database migration is required. See `SPRINT_003_CHANGELOG.md` for the feature
 
 ## Sprint 008: Personalised Job Alerts
 See `SPRINT_008_JOB_ALERTS.md` for saved searches, migration and Ubuntu deployment steps.
+
+
+## Career platform visual refresh and AI credit wallet
+
+The latest update introduces a redesigned public hero, refined dashboard styling, a visible AI credit balance, and a Billing → AI Credits page. Prepaid packs are one-time purchases; provider verification fulfils the wallet ledger and included daily plan limits are consumed before prepaid credits.
+
+Before deploying, read `AI_CREDIT_WALLET_DEPLOYMENT.md`, back up the live database, and run `flask db upgrade`. The new migration is `cd84a21b0f91`.
