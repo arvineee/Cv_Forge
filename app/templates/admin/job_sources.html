@@ -1,0 +1,127 @@
+{% extends "base_dashboard.html" %}
+{% block title %}Job sources — Admin{% endblock %}
+{% block page_title %}Job sources{% endblock %}
+{% block page_subtitle %}Add the RSS/Atom feeds that power Find Jobs. No .env editing or server restart needed.{% endblock %}
+
+{% block page_actions %}
+<form method="POST">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="action" value="sync">
+  <button class="btn btn-primary btn-sm" {% if not sources and not env_pending %}disabled{% endif %}>↻ Sync all now</button>
+</form>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6 max-w-5xl">
+
+  <div class="grid sm:grid-cols-3 gap-4">
+    <div class="tile"><p class="tile-label">Approved sources</p><p class="tile-value">{{ sources|selectattr('is_active')|list|length }}<span class="text-base font-semibold text-gray-400"> / {{ sources|length }}</span></p></div>
+    <div class="tile"><p class="tile-label">Live vacancies</p><p class="tile-value">{{ live_count }}</p></div>
+    <div class="tile"><p class="tile-label">Auto-sync</p><p class="text-sm text-gray-600 mt-2">Runs on your server schedule (<code>flask sync-job-feeds</code>). “Sync all now” runs it on demand.</p></div>
+  </div>
+
+  {% if env_pending %}
+  <div class="rounded-2xl border border-blue-200 bg-blue-50 p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+    <div class="flex-1">
+      <p class="font-semibold text-blue-900">{{ env_pending|length }} feed{{ '' if env_pending|length == 1 else 's' }} still hardcoded in your .env</p>
+      <p class="text-sm text-blue-800 mt-1">They keep working, but you can move them here to manage them from this page. After importing you can delete <code>JOB_FEEDS_JSON</code> and <code>JOB_FEED_ALLOWED_DOMAINS</code> from .env.</p>
+    </div>
+    <form method="POST"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="import_env">
+      <button class="btn btn-primary btn-sm">Import into Job sources</button></form>
+  </div>
+  {% endif %}
+
+  <!-- Add -->
+  <section class="card card-pad" aria-labelledby="add-source">
+    <h2 id="add-source" class="font-bold text-gray-900">Add an approved job feed</h2>
+    <p class="text-sm text-gray-500 mt-1">Only add feeds you have permission to use. We test the URL before saving, and its website is approved automatically. Only secure <code>https://</code> addresses on public servers are fetched.</p>
+    <form method="POST" class="form-grid mt-5 grid sm:grid-cols-6 gap-4">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="action" value="add">
+      <div class="sm:col-span-4">
+        <label for="url" class="block text-sm font-semibold text-gray-700 mb-1">Feed URL</label>
+        <input id="url" name="url" type="url" required maxlength="1000" placeholder="https://careers.example.org/jobs/rss.xml" inputmode="url" autocomplete="off">
+      </div>
+      <div class="sm:col-span-2">
+        <label for="name" class="block text-sm font-semibold text-gray-700 mb-1">Display name</label>
+        <input id="name" name="name" maxlength="120" placeholder="Example Careers (optional)">
+      </div>
+      <div class="sm:col-span-2">
+        <label for="country" class="block text-sm font-semibold text-gray-700 mb-1">Country</label>
+        <input id="country" name="country" list="countries" maxlength="80" value="Kenya">
+        <datalist id="countries"><option>Kenya</option><option>Uganda</option><option>Tanzania</option><option>Rwanda</option><option>Nigeria</option><option>Ghana</option><option>South Africa</option><option>Remote</option><option>International</option></datalist>
+      </div>
+      <div class="sm:col-span-2">
+        <label for="location" class="block text-sm font-semibold text-gray-700 mb-1">Location <span class="font-normal text-gray-400">(optional)</span></label>
+        <input id="location" name="location" maxlength="180" placeholder="Nairobi">
+      </div>
+      <div class="sm:col-span-2">
+        <label for="employment_type" class="block text-sm font-semibold text-gray-700 mb-1">Type <span class="font-normal text-gray-400">(optional)</span></label>
+        <select id="employment_type" name="employment_type"><option value="">Mixed / unspecified</option><option>Full-time</option><option>Part-time</option><option>Contract</option><option>Internship</option><option>Volunteer</option></select>
+      </div>
+      <div class="sm:col-span-6 flex flex-wrap items-center gap-x-6 gap-y-3">
+        <label class="inline-flex items-center gap-2 text-sm text-gray-700"><input type="checkbox" name="sync_now" value="1" checked> Import listings straight away</label>
+        <label class="inline-flex items-center gap-2 text-sm text-gray-500"><input type="checkbox" name="force" value="1"> Save even if the test fails</label>
+        <button class="btn btn-primary ml-auto">Test &amp; add source</button>
+      </div>
+    </form>
+  </section>
+
+  <!-- List -->
+  <section class="card overflow-hidden" aria-labelledby="source-list">
+    <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+      <h2 id="source-list" class="font-bold text-gray-900">Your sources</h2>
+    </div>
+    {% if sources %}
+    <div class="overflow-x-auto">
+      <table class="table-clean">
+        <thead><tr><th>Source</th><th>Status</th><th>Last sync</th><th class="text-right">Actions</th></tr></thead>
+        <tbody>
+        {% for s in sources %}
+        <tr>
+          <td class="min-w-[220px]">
+            <p class="font-semibold text-gray-900">{{ s.name }}</p>
+            <p class="text-xs text-gray-500 break-all">{{ s.url }}</p>
+            <p class="text-xs text-gray-400 mt-1">{{ s.country }}{% if s.location %} · {{ s.location }}{% endif %}{% if s.employment_type %} · {{ s.employment_type }}{% endif %}</p>
+          </td>
+          <td>
+            {% if not s.is_active %}<span class="badge badge-muted">Paused</span>
+            {% elif s.last_status == 'ok' %}<span class="badge badge-ok">Healthy</span>
+            {% elif s.last_status in ('error', 'blocked') %}<span class="badge badge-bad">Needs attention</span>
+            {% else %}<span class="badge">Not synced yet</span>{% endif %}
+            {% if s.last_message %}<p class="text-xs text-gray-500 mt-1 max-w-[220px]">{{ s.last_message }}</p>{% endif %}
+          </td>
+          <td class="text-sm text-gray-600 whitespace-nowrap">
+            {% if s.last_synced_at %}{{ s.last_synced_at.strftime('%d %b %Y, %H:%M') }}<p class="text-xs text-gray-400">{{ s.last_entry_count }} listings</p>{% else %}—{% endif %}
+          </td>
+          <td>
+            <div class="flex flex-wrap justify-end gap-2">
+              {% for act, label, cls in [('test','Test','btn-soft'),('toggle', 'Resume' if not s.is_active else 'Pause','btn-soft'),('delete','Remove','btn-danger')] %}
+              <form method="POST" {% if act == 'delete' %}onsubmit="return confirm('Remove {{ s.name|e }}? Its feed will stop syncing.')"{% endif %}>
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="id" value="{{ s.id }}">
+                <input type="hidden" name="action" value="{{ act }}">
+                <button class="btn {{ cls }} btn-sm">{{ label }}</button>
+              </form>
+              {% endfor %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="text-center py-12 px-6">
+      <p class="font-semibold text-gray-900">No job sources yet</p>
+      <p class="text-sm text-gray-500 mt-1">Paste a feed URL above to approve your first source. Find Jobs fills up after the first sync.</p>
+    </div>
+    {% endif %}
+  </section>
+
+  <p class="text-xs text-gray-400 max-w-3xl">
+    Review each publisher's terms before enabling a source, and keep attribution links intact. Imported vacancies can expire at the publisher; CVForge does not guarantee that a listing is still open.
+    For extra assurance, you can also restrict outbound traffic from the server to your approved hosts.
+  </p>
+</div>
+{% endblock %}

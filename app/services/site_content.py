@@ -12,9 +12,9 @@ Wording rules for this file:
 
 SITE_NAME = "CVForge AI"
 
-HOME_TITLE = "CVForge: Online CV Builder, Resume Maker & CV Generator"
+HOME_TITLE = "CVForge: CV Builder, Resume Maker, ATS Checker & Job Search"
 HOME_DESCRIPTION = (
-    "Start free: an online CV creator and resume maker with AI. Build an ATS-friendly CV, improve an old resume, write cover letters, download PDF or Word."
+    "Build an ATS-friendly CV with AI, check your score, write cover letters, find jobs and track every application. Free to start. Pay by M-Pesa or card."
 )
 # The 9 original phrases come first and must stay (tests pin them). The rest cover the
 # other names people search for. Search engines mostly ignore the keywords tag, so the
@@ -28,7 +28,9 @@ SEO_KEYWORDS = (
     "AI resume builder, AI CV generator, AI resume generator, professional CV maker, "
     "curriculum vitae maker, create a CV online, make a CV online, make a resume online, "
     "ATS resume checker, ATS-friendly CV template, CV templates, resume templates, "
-    "cover letter maker, CV maker Kenya, CV builder Kenya"
+    "cover letter maker, CV maker Kenya, CV builder Kenya, "
+    "job search tool, find jobs in Kenya, job alerts Kenya, job application tracker, "
+    "career tools, ATS score checker, AI career coach"
 )
 
 # Keywords for specific pages (used by the pages' own meta_keywords block).
@@ -49,6 +51,15 @@ REGISTER_KEYWORDS = (
 GUIDE_KEYWORDS = (
     "how to make a CV, how to write a CV, how to make a resume online, CV writing guide, "
     "CV maker guide, resume builder tutorial, CV generator, resume maker"
+)
+
+JOBS_KEYWORDS = (
+    "jobs in Kenya, find jobs online, job search tool, job alerts, job application tracker, "
+    "match my CV to a job, vacancies Kenya"
+)
+ATS_KEYWORDS = (
+    "free ATS checker, ATS resume checker, ATS score checker, ATS-friendly CV, "
+    "check my CV against a job description, resume scanner, CV checker"
 )
 
 PAYMENT_CARD_NOTE = (
@@ -137,6 +148,18 @@ LANDING_FAQS = [
         "You choose whether to buy another period when it ends.",
     ),
     (
+        "Can CVForge help me find jobs, not just write a CV?",
+        "Yes. Job Discovery lists vacancies from sources we have reviewed and links to the original "
+        "employer or publisher page. You can save a vacancy to your Career Workspace, match your CV "
+        "against it and get alerts when new listings fit your search. Always confirm the details and "
+        "closing date on the original page, because the publisher controls each vacancy.",
+    ),
+    (
+        "Can I track my job applications?",
+        "Yes. The Career Workspace keeps every opportunity in one place with its status (saved, applied, "
+        "interview, offer), deadline, notes and the CV you used, so nothing slips past a closing date.",
+    ),
+    (
         "How is my data handled?",
         "We do not sell your data and we do not use your CV content to train AI models. AI features "
         "send the relevant text to Google's Gemini API to generate a response. The Privacy Policy "
@@ -218,6 +241,9 @@ def landing_jsonld(base_url, plans, pricing_url, logo_url):
             "alternateName": ["CVForge CV Maker", "CVForge Resume Maker", "CVForge CV Generator"],
             "keywords": SEO_KEYWORDS,
             "featureList": [
+                "Job discovery from reviewed sources",
+                "Job application tracker and job alerts",
+                "AI career coach",
                 "Professional CV and resume builder",
                 "ATS-friendly CV and resume optimisation",
                 "Resume improvement and rewriting",

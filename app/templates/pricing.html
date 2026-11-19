@@ -3,20 +3,7 @@
 {% block meta_description %}CVForge CV maker and resume builder plans: ATS-friendly CVs, resumes, cover letters and PDF or Word downloads. Pay by card via Paystack or M-Pesa. Prices in KES.{% endblock %}
 {% block meta_keywords %}{{ pricing_keywords }}{% endblock %}
 {% block body %}
-<nav class="sticky top-0 z-50 bg-white/90 backdrop-blur-sm border-b border-gray-100">
-  <div class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-    <a href="{{ url_for('main.index') }}" class="flex items-center gap-2 font-bold text-xl text-gray-900">
-      <img src="{{ url_for('static', filename='favicon.ico') }}" alt="CVForge AI logo" width="32" height="32" class="w-8 h-8 rounded-lg"/>
-      CVForge AI
-    </a>
-    <div class="flex gap-3">
-      <a href="{{ url_for('auth.login') }}" class="text-sm font-medium text-gray-600 hover:text-gray-900 transition hidden sm:inline">Sign In</a>
-      <a href="{{ url_for('auth.register') }}" class="px-4 py-2 gradient-brand text-white text-sm font-semibold rounded-lg hover:opacity-90 transition">
-        Get Started Free
-      </a>
-    </div>
-  </div>
-</nav>
+{% include "_public_nav.html" %}
 
 <section class="py-20 px-4 bg-white">
   <div class="max-w-5xl mx-auto">
@@ -213,13 +200,7 @@
   </div>
 </section>
 
-<footer class="bg-gray-900 text-gray-400 py-8 px-4 text-center text-sm">
-  © 2026 CVForge AI · Built in Kenya, for job seekers worldwide ·
-  <a href="{{ url_for('main.index') }}" class="hover:text-white transition">Home</a> ·
-  <a href="{{ url_for('main.about') }}" class="hover:text-white transition">About</a> ·
-  <a href="{{ url_for('main.privacy') }}" class="hover:text-white transition">Privacy</a> ·
-  <a href="{{ url_for('main.terms') }}" class="hover:text-white transition">Terms</a>
-</footer>
+{% include "_public_footer.html" %}
 {% endblock %}
 
 

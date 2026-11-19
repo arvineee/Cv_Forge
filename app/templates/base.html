@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 
   <!-- ── Core SEO ─────────────────────────────────────────────── -->
-  <title>{% block title %}CVForge: Online CV Builder, Resume Maker & CV Generator{% endblock %}</title>
-  <meta name="description" content="{% block meta_description %}Start free: an online CV creator and resume maker with AI. Build an ATS-friendly CV, improve an old resume, write cover letters, download PDF or Word.{% endblock %}"/>
+  <title>{% block title %}CVForge: CV Builder, Resume Maker, ATS Checker & Job Search{% endblock %}</title>
+  <meta name="description" content="{% block meta_description %}Build an ATS-friendly CV with AI, check your score, write cover letters, find jobs and track every application. Free to start. Pay by M-Pesa or card.{% endblock %}"/>
   <meta name="keywords" content="{% block meta_keywords %}{{ seo_keywords }}{% endblock %}"/>
   <meta name="robots" content="{% block robots %}index, follow, max-image-preview:large, max-snippet:-1{% endblock %}"/>
   <meta name="author" content="CVForge AI"/>
@@ -15,9 +15,13 @@
   <link rel="canonical" href="{{ page_canonical|trim }}"/>
   <link rel="alternate" hreflang="en" href="{{ page_canonical|trim }}"/>
   <link rel="alternate" hreflang="x-default" href="{{ page_canonical|trim }}"/>
-  <meta name="theme-color" content="#1e40af"/>
+  <meta name="theme-color" content="{% block theme_color %}#0b3d6b{% endblock %}"/>
+  <meta name="application-name" content="CVForge"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-title" content="CVForge"/>
+  <meta name="format-detection" content="telephone=no"/>
+  <link rel="manifest" href="{{ url_for('seo.manifest') }}"/>
   <meta name="google-site-verification" content="PTBfBlpvOOpZEUnjCPpjUN4pGJ6JABkbeH8BmkXlAno" />
-  <meta name="google-adsense-account" content="ca-pub-2038759698856668">
   <meta name="google-adsense-account" content="ca-pub-2038759698856668">
 
   <!-- Favicon -->
@@ -35,7 +39,8 @@
   <!-- ── Open Graph (Facebook, WhatsApp, LinkedIn, Telegram) ───── -->
   <meta property="og:type" content="{% block og_type %}website{% endblock %}"/>
   <meta property="og:site_name" content="CVForge AI"/>
-  <meta property="og:locale" content="en_US"/>
+  <meta property="og:locale" content="en_KE"/>
+  <meta property="og:locale:alternate" content="en_US"/>
   <meta property="og:url" content="{{ share_url }}"/>
   <meta property="og:title" content="{{ share_title|trim }}"/>
   <meta property="og:description" content="{{ share_description|trim }}"/>
@@ -63,7 +68,7 @@
     "name": "CVForge AI",
     "url": "{{ site_url }}/",
     "logo": "{{ site_url }}{{ url_for('static', filename='logo.png') }}",
-    "description": "CVForge AI is a professional CV and resume builder for job seekers worldwide, built in Kenya.",
+    "description": "CVForge AI is a career platform built in Kenya: CV and resume builder, ATS checker, cover letters, job discovery and application tracking for job seekers worldwide.",
     "areaServed": "Worldwide",
     "sameAs": []
   }
@@ -71,25 +76,27 @@
   {% block structured_data %}{% endblock %}
 
   <link rel="preconnect" href="https://unpkg.com" crossorigin>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/tw.css') }}?v=1">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=DM+Sans:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=DM+Sans:wght@400;500;600;700&display=swap"></noscript>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/tw.css') }}?v={{ asset_version }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v={{ asset_version }}">
   <script defer src="https://unpkg.com/alpinejs@3.14.1/dist/cdn.min.js"></script>
   <script defer src="https://unpkg.com/htmx.org@1.9.12"></script>
-  <style>
-    [x-cloak]{display:none!important}
-    .gradient-brand{background:linear-gradient(135deg,#1e40af 0%,#3b82f6 100%)}
-    .card-hover{transition:all .2s ease;border:1px solid #e5e7eb}
-    .card-hover:hover{box-shadow:0 8px 30px rgba(37,99,235,.12);border-color:#bfdbfe;transform:translateY(-2px)}
-  </style>
+  <script>document.documentElement.classList.add('js')</script>
+  <style>[x-cloak]{display:none!important}</style>
   {% block extra_head %}{% endblock %}
 </head>
-<body class="h-full bg-gray-50 text-gray-900 antialiased">
+<body class="h-full {% block body_class %}bg-gray-50{% endblock %} text-gray-900 antialiased">
+<a href="#main-content" class="skip-link">Skip to content</a>
 
 {% with messages = get_flashed_messages(with_categories=true) %}
   {% if messages %}
-  <div id="flash-container" class="fixed top-4 right-4 z-50 space-y-2 max-w-sm w-full">
+  <div id="flash-container" class="fixed top-4 right-4 z-[80] space-y-2 max-w-sm w-full" role="status" aria-live="polite">
     {% for category, message in messages %}
-    <div x-data="{show:true}" x-show="show" x-transition
-         class="flex items-start gap-3 p-4 rounded-xl shadow-lg text-sm font-medium
+    <div x-data="{show:true}" x-show="show" x-transition x-init="setTimeout(()=>show=false, 9000)"
+         class="flash flex items-start gap-3 p-4 rounded-xl shadow-lg text-sm font-medium
          {% if category == 'error' %}bg-red-50 text-red-800 border border-red-200
          {% elif category == 'success' %}bg-green-50 text-green-800 border border-green-200
          {% elif category == 'warning' %}bg-yellow-50 text-yellow-800 border border-yellow-200
@@ -119,6 +126,16 @@
 {% endblock %}
 
 {% block extra_scripts %}{% endblock %}
+<script>
+  /* Progressive scroll-reveal: content stays visible if JS or IntersectionObserver is unavailable. */
+  (function(){
+    var els=document.querySelectorAll('.reveal');
+    if(!els.length) return;
+    if(!('IntersectionObserver' in window)){els.forEach(function(e){e.classList.add('in')});return;}
+    var io=new IntersectionObserver(function(entries){entries.forEach(function(en){if(en.isIntersecting){en.target.classList.add('in');io.unobserve(en.target)}})},{rootMargin:'0px 0px -8% 0px',threshold:.05});
+    els.forEach(function(e){io.observe(e)});
+  })();
+</script>
 {% include "_progress.html" %}
 </body>
 </html>

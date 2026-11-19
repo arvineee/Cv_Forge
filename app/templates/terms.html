@@ -2,15 +2,7 @@
 {% block title %}Terms of Service | CVForge{% endblock %}
 {% block meta_description %}The terms for using CVForge: accounts, plans and payments, AI-generated content, acceptable use and how plans work.{% endblock %}
 {% block body %}
-<nav class="sticky top-0 z-50 bg-white/90 backdrop-blur-sm border-b border-gray-100">
-  <div class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-    <a href="{{ url_for('main.index') }}" class="flex items-center gap-2 font-bold text-xl text-gray-900">
-      <img src="{{ url_for('static', filename='favicon.ico') }}" alt="CVForge AI logo" width="32" height="32" class="w-8 h-8 rounded-lg"/>
-      CVForge AI
-    </a>
-    <a href="{{ url_for('auth.login') }}" class="text-sm font-medium text-gray-600 hover:text-gray-900 transition">Sign In</a>
-  </div>
-</nav>
+{% include "_public_nav.html" %}
 
 <section class="max-w-3xl mx-auto px-4 py-16">
   <h1 class="text-3xl font-black text-gray-900 mb-2">Terms of Service</h1>
@@ -125,11 +117,6 @@
   </div>
 </section>
 
-<footer class="bg-gray-900 text-gray-400 py-8 px-4 text-center text-sm">
-  © 2026 CVForge AI · Built in Kenya 🇰🇪 ·
-  <a href="{{ url_for('main.index') }}" class="hover:text-white transition">Home</a> ·
-  <a href="{{ url_for('main.privacy') }}" class="hover:text-white transition">Privacy</a> ·
-  <a href="{{ url_for('main.terms') }}" class="hover:text-white transition">Terms</a>
-</footer>
+{% include "_public_footer.html" %}
 {% endblock %}
 

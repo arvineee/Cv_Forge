@@ -18,12 +18,9 @@ systemctl enable --now cvforge-nudges.timer cvforge-cv-reminders.timer cvforge-p
 echo
 systemctl list-timers 'cvforge-*' --no-pager
 echo
-<<<<<<< HEAD
 echo "Job feeds / job alerts timers are installed but NOT enabled (review the dry run first):"
 echo "  flask sync-job-feeds ; flask process-job-alerts --dry-run  # then:"
 echo "  sudo systemctl enable --now cvforge-job-feeds.timer cvforge-job-alerts.timer"
 echo
-=======
->>>>>>> ee431c06f8596a451011871582c1200fef239ca0
 echo "Test now (no waiting):  sudo systemctl start cvforge-nudges.service"
 echo "Logs:                   journalctl -u cvforge-nudges.service -n 50 --no-pager"

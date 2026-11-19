@@ -229,6 +229,94 @@ def payment_methods():
                            status=status, configured=configured)
 
 
+# ── Job sources (approved job feed URLs) ──────────────────────────
+
+@admin_bp.route("/job-sources", methods=["GET", "POST"])
+@login_required
+@admin_required
+def job_sources():
+    """Add, pause, test, sync and remove approved job feed URLs.
+
+    Replaces hardcoding JOB_FEEDS_JSON / JOB_FEED_ALLOWED_DOMAINS in .env.
+    """
+    from app.models import JobFeedSource, JobOpportunity
+    from app.services import job_discovery as jd
+
+    jd.ensure_schema()
+
+    if request.method == "POST":
+        action = request.form.get("action", "")
+        source = None
+        if request.form.get("id", "").isdigit():
+            source = db.session.get(JobFeedSource, int(request.form["id"]))
+
+        def audit(name, **details):
+            db.session.add(ActivityLog(user_id=current_user.id, action=name, resource_type="job_feed_source",
+                                       resource_id=source.id if source else None,
+                                       ip_address=request.remote_addr, details=details))
+
+        if action == "add":
+            try:
+                url = jd.normalize_feed_url(request.form.get("url", ""))
+            except ValueError as exc:
+                flash(str(exc), "error")
+                return redirect(url_for("admin.job_sources"))
+            if JobFeedSource.query.filter_by(url=url).first():
+                flash("That feed is already in your list.", "warning")
+                return redirect(url_for("admin.job_sources"))
+            check = jd.check_feed(url)
+            if not check["ok"] and request.form.get("force") != "1":
+                flash(f"Not saved: {check['message']} Tick 'Save anyway' to add it regardless.", "error")
+                return redirect(url_for("admin.job_sources"))
+            host = (jd.urlparse(url).hostname or "")
+            source = JobFeedSource(
+                name=(request.form.get("name", "").strip() or host)[:120], url=url,
+                country=(request.form.get("country", "").strip() or "Kenya")[:80],
+                location=(request.form.get("location", "").strip()[:180] or None),
+                employment_type=(request.form.get("employment_type", "").strip()[:60] or None))
+            db.session.add(source)
+            db.session.flush()
+            audit("admin_job_source_added", url=url)
+            db.session.commit()
+            flash(f"Added {source.name}. {check['message']}", "success")
+            if check["ok"] and request.form.get("sync_now") == "1":
+                result = jd.sync_job_feeds()
+                flash(f"Imported {result['created']} new listings.", "success")
+        elif action == "import_env":
+            added = jd.import_env_sources()
+            flash(f"Imported {added} feed(s) from your .env file." if added else "Nothing new to import from .env.",
+                  "success" if added else "info")
+        elif action == "sync":
+            result = jd.sync_job_feeds()
+            flash("Sync finished: " + ", ".join(f"{k} {v}" for k, v in result.items() if v), "success" if not result["errors"] else "warning")
+        elif source is None:
+            abort(404)
+        elif action == "toggle":
+            source.is_active = not source.is_active
+            audit("admin_job_source_toggled", active=source.is_active)
+            db.session.commit()
+            flash(f"{source.name} is now {'active' if source.is_active else 'paused'}.", "success" if source.is_active else "warning")
+        elif action == "delete":
+            name = source.name
+            audit("admin_job_source_deleted", url=source.url)
+            db.session.delete(source)
+            db.session.commit()
+            flash(f"Removed {name}. Listings already imported stay until the next sync deactivates them.", "info")
+        elif action == "test":
+            check = jd.check_feed(source.url)
+            flash(f"{source.name}: {check['message']}" + (f" e.g. “{check['samples'][0]}”" if check["samples"] else ""),
+                  "success" if check["ok"] else "error")
+        else:
+            abort(400)
+        return redirect(url_for("admin.job_sources"))
+
+    sources = JobFeedSource.query.order_by(JobFeedSource.created_at.desc()).all()
+    env_feeds, _ = jd._env_feed_config()
+    env_pending = [f for f in env_feeds if f.get("url") and not any(s.url == str(f["url"]).strip() for s in sources)]
+    live_count = JobOpportunity.query.filter_by(is_active=True).count()
+    return render_template("admin/job_sources.html", sources=sources, env_pending=env_pending, live_count=live_count)
+
+
 # ── Pricing Plans ─────────────────────────────────────────────────
 
 @admin_bp.route("/pricing")

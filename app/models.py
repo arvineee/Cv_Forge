@@ -754,6 +754,37 @@ class JobOpportunity(db.Model):
         return f"<JobOpportunity {self.title!r} from {self.source_name!r}>"
 
 
+class JobFeedSource(db.Model):
+    """An approved RSS/Atom job feed, managed from Admin -> Job sources.
+
+    Replaces hardcoding JOB_FEEDS_JSON / JOB_FEED_ALLOWED_DOMAINS in .env.
+    Adding an active source approves its hostname for fetching; the importer
+    still enforces HTTPS, public IPs, no redirects and size limits.
+    """
+    __tablename__ = "job_feed_sources"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False)
+    url = db.Column(db.String(1000), nullable=False, unique=True)
+    country = db.Column(db.String(80), nullable=False, default="Kenya")
+    location = db.Column(db.String(180), nullable=True)
+    employment_type = db.Column(db.String(60), nullable=True)
+    is_active = db.Column(db.Boolean, nullable=False, default=True, index=True)
+    last_synced_at = db.Column(db.DateTime, nullable=True)
+    last_status = db.Column(db.String(20), nullable=True)  # ok | error | blocked
+    last_message = db.Column(db.String(300), nullable=True)
+    last_entry_count = db.Column(db.Integer, nullable=False, default=0)
+    created_at = db.Column(db.DateTime, nullable=False, default=utcnow)
+
+    @property
+    def host(self):
+        from urllib.parse import urlparse
+        return (urlparse(self.url).hostname or "").lower()
+
+    def __repr__(self):
+        return f"<JobFeedSource {self.name!r} {self.url!r}>"
+
+
 class JobAlertPreference(db.Model):
     """A user's explicit in-app job alert search."""
     __tablename__ = "job_alert_preferences"

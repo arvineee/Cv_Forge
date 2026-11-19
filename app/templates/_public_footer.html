@@ -1,0 +1,43 @@
+<footer class="pub-footer" style="padding: 64px 0 32px;">
+  <div class="wrap grid md:grid-cols-2 lg:grid-cols-5 gap-10">
+    <div class="lg:col-span-2">
+      <p class="display" style="font-weight: 800; font-size: 24px; color: #fff;">CVForge<span style="color: var(--orange-500);">.</span></p>
+      <p style="font-size: 15px; line-height: 1.65; margin-top: 12px; max-width: 26em;">
+        Your whole job search in one place: build the CV, check it against the job, write the cover letter, find vacancies and track every application. Built in Kenya, for job seekers worldwide.
+      </p>
+      <p style="font-size: 13.5px; margin-top: 16px;">Cards via Paystack · M-Pesa in Kenya</p>
+    </div>
+    <div>
+      <h4>Build</h4>
+      <ul style="display: grid; gap: 9px; font-size: 15px; padding: 0; list-style: none;">
+        <li><a href="{{ url_for('auth.register') }}">CV &amp; resume builder</a></li>
+        <li><a href="{{ url_for('templates_gallery.index') }}">Templates</a></li>
+        <li><a href="{{ url_for('cv_examples.index') }}">CV examples</a></li>
+        <li><a href="{{ url_for('free_ats.checker') }}">Free ATS checker</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Job search</h4>
+      <ul style="display: grid; gap: 9px; font-size: 15px; padding: 0; list-style: none;">
+        <li><a href="{{ url_for('dashboard.job_discovery') }}">Find jobs</a></li>
+        <li><a href="{{ url_for('dashboard.applications') }}">Application tracker</a></li>
+        <li><a href="{{ url_for('dashboard.job_alerts') }}">Job alerts</a></li>
+        <li><a href="{{ url_for('main.pricing') }}">Pricing</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Company</h4>
+      <ul style="display: grid; gap: 9px; font-size: 15px; padding: 0; list-style: none;">
+        <li><a href="{{ url_for('main.about') }}">About</a></li>
+        <li><a href="{{ url_for('guide.index') }}">User guide</a></li>
+        <li><a href="{{ url_for('support.index') }}">Support</a></li>
+        <li><a href="{{ url_for('main.privacy') }}">Privacy policy</a></li>
+        <li><a href="{{ url_for('main.terms') }}">Terms of service</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="wrap" style="margin-top: 44px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,.12); font-size: 14px; display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: space-between;">
+    <span>&copy; {{ now_year }} CVForge AI. Built in Kenya, for job seekers worldwide.</span>
+    <span>Vacancy details belong to their original publishers. Always verify before you apply.</span>
+  </div>
+</footer>

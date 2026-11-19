@@ -35,12 +35,36 @@ def site_base_url() -> str:
     return ""
 
 
+_asset_version_cache = {}
+
+
+def _asset_version() -> str:
+    """Cache-busting token derived from the newest CSS/JS file, so browsers
+    pick up a new stylesheet automatically after every deploy (no hand-edited
+    ?v=1 to forget)."""
+    if "v" not in _asset_version_cache:
+        import os
+        newest = 0
+        for sub in ("css", "js"):
+            folder = os.path.join(current_app.static_folder or "", sub)
+            if os.path.isdir(folder):
+                for name in os.listdir(folder):
+                    try:
+                        newest = max(newest, int(os.path.getmtime(os.path.join(folder, name))))
+                    except OSError:
+                        pass
+        _asset_version_cache["v"] = str(newest or 1)
+    return _asset_version_cache["v"]
+
+
 @seo_bp.app_context_processor
 def _inject_site_url():
     from app.services import site_content as _sc
     from app.services.site_content import PAYMENT_CARD_NOTE, PRICING_FAQS, SEO_KEYWORDS
     return {
         "site_url": site_base_url(),
+        "asset_version": _asset_version(),
+        "now_year": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).year,
         "payment_card_note": PAYMENT_CARD_NOTE,
         "pricing_faqs": PRICING_FAQS,
         "seo_keywords": SEO_KEYWORDS,
@@ -48,6 +72,8 @@ def _inject_site_url():
         "pricing_keywords": _sc.PRICING_KEYWORDS,
         "register_keywords": _sc.REGISTER_KEYWORDS,
         "guide_keywords": _sc.GUIDE_KEYWORDS,
+        "jobs_keywords": _sc.JOBS_KEYWORDS,
+        "ats_keywords": _sc.ATS_KEYWORDS,
     }
 
 
@@ -81,6 +107,7 @@ PUBLIC_PAGES = [
 # future noindex audit can reference the same list.
 DISALLOWED_PREFIXES = [
     "/dashboard",
+    "/career/",
     "/cv/",
     "/cover-letter/",
     "/ats/",
@@ -96,6 +123,36 @@ DISALLOWED_PREFIXES = [
     "/auth/forgot-password",
     "/support/ask",
 ]
+
+
+@seo_bp.route("/manifest.webmanifest")
+def manifest():
+    """Web app manifest: makes the site installable (PWA) and TWA-ready."""
+    import json
+    data = {
+        "name": "CVForge AI: CV Builder & Job Search",
+        "short_name": "CVForge",
+        "description": "Build CVs, check your ATS score, write cover letters, find jobs and track applications.",
+        "id": "/",
+        "start_url": "/dashboard?source=pwa",
+        "scope": "/",
+        "display": "standalone",
+        "orientation": "portrait-primary",
+        "background_color": "#ffffff",
+        "theme_color": "#0b3d6b",
+        "categories": ["business", "productivity", "education"],
+        "icons": [
+            {"src": url_for("static", filename="icon-192.png"), "sizes": "192x192", "type": "image/png", "purpose": "any"},
+            {"src": url_for("static", filename="icon-512.png"), "sizes": "512x512", "type": "image/png", "purpose": "any"},
+            {"src": url_for("static", filename="icon-512.png"), "sizes": "512x512", "type": "image/png", "purpose": "maskable"},
+        ],
+        "shortcuts": [
+            {"name": "New CV", "url": "/cv/start"},
+            {"name": "Find jobs", "url": "/career/jobs"},
+            {"name": "ATS checker", "url": "/ats/"},
+        ],
+    }
+    return Response(json.dumps(data, indent=2), mimetype="application/manifest+json")
 
 
 @seo_bp.route("/robots.txt")

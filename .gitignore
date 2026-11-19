@@ -132,6 +132,3 @@ htmlcov/
 *.swo
 *.zip
 .DS_Store
-.env
-instance/*.db
-instance/payment_settings.json

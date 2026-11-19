@@ -36,10 +36,11 @@ def _read(rel):
 
 class SeoKeywordTests(unittest.TestCase):
     def test_home_title_and_description_limits(self):
-        self.assertIn("Online CV Builder", sc.HOME_TITLE)
+        self.assertIn("CV Builder", sc.HOME_TITLE)
         self.assertLessEqual(len(sc.HOME_TITLE), 65)
         self.assertTrue(120 <= len(sc.HOME_DESCRIPTION) <= 160, len(sc.HOME_DESCRIPTION))
-        for kw in ("CV builder", "resume maker", "CV generator"):
+        # Positioning widened from "CV generator" to a full career platform.
+        for kw in ("CV builder", "resume maker", "ats checker", "job search"):
             self.assertIn(kw.lower(), sc.HOME_TITLE.lower())
 
     def test_keywords_keep_originals_and_add_targets(self):

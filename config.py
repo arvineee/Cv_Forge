@@ -4,7 +4,6 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_DATABASE_PATH = os.path.join(PROJECT_ROOT, "instance", "cvforge.db")
 

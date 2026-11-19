@@ -90,12 +90,14 @@ class InternationalSiteTests(unittest.TestCase):
     # ── copy ───────────────────────────────────────────────────────────
     def test_landing_headline_and_features(self):
         html = self.get("/")
-        self.assertIn("Build a CV That Gets You Noticed,", html)
-        self.assertIn("Wherever You Want to Work.", html)
+        self.assertIn("Your whole job search,", html)
+        self.assertIn("in one place.", html)
         for phrase in ("ATS-friendly", "Job description matching", "cover letter",
                        "PDF and Word", "Resume improvement and rewriting"):
             self.assertIn(phrase.lower(), html.lower(), phrase)
         self.assertNotIn("Professional CV Builder for African Professionals", html)
+        for phrase in ("Job discovery", "Application tracker", "Job alerts"):
+            self.assertIn(phrase, html, phrase)
 
     def test_no_africa_only_marketing_language_on_public_pages(self):
         for path in PUBLIC_PATHS:
@@ -145,7 +147,8 @@ class InternationalSiteTests(unittest.TestCase):
     def test_homepage_seo_tags(self):
         html = self.get("/")
         title = re.search(r"<title>(.*?)</title>", html, re.S).group(1).strip()
-        self.assertIn("Online CV Builder", title)
+        self.assertIn("CV Builder", title)
+        self.assertIn("Job Search", title)
         self.assertLessEqual(len(title), 65)
         desc = _meta(html, "name", "description")
         self.assertTrue(120 <= len(desc) <= 160, len(desc))

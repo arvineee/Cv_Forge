@@ -31,6 +31,23 @@
 {% endblock %}
 
 {% block content %}
+{% set admin_tools = [
+          ('Growth & conversion','Signups, activation and revenue','admin.growth','↗'),
+          ('Unit economics','Gross collections and variable usage','admin.unit_economics','◫'),
+          ('First-CV funnel','Track start, completion and download','admin.conversion','◫'),
+          ('User management','Search, review and manage accounts','admin.users','♙'),
+          ('Pricing plans','Manage subscriptions and pricing','admin.pricing','◇'),
+          ('Offers & discounts','Configure promotional offers','admin.offers','％'),
+          ('Customer feedback','Review user suggestions','admin.feedback','✉'),
+          ('CV templates','Manage available CV designs','admin.templates','▤'),
+          ('Payments','Review payment transactions','admin.payments','▣'),
+          ('Payment settings','Enable or pause payment providers','admin.payment_methods','⚙'),
+          ('Visitor analytics','Inspect traffic and page visits','admin.visitors','◎'),
+          ('Upgrade reminders','Review eligible Pro nudges','admin.nudges','⌁'),
+          ('Payment claims','Resolve manual payment claims','admin.claims','✓'),
+          ('Manual plan activation','Grant approved plan access','admin.manual_plan','＋'),
+          ('Broadcast email','Prepare and send user announcements','admin.broadcast','➤'),
+          ('Job sources','Approve job feed URLs for Find Jobs','admin.job_sources','⌕')] %}
 <div class="admin-shell space-y-6">
   <section class="admin-hero">
     <div class="relative" style="z-index:1;max-width:680px">
@@ -82,25 +99,9 @@
 
   <section class="grid lg:grid-cols-3 gap-4">
     <div class="admin-panel lg:col-span-2">
-      <div class="admin-panel-head"><div><h3 class="font-bold text-sm">Administration</h3><p class="text-xs text-gray-500 mt-1">Management tools and platform controls</p></div><span class="admin-pill" style="background:#edf4ff;color:#2857a4">14 tools</span></div>
+      <div class="admin-panel-head"><div><h3 class="font-bold text-sm">Administration</h3><p class="text-xs text-gray-500 mt-1">Management tools and platform controls</p></div><span class="admin-pill" style="background:#edf4ff;color:#2857a4">{{ admin_tools|length }} tools</span></div>
       <div class="admin-panel-body grid sm:grid-cols-2 gap-2">
-        {% for label, desc, endpoint, symbol in [
-          ('Growth & conversion','Signups, activation and revenue','admin.growth','↗'),
-          ('Unit economics','Gross collections and variable usage','admin.unit_economics','◫'),
-          ('First-CV funnel','Track start, completion and download','admin.conversion','◫'),
-          ('User management','Search, review and manage accounts','admin.users','♙'),
-          ('Pricing plans','Manage subscriptions and pricing','admin.pricing','◇'),
-          ('Offers & discounts','Configure promotional offers','admin.offers','％'),
-          ('Customer feedback','Review user suggestions','admin.feedback','✉'),
-          ('CV templates','Manage available CV designs','admin.templates','▤'),
-          ('Payments','Review payment transactions','admin.payments','▣'),
-          ('Payment settings','Enable or pause payment providers','admin.payment_methods','⚙'),
-          ('Visitor analytics','Inspect traffic and page visits','admin.visitors','◎'),
-          ('Upgrade reminders','Review eligible Pro nudges','admin.nudges','⌁'),
-          ('Payment claims','Resolve manual payment claims','admin.claims','✓'),
-          ('Manual plan activation','Grant approved plan access','admin.manual_plan','＋'),
-          ('Broadcast email','Prepare and send user announcements','admin.broadcast','➤')
-        ] %}
+        {% for label, desc, endpoint, symbol in admin_tools %}
         <a href="{{ url_for(endpoint) }}" class="admin-link">
           <span class="admin-link-icon" aria-hidden="true">{{ symbol }}</span>
           <span class="min-w-0"><span class="admin-link-title block">{{ label }}</span><span class="admin-link-desc block">{{ desc }}</span></span>

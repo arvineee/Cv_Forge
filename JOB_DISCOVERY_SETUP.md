@@ -1,3 +1,5 @@
+> **Update:** job feed URLs are now managed in the app at **Admin -> Job sources**. Paste a feed URL, it is tested and approved automatically, and listings import immediately. The .env settings described below still work and can be imported with one click.
+
 # CVForge Job Discovery — operator setup
 
 Sprint 007 adds an RSS/Atom vacancy catalogue. It does **not** scrape job-board pages, bypass access controls, or assume that a website offers a public feed. Only feeds you have permission to consume and display should be configured.

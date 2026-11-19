@@ -5,13 +5,10 @@
 | cvforge-nudges | `flask send-nudges` | daily 09:00 |
 | cvforge-cv-reminders | `flask send-cv-reminders` | every 6 hours |
 | cvforge-prune-visits | `flask prune-visits` | Sundays 03:30 |
-<<<<<<< HEAD
 | cvforge-job-feeds *(opt-in)* | `flask sync-job-feeds` | every 4 hours at :15 |
 | cvforge-job-alerts *(opt-in)* | `flask process-job-alerts` | every 4 hours at :30 |
 
 The two job timers are installed but **not enabled** by `install.sh`. Follow `JOB_DISCOVERY_SETUP.md` and `SPRINT_008_JOB_ALERTS.md` (apply migrations, run the dry run) and then run `sudo systemctl enable --now cvforge-job-feeds.timer cvforge-job-alerts.timer`.
-=======
->>>>>>> ee431c06f8596a451011871582c1200fef239ca0
 
 ## Install
 1. Upload this folder to the VPS.

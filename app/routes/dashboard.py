@@ -12,6 +12,24 @@ from app.models import (db, Resume, CoverLetter, ATSReport, AIUsage, Profile,
 dashboard_bp = Blueprint("dashboard", __name__)
 
 
+@dashboard_bp.app_context_processor
+def _shell_helpers():
+    """Lazy counters for the app shell (sidebar badge, bell). The query only
+    runs when a template actually calls nav_counts(), and a failure never
+    breaks a page."""
+    def nav_counts():
+        counts = {"unread": 0}
+        try:
+            if current_user.is_authenticated:
+                counts["unread"] = Notification.query.filter_by(
+                    user_id=current_user.id, is_read=False).filter(
+                    Notification.action_url.like("/career/jobs%")).count()
+        except Exception:
+            db.session.rollback()
+        return counts
+    return {"nav_counts": nav_counts}
+
+
 @dashboard_bp.route("/dashboard")
 @login_required
 def index():
@@ -62,7 +80,24 @@ def index():
             user_id=current_user.id, action="cv_first_download", resource_type="resume"
         ).all()
     }
+    # Job-search snapshot for the dashboard home (read-only aggregates).
+    from datetime import date as _date
+    pipeline = {status: 0 for status in JobApplication.STATUSES}
+    for status, total in (db.session.query(JobApplication.status, db.func.count(JobApplication.id))
+                          .filter_by(user_id=current_user.id).group_by(JobApplication.status).all()):
+        pipeline[status] = total
+    upcoming = (JobApplication.query.filter_by(user_id=current_user.id)
+                .filter(JobApplication.deadline.isnot(None), JobApplication.deadline >= _date.today(),
+                        JobApplication.status.in_(("saved", "applied", "interview")))
+                .order_by(JobApplication.deadline).limit(3).all())
+    latest_jobs = (JobOpportunity.query.filter_by(is_active=True)
+                   .order_by(JobOpportunity.published_at.desc().nullslast(), JobOpportunity.created_at.desc())
+                   .limit(3).all())
+    active_jobs_total = JobOpportunity.query.filter_by(is_active=True).count()
     return render_template("dashboard/index.html",
+                           pipeline=pipeline, pipeline_total=sum(pipeline.values()),
+                           upcoming_deadlines=upcoming, latest_jobs=latest_jobs,
+                           active_jobs_total=active_jobs_total,
                            now_utc=utcnow(),
                            resumes=resumes,
                            unfinished_resumes=unfinished_resumes,

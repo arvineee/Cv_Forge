@@ -1,262 +1,171 @@
 {% extends "base.html" %}
-{% block title %}CVForge: Online CV Builder, Resume Maker & CV Generator{% endblock %}
-{% block meta_description %}Start free: an online CV creator and resume maker with AI. Build an ATS-friendly CV, improve an old resume, write cover letters, download PDF or Word.{% endblock %}
+{% block title %}CVForge: CV Builder, Resume Maker, ATS Checker & Job Search{% endblock %}
+{% block meta_description %}Build an ATS-friendly CV with AI, check your score, write cover letters, find jobs and track every application. Free to start. Pay by M-Pesa or card.{% endblock %}
 {% block structured_data %}
 <script type="application/ld+json">
 {{ jsonld|tojson }}
 </script>
 {% endblock %}
 
-{% block extra_head %}
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=DM+Sans:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
-<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=DM+Sans:wght@400;500;600;700&display=swap"></noscript>
-{% endblock %}
+{% macro icon(path) -%}
+<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="{{ path }}"/></svg>
+{%- endmacro %}
 
 {% block body %}
-<style>
+{% include "_public_nav.html" %}
 
-  .lp {
-    /* Brand colours, taken from the CVForge logo */
-    --navy: #0B3D6B;
-    --navy-deep: #082C4E;
-    --blue: #0F5A9C;
-    --orange: #F08A00;
-    --orange-soft: #FDEBD0;
-    --blue-soft: #E3EEF8;
-    --ink: #0E2238;
-    --ink-2: #51606F;
-    --paper: #FFFFFF;
-    --mist: #F4F7FA;
-    --line: #DCE4EC;
-    font-family: 'DM Sans', system-ui, sans-serif;
-    color: var(--ink);
-    background: var(--paper);
-    -webkit-font-smoothing: antialiased;
-  }
-  .lp h1, .lp h2, .lp h3, .lp .display { font-family: 'Bricolage Grotesque', 'DM Sans', sans-serif; letter-spacing: -0.02em; color: var(--navy); }
-  .lp a:focus-visible, .lp button:focus-visible, .lp summary:focus-visible {
-    outline: 3px solid var(--orange); outline-offset: 3px; border-radius: 6px;
-  }
-  .lp .wrap { max-width: 1160px; margin: 0 auto; padding: 0 20px; }
-  @media (min-width: 640px) { .lp .wrap { padding: 0 32px; } }
-
-  /* Support bubble on this page follows the brand navy */
-  .gradient-brand { background: linear-gradient(135deg, #0B3D6B 0%, #0F5A9C 100%); }
-
-  /* Buttons */
-  .lp .btn {
-    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-    min-height: 48px; padding: 0 24px; border-radius: 999px;
-    font-weight: 600; font-size: 16px; transition: transform .15s, background-color .15s, color .15s;
-    text-decoration: none; cursor: pointer; border: 2px solid transparent;
-  }
-  .lp .btn-primary { background: var(--navy); color: #fff; }
-  .lp .btn-primary:hover { background: var(--navy-deep); transform: translateY(-1px); }
-  .lp .btn-ghost { border-color: var(--navy); color: var(--navy); background: transparent; }
-  .lp .btn-ghost:hover { background: var(--navy); color: #fff; }
-  .lp .btn-accent { background: var(--orange); color: var(--navy-deep); }
-  .lp .btn-accent:hover { background: #FFA11F; transform: translateY(-1px); }
-
-  /* Highlight for the words the AI changed */
-  .lp mark { background: linear-gradient(transparent 14%, rgba(240,138,0,.32) 14%, rgba(240,138,0,.32) 92%, transparent 92%); color: inherit; padding: 0 2px; }
-
-  /* Short orange underline on the main headline phrase */
-  .lp .underline-accent { background: linear-gradient(transparent 88%, var(--orange) 88%); padding-bottom: 2px; }
-
-  /* Hero CV sheet */
-  .lp .sheet {
-    background: #fff; border: 1px solid var(--line); border-radius: 16px;
-    box-shadow: 0 18px 40px -18px rgba(11,61,107,.28);
-  }
-  .lp .toggle {
-    display: inline-flex; padding: 4px; border-radius: 999px; background: var(--mist); border: 1px solid var(--line);
-  }
-  .lp .toggle button {
-    min-height: 40px; padding: 0 16px; border-radius: 999px; font-size: 14px; font-weight: 600; color: var(--ink-2);
-    transition: background-color .2s;
-  }
-  .lp .toggle button[aria-pressed="true"] { background: var(--navy); color: #fff; }
-
-  /* Score ring */
-  .lp .ring { --p: 86; width: 132px; height: 132px; border-radius: 50%;
-    background: conic-gradient(var(--orange) calc(var(--p) * 1%), var(--line) 0);
-    display: grid; place-items: center; }
-  .lp .ring::after { content: attr(data-label); width: 100px; height: 100px; border-radius: 50%; background: #fff; color: var(--navy);
-    display: grid; place-items: center; font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: 34px; }
-
-  .lp .chip { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 12px; border-radius: 999px; font-size: 14px; font-weight: 500; }
-  .lp .chip-ok { background: var(--blue-soft); color: var(--navy); }
-  .lp .chip-miss { background: var(--orange-soft); color: #8A4B00; }
-
-
-  /* Eyebrow label above section headings */
-  .lp .eyebrow { display: inline-flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--blue); margin-bottom: 14px; }
-  .lp .eyebrow::before { content: ""; width: 22px; height: 3px; border-radius: 2px; background: var(--orange); }
-
-  /* Hero collage of real CV template previews */
-  .lp .collage { position: relative; width: 100%; max-width: 540px; aspect-ratio: 1 / 1; margin: 0 auto; }
-  .lp .collage img { position: absolute; height: auto; border-radius: 12px; border: 1px solid var(--line); background: #fff;
-    box-shadow: 0 24px 48px -20px rgba(11,61,107,.35); }
-  .lp .collage .c1 { top: 0; left: 0; width: 62%; transform: rotate(-3deg); z-index: 1; }
-  .lp .collage .c2 { top: 24%; right: 0; width: 62%; transform: rotate(3deg); z-index: 2; }
-  .lp .collage .c3 { top: 43%; left: 13%; width: 74%; z-index: 3; box-shadow: 0 30px 60px -22px rgba(11,61,107,.45); }
-
-  /* Slim trust strip under the hero */
-  .lp .trust { background: var(--mist); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
-  .lp .trust li { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 15px; color: var(--navy); }
-
-  /* Template showcase cards */
-  .lp .tpl-card { display: block; text-decoration: none; }
-  .lp .tpl-card img { width: 100%; height: auto; border-radius: 12px; border: 1px solid var(--line); background: #fff;
-    box-shadow: 0 10px 24px -14px rgba(11,61,107,.35); transition: transform .2s, box-shadow .2s; }
-  .lp .tpl-card:hover img { transform: translateY(-4px); box-shadow: 0 18px 32px -16px rgba(11,61,107,.45); }
-  @media (prefers-reduced-motion: reduce) { .lp .tpl-card img { transition: none; } }
-
-  /* Feature cards */
-  .lp .feature { background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 32px; position: relative; }
-  .lp .feature::before { content: ""; position: absolute; top: 0; left: 32px; width: 36px; height: 4px; border-radius: 0 0 4px 4px; background: var(--orange); }
-
-  /* Pricing grid adapts to however many plans exist */
-  .lp .plans { display: grid; gap: 20px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
-
-  .lp details > summary { list-style: none; cursor: pointer; }
-  .lp details > summary::-webkit-details-marker { display: none; }
-  .lp details[open] .plus { transform: rotate(45deg); }
-  .lp .plus { transition: transform .2s; color: var(--orange); }
-
-  /* One orchestrated entrance: the hero sheet */
-  @keyframes lp-settle { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
-  .lp .settle { animation: lp-settle .7s cubic-bezier(.2,.8,.2,1) both; }
-  @media (prefers-reduced-motion: reduce) {
-    .lp .settle { animation: none; }
-    .lp .btn, .lp .plus { transition: none; }
-  }
-  [x-cloak] { display: none !important; }
-</style>
-
-<div class="lp">
-
-<!-- NAV -->
-<header class="sticky top-0 z-50" style="background: rgba(255,255,255,.95); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line);"
-        x-data="{ open: false }" @keydown.escape.window="open = false" @click.outside="open = false">
-  <div class="wrap flex items-center justify-between" style="min-height: 72px;">
-    <a href="{{ url_for('main.index') }}" class="flex items-center" style="min-height: 48px;" aria-label="CVForge home">
-      <img src="{{ url_for('static', filename='logo-nav.webp') }}" alt="CVForge" width="116" height="45" style="height: 45px; width: auto;"/>
-    </a>
-
-    <nav class="hidden md:flex items-center gap-8" style="font-weight: 500; color: var(--ink-2);" aria-label="Main">
-      <a href="#how" class="hover:underline">How it works</a>
-      <a href="{{ url_for('templates_gallery.index') }}" class="hover:underline">Templates</a>
-      <a href="{{ url_for('main.pricing') }}" class="hover:underline">Pricing</a>
-      <a href="{{ url_for('main.about') }}" class="hover:underline">About</a>
-    </nav>
-
-    <div class="flex items-center gap-2">
-      {% if current_user.is_authenticated %}
-      <a href="{{ url_for('dashboard.index') }}" class="btn btn-primary" style="min-height: 44px;">Dashboard</a>
-      {% else %}
-      <a href="{{ url_for('auth.login') }}" class="hidden sm:inline-flex items-center px-3" style="min-height: 44px; font-weight: 600; color: var(--navy);">Sign in</a>
-      <a href="{{ url_for('auth.register') }}" class="btn btn-primary" style="min-height: 44px; padding: 0 20px;">Start free</a>
-      {% endif %}
-      <button type="button" class="md:hidden inline-flex items-center justify-center" style="min-width: 44px; min-height: 44px; color: var(--navy);"
-              @click="open = !open" :aria-expanded="open.toString()" aria-controls="mobile-menu" aria-label="Toggle menu">
-        <svg x-show="!open" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
-        <svg x-show="open" x-cloak class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M6 6l12 12M18 6L6 18"/></svg>
-      </button>
-    </div>
-  </div>
-
-  <div id="mobile-menu" x-show="open" x-cloak class="md:hidden wrap pb-3" style="border-top: 1px solid var(--line); background: #fff;">
-    <ul class="flex flex-col" style="font-weight: 500;">
-      <li><a href="#how" @click="open = false" class="flex items-center" style="min-height: 48px; border-bottom: 1px solid var(--line);">How it works</a></li>
-      <li><a href="{{ url_for('templates_gallery.index') }}" class="flex items-center" style="min-height: 48px; border-bottom: 1px solid var(--line);">Templates</a></li>
-      <li><a href="{{ url_for('main.pricing') }}" class="flex items-center" style="min-height: 48px; border-bottom: 1px solid var(--line);">Pricing</a></li>
-      <li><a href="{{ url_for('main.about') }}" class="flex items-center" style="min-height: 48px;">About</a></li>
-      {% if not current_user.is_authenticated %}
-      <li><a href="{{ url_for('auth.login') }}" class="flex items-center" style="min-height: 48px; border-top: 1px solid var(--line);">Sign in</a></li>
-      {% endif %}
-    </ul>
-  </div>
-</header>
-
-<main>
+<main id="main-content">
 
 <!-- HERO -->
-<section style="background: linear-gradient(180deg, #F4F7FA 0%, #FFFFFF 100%); overflow: hidden;">
-  <div class="wrap grid lg:grid-cols-[1.05fr_1fr] gap-12 items-center" style="padding-top: 64px; padding-bottom: 80px;">
+<section class="hero-bg" style="overflow: hidden;">
+  <div class="wrap grid lg:grid-cols-[1.05fr_1fr] gap-12 items-center" style="padding-top: 56px; padding-bottom: 72px;">
     <div>
-      <p class="eyebrow">Online CV &amp; resume builder</p>
-      <h1 style="font-weight: 800; font-size: clamp(2.3rem, 5.2vw, 3.8rem); line-height: 1.07;">
-        Build a CV That Gets You Noticed, <span class="underline-accent">Wherever You Want to Work.</span>
+      <p class="eyebrow">CV builder · Job search · Career tools</p>
+      <h1 class="h-display h-xl" style="margin-top: 16px;">
+        Your whole job search, <span class="underline-accent">in one place.</span>
       </h1>
-      <p style="font-size: 19px; line-height: 1.6; color: var(--ink-2); max-width: 31em; margin-top: 24px;">
-        Create a professional, ATS-friendly CV or resume, improve the one you already have, match it to a job description and write a tailored cover letter. Download it as a PDF or Word file.
+      <p class="lead" style="max-width: 32em; margin-top: 22px;">
+        Build an ATS-friendly CV or resume, check it against the job, write a tailored cover letter, find vacancies and keep every application on track. Download as PDF or Word.
       </p>
-      <ul style="margin-top: 20px; display: grid; gap: 8px; padding: 0; list-style: none; font-size: 16px; color: var(--ink);">
-        {% for item in ['Professional CV and resume creation', 'ATS-friendly optimisation and rewriting', 'Job description matching and cover letters'] %}
+      <ul style="margin-top: 22px; display: grid; gap: 9px; padding: 0; list-style: none; font-size: 16px; color: var(--ink);">
+        {% for item in ['Professional CV and resume creation with AI help', 'Job matching, ATS checks and cover letters', 'Job discovery, alerts and an application tracker'] %}
         <li class="flex items-start gap-3"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none" style="flex:none; margin-top: 2px;"><circle cx="10" cy="10" r="10" fill="#FDEBD0"/><path d="M5.5 10.5l3 3 6-6.5" stroke="#0B3D6B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>{{ item }}</span></li>
         {% endfor %}
       </ul>
       <div class="flex flex-col sm:flex-row gap-3" style="margin-top: 32px;">
-        <a href="{{ url_for('auth.register') }}" class="btn btn-primary">Build my CV free</a>
-        <a href="{{ url_for('templates_gallery.index') }}" class="btn btn-ghost">Browse templates</a>
+        <a href="{{ url_for('auth.register') }}" class="btn btn-accent btn-lg">Build my CV free</a>
+        <a href="{{ url_for('free_ats.checker') }}" class="btn btn-ghost btn-lg">Try the free ATS checker</a>
       </div>
       <p style="margin-top: 16px; font-size: 14px; color: var(--ink-2);">Build and preview free. Choose a plan when you want to download. Pay by debit or credit card (Paystack), or M-Pesa in Kenya.</p>
     </div>
 
-    <!-- Real template previews -->
-    <div class="collage settle">
+    <div class="collage settle" aria-hidden="false">
       <img class="c1" src="{{ url_for('static', filename='templates/modern-blue.webp') }}" alt="" width="480" height="372"/>
       <img class="c2" src="{{ url_for('static', filename='templates/timeline-teal.webp') }}" alt="" width="480" height="372"/>
       <img class="c3" src="{{ url_for('static', filename='templates/sidebar-navy.webp') }}" alt="Example CV made with the Sidebar Navy template" width="480" height="372" fetchpriority="high"/>
+      <div class="float-chip" style="top: 6%; right: 2%;" aria-hidden="true">
+        <span class="icon-tile tone-green" style="width: 32px; height: 32px; border-radius: 10px;">{{ icon('M5 13l4 4L19 7') }}</span>
+        <span>ATS match example<br><small style="font-weight: 500; color: var(--ink-2);">Strong · 86 / 100</small></span>
+      </div>
+      <div class="float-chip" style="bottom: 4%; left: -2%;" aria-hidden="true">
+        <span class="icon-tile tone-orange" style="width: 32px; height: 32px; border-radius: 10px;">{{ icon('M18 8a6 6 0 00-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9m-8 12a2 2 0 004 0') }}</span>
+        <span>Job alerts<br><small style="font-weight: 500; color: var(--ink-2);">Matching vacancies, in your inbox</small></span>
+      </div>
     </div>
   </div>
 </section>
 
-<!-- TRUST STRIP -->
-<section class="trust" aria-label="Highlights">
-  <ul class="wrap grid grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-4" style="padding-top: 22px; padding-bottom: 22px; list-style: none; margin: 0 auto;">
-    <li><svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none" style="flex:none;"><circle cx="10" cy="10" r="10" fill="#FDEBD0"/><path d="M5.5 10.5l3 3 6-6.5" stroke="#0B3D6B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>ATS-friendly CV &amp; resume layouts</li>
-    <li><svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none" style="flex:none;"><circle cx="10" cy="10" r="10" fill="#FDEBD0"/><path d="M5.5 10.5l3 3 6-6.5" stroke="#0B3D6B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>PDF and Word (DOCX) downloads</li>
-    <li><svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none" style="flex:none;"><circle cx="10" cy="10" r="10" fill="#FDEBD0"/><path d="M5.5 10.5l3 3 6-6.5" stroke="#0B3D6B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Secure card payments via Paystack</li>
-    <li><svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none" style="flex:none;"><circle cx="10" cy="10" r="10" fill="#FDEBD0"/><path d="M5.5 10.5l3 3 6-6.5" stroke="#0B3D6B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>M-Pesa available in Kenya</li>
-  </ul>
+<!-- STAT STRIP -->
+<section aria-label="Highlights" style="margin-top: -8px;">
+  <div class="wrap">
+    <div class="stat-strip">
+      <div><b>20</b><span>ATS-friendly CV &amp; resume templates</span></div>
+      <div><b>PDF + Word</b><span>Downloads, Word on eligible plans</span></div>
+      <div><b>Free to start</b><span>Build and preview before you pay</span></div>
+      <div><b>M-Pesa &amp; cards</b><span>Secure checkout, prices in KES</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURE BENTO -->
+<section id="features" class="section">
+  <div class="wrap">
+    <div style="max-width: 40em;">
+      <p class="eyebrow">What you can do</p>
+      <h2 class="h-display h-lg" style="margin-top: 14px;">Everything between &ldquo;I need a new job&rdquo; and &ldquo;Application sent&rdquo;</h2>
+      <p class="lead" style="margin-top: 16px;">One account covers the document, the match, the vacancy and the follow-up, so you stop juggling tabs and spreadsheets.</p>
+    </div>
+
+    <div class="bento reveal" style="margin-top: 44px;">
+      <article class="bento-card dark b-4">
+        <span class="icon-tile">{{ icon('M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z') }}</span>
+        <h3>Job discovery</h3>
+        <p>Search vacancies from sources we have reviewed, filter by country and location, then save the ones you like straight to your workspace. Every listing links back to the original publisher.</p>
+        <a href="{{ url_for('dashboard.job_discovery') }}" class="btn btn-accent btn-sm" style="margin-top: 18px;">Find jobs</a>
+      </article>
+      <article class="bento-card b-2">
+        <span class="icon-tile tone-violet">{{ icon('M8 7h12M8 12h12M8 17h12M4 7h.01M4 12h.01M4 17h.01') }}</span>
+        <h3>Application tracker</h3>
+        <p>Saved, applied, interview, offer. Deadlines, notes and the CV you used, all in one pipeline.</p>
+      </article>
+
+      <article class="bento-card b-2">
+        <span class="icon-tile tone-blue">{{ icon('M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z') }}</span>
+        <h3>Professional CV and resume creation</h3>
+        <p>A guided builder walks you through details, experience, education and skills, one section at a time.</p>
+      </article>
+      <article class="bento-card b-2">
+        <span class="icon-tile tone-orange">{{ icon('M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z') }}</span>
+        <h3>Resume improvement and rewriting</h3>
+        <p>Upload a PDF or DOCX. The AI rewrites weak bullets using only the facts you give it.</p>
+      </article>
+      <article class="bento-card b-2">
+        <span class="icon-tile tone-green">{{ icon('M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z') }}</span>
+        <h3>ATS-friendly optimisation</h3>
+        <p>Clean layouts and clear headings help screening software read your document. The checker shows what to fix.</p>
+      </article>
+
+      <article class="bento-card b-3">
+        <span class="icon-tile tone-teal">{{ icon('M9 5h6m-6 4h6m-6 4h3m-7 7h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z') }}</span>
+        <h3>Job description matching</h3>
+        <p>Paste a posting to see which keywords you cover, which are missing and how to adjust your wording, or match your CV to a saved vacancy in one click.</p>
+      </article>
+      <article class="bento-card b-3">
+        <span class="icon-tile tone-rose">{{ icon('M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z') }}</span>
+        <h3>Professional cover letters</h3>
+        <p>Generate a cover letter written for one role and company, set the tone, then edit it before you send it.</p>
+      </article>
+
+      <article class="bento-card b-2">
+        <span class="icon-tile tone-orange">{{ icon('M18 8a6 6 0 00-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9m-8 12a2 2 0 004 0') }}</span>
+        <h3>Job alerts</h3>
+        <p>Save a search and get notified when a new vacancy matches it.</p>
+      </article>
+      <article class="bento-card b-2">
+        <span class="icon-tile tone-blue">{{ icon('M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4') }}</span>
+        <h3>PDF and Word downloads</h3>
+        <p>A clean PDF for employers. Word (DOCX) files on eligible plans if you want to keep editing.</p>
+      </article>
+      <article class="bento-card b-2">
+        <span class="icon-tile tone-violet">{{ icon('M13 10V3L4 14h7v7l9-11h-7z') }}</span>
+        <h3>AI Career Coach</h3>
+        <p>On Premium, get a direct line-by-line critique of your finished CV and exactly how to fix it.</p>
+      </article>
+    </div>
+  </div>
 </section>
 
 <!-- BEFORE / AFTER -->
-<section style="padding: 96px 0;">
+<section class="section section-mist">
   <div class="wrap grid lg:grid-cols-2 gap-14 items-center">
-    <div>
+    <div class="reveal">
       <p class="eyebrow">The difference</p>
-      <h2 style="font-weight: 800; font-size: clamp(2rem, 4vw, 3rem); line-height: 1.08;">Same experience, written to be read</h2>
-      <p style="font-size: 18px; line-height: 1.65; color: var(--ink-2); margin-top: 20px; max-width: 30em;">
+      <h2 class="h-display h-lg" style="margin-top: 14px;">Same experience, written to be read</h2>
+      <p class="lead" style="margin-top: 20px; max-width: 30em;">
         Many CVs and resumes undersell good work. CVForge keeps your facts and rewrites them with the scope, numbers and results a recruiter looks for. Where a number is missing, it leaves a placeholder for you to fill in rather than inventing one.
       </p>
     </div>
 
-    <div x-data="{ ai: false }">
+    <div x-data="{ ai: false }" class="reveal">
       <div class="flex items-center justify-between flex-wrap gap-3" style="margin-bottom: 16px;">
-        <span style="font-weight: 600; font-size: 15px; color: var(--navy);">Try it: one bullet, two versions</span>
+        <span style="font-weight: 600; font-size: 15px; color: var(--navy-800);">Try it: one bullet, two versions</span>
         <div class="toggle" role="group" aria-label="Compare versions">
           <button type="button" :aria-pressed="(!ai).toString()" @click="ai = false">Your draft</button>
           <button type="button" :aria-pressed="ai.toString()" @click="ai = true">After CVForge</button>
         </div>
       </div>
-
       <div class="sheet" style="padding: 28px;">
         <div style="border-bottom: 1px solid var(--line); padding-bottom: 16px; margin-bottom: 18px;">
-          <p class="display" style="font-weight: 800; font-size: 24px;">Alex M. Morgan</p>
+          <p class="display" style="font-weight: 800; font-size: 24px; color: var(--navy-800);">Alex M. Morgan</p>
           <p style="color: var(--ink-2); font-size: 15px;">Sales Supervisor · Manchester</p>
         </div>
-        <p style="font-weight: 700; font-size: 14px; margin-bottom: 10px; color: var(--navy);">Experience</p>
+        <p style="font-weight: 700; font-size: 14px; margin-bottom: 10px; color: var(--navy-800);">Experience</p>
         <div style="min-height: 132px;" aria-live="polite">
           <p x-show="!ai" style="line-height: 1.65; font-size: 16px;">
             &bull; Was in charge of sales at the shop and helped the team do better. Handled customers and stock.
           </p>
           <p x-show="ai" x-cloak style="line-height: 1.65; font-size: 16px;">
-            &bull; <mark>Led a team of 6</mark> across 3 branches, <mark>growing monthly sales 32%</mark> in 8 months while <mark>cutting stock-outs by a quarter</mark> through weekly reorder checks.
+            &bull; <mark class="hl">Led a team of 6</mark> across 3 branches, <mark class="hl">growing monthly sales 32%</mark> in 8 months while <mark class="hl">cutting stock-outs by a quarter</mark> through weekly reorder checks.
           </p>
         </div>
         <p x-show="ai" x-cloak style="font-size: 13px; color: var(--ink-2); margin-top: 12px;">Example for illustration. The highlighted parts are what the rewrite added.</p>
@@ -267,54 +176,50 @@
 </section>
 
 <!-- ATS CHECK -->
-<section style="background: var(--mist); padding: 96px 0;">
+<section class="section">
   <div class="wrap grid lg:grid-cols-2 gap-14 items-center">
-    <div>
+    <div class="reveal">
       <p class="eyebrow">ATS check &amp; job matching</p>
-      <h2 style="font-weight: 800; font-size: clamp(2rem, 4vw, 3rem); line-height: 1.08;">Know how your CV scores against the job before you apply</h2>
-      <p style="font-size: 18px; line-height: 1.65; color: var(--ink-2); margin-top: 20px; max-width: 30em;">
-        Many employers filter applications with applicant tracking software. Paste the job description and CVForge shows which keywords you already cover, which you're missing, and what to change. The score is a guide, not a guarantee.
+      <h2 class="h-display h-lg" style="margin-top: 14px;">Know how your CV scores against the job before you apply</h2>
+      <p class="lead" style="margin-top: 20px; max-width: 30em;">
+        Many employers filter applications with applicant tracking software. Paste the job description and CVForge shows which keywords you already cover, which you are missing, and what to change. The score is a guide, not a guarantee.
       </p>
-      <a href="{{ url_for('auth.register') }}" class="btn btn-ghost" style="margin-top: 28px;">Check my CV</a>
+      <div class="flex flex-wrap gap-3" style="margin-top: 28px;">
+        <a href="{{ url_for('free_ats.checker') }}" class="btn btn-primary">Try the free checker</a>
+        <a href="{{ url_for('auth.register') }}" class="btn btn-ghost">Check my CV</a>
+      </div>
     </div>
-
-    <div class="sheet" style="padding: 28px;">
+    <div class="sheet reveal" style="padding: 28px;">
       <div class="flex items-center gap-6 flex-wrap">
         <div class="ring" style="--p: 86;" data-label="86" role="img" aria-label="Example match score: 86 out of 100"></div>
         <div>
-          <p class="display" style="font-weight: 800; font-size: 22px;">Strong match</p>
+          <p class="display" style="font-weight: 800; font-size: 22px; color: var(--navy-800);">Strong match</p>
           <p style="color: var(--ink-2); font-size: 15px;">Example: Sales Supervisor posting</p>
         </div>
       </div>
-      <p style="font-weight: 600; font-size: 14px; margin: 24px 0 10px; color: var(--navy);">Found in your CV</p>
+      <p style="font-weight: 600; font-size: 14px; margin: 24px 0 10px; color: var(--navy-800);">Found in your CV</p>
       <div class="flex flex-wrap gap-2">
-        <span class="chip chip-ok">Team leadership</span>
-        <span class="chip chip-ok">Inventory control</span>
-        <span class="chip chip-ok">Customer service</span>
-        <span class="chip chip-ok">Sales targets</span>
+        <span class="chip chip-ok">Team leadership</span><span class="chip chip-ok">Inventory control</span>
+        <span class="chip chip-ok">Customer service</span><span class="chip chip-ok">Sales targets</span>
       </div>
-      <p style="font-weight: 600; font-size: 14px; margin: 20px 0 10px; color: var(--navy);">Missing from your CV</p>
-      <div class="flex flex-wrap gap-2">
-        <span class="chip chip-miss">Merchandising</span>
-        <span class="chip chip-miss">POS systems</span>
-      </div>
+      <p style="font-weight: 600; font-size: 14px; margin: 20px 0 10px; color: var(--navy-800);">Missing from your CV</p>
+      <div class="flex flex-wrap gap-2"><span class="chip chip-miss">Merchandising</span><span class="chip chip-miss">POS systems</span></div>
     </div>
   </div>
 </section>
 
-<!-- TEMPLATES SHOWCASE -->
-<section style="padding: 96px 0;">
+<!-- TEMPLATES -->
+<section class="section section-mist">
   <div class="wrap">
     <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
       <div style="max-width: 34em;">
         <p class="eyebrow">Templates</p>
-        <h2 style="font-weight: 800; font-size: clamp(2rem, 4vw, 3rem); line-height: 1.08;">Layouts recruiters can read in seconds</h2>
-        <p style="font-size: 18px; line-height: 1.6; color: var(--ink-2); margin-top: 16px;">Pick a design, fill in your details, and switch templates any time without retyping.</p>
+        <h2 class="h-display h-lg" style="margin-top: 14px;">Layouts recruiters can read in seconds</h2>
+        <p class="lead" style="margin-top: 16px;">Pick a design, fill in your details, and switch templates any time without retyping.</p>
       </div>
       <a href="{{ url_for('templates_gallery.index') }}" class="btn btn-ghost" style="flex: none;">Browse all templates</a>
     </div>
-
-    <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-6" style="margin-top: 48px;">
+    <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 reveal" style="margin-top: 44px;">
       {% for file, name, kind in [
         ('sidebar-navy.webp', 'Sidebar Navy', 'Two-column'),
         ('modern-blue.webp', 'Modern Blue', 'Single column'),
@@ -323,7 +228,7 @@
       ] %}
       <a href="{{ url_for('templates_gallery.index') }}" class="tpl-card">
         <img src="{{ url_for('static', filename='templates/' ~ file) }}" alt="{{ name }} CV template preview" width="480" height="372" loading="lazy"/>
-        <p style="font-weight: 700; font-size: 17px; color: var(--navy); margin-top: 14px;">{{ name }}</p>
+        <p style="font-weight: 700; font-size: 17px; color: var(--navy-800); margin-top: 14px;">{{ name }}</p>
         <p style="font-size: 14px; color: var(--ink-2);">{{ kind }}</p>
       </a>
       {% endfor %}
@@ -331,107 +236,43 @@
   </div>
 </section>
 
-<!-- FEATURES -->
-<section style="background: var(--mist); padding: 96px 0;">
-  <div class="wrap">
-    <p class="eyebrow">What you can do</p>
-    <h2 style="font-weight: 800; font-size: clamp(2rem, 4vw, 3rem); line-height: 1.08; max-width: 15em;">Everything between &ldquo;I need a new job&rdquo; and &ldquo;Application sent&rdquo;</h2>
-
-    <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-5" style="margin-top: 48px;">
-      {% for title, desc in [
-        ('Professional CV and resume creation', 'A guided builder walks you through your details, experience, education and skills. Choose from 20 templates and switch any time without retyping.'),
-        ('ATS-friendly optimisation', 'Clean layouts and clear section headings help screening software read your document. The ATS checker shows what to fix.'),
-        ('Resume improvement and rewriting', 'Upload a PDF or DOCX, or paste your work history. The AI rewrites weak bullets using only the facts you give it.'),
-        ('Job description matching', 'Paste a job posting to see which keywords you cover, which are missing and how to adjust your wording.'),
-        ('Professional cover letters', 'Generate a letter written for one specific role and company, then edit it before you send it.'),
-        ('PDF and Word downloads', 'Download a clean PDF to send to employers. Word (DOCX) files are included on eligible plans if you want to keep editing.'),
-      ] %}
-      <div class="feature">
-        <h3 style="font-weight: 800; font-size: 21px; margin-top: 8px;">{{ title }}</h3>
-        <p style="font-size: 16px; line-height: 1.6; margin-top: 12px; color: var(--ink-2);">{{ desc }}</p>
-      </div>
-      {% endfor %}
-    </div>
-  </div>
-</section>
-
-<!-- ONE TOOL, EVERY NAME (CV maker / resume maker / generator) -->
-<section style="padding: 96px 0;">
-  <div class="wrap">
-    <p class="eyebrow">CV maker and resume maker</p>
-    <h2 style="font-weight: 800; font-size: clamp(2rem, 4vw, 3rem); line-height: 1.08; max-width: 16em;">A CV creator, resume maker and CV generator in one place</h2>
-    <p style="font-size: 18px; line-height: 1.65; margin-top: 18px; max-width: 40em; color: var(--ink-2);">
-      Whether you search for a CV maker, a resume builder or a resume generator, you get the same thing: a guided online tool that turns your details into a clean, professional document you can send today.
-    </p>
-
-    <div class="grid md:grid-cols-3 gap-5" style="margin-top: 40px;">
-      {% for title, desc in [
-        ('CV maker and CV creator', 'Make a CV online from scratch with a step-by-step builder, or upload the one you already have. Choose from 20 templates and download a PDF.'),
-        ('Resume maker and resume builder', 'Create a resume in the format employers expect, with clear section headings and a layout that screening software can read.'),
-        ('AI CV generator and resume generator', 'Let the AI draft your summary and experience bullets from the facts you give it, then edit every line. It never invents jobs or qualifications.'),
-      ] %}
-      <div class="feature">
-        <h3 style="font-weight: 800; font-size: 21px; margin-top: 8px;">{{ title }}</h3>
-        <p style="font-size: 16px; line-height: 1.6; margin-top: 12px; color: var(--ink-2);">{{ desc }}</p>
-      </div>
-      {% endfor %}
-    </div>
-
-    <p style="margin-top: 32px; font-size: 16px; line-height: 1.8; color: var(--ink-2);">
-      Explore:
-      <a href="{{ url_for('free_ats.checker') }}" style="color: var(--blue); font-weight: 600;">free ATS resume checker</a> &middot;
-      <a href="{{ url_for('cv_examples.index') }}" style="color: var(--blue); font-weight: 600;">CV examples</a> &middot;
-      <a href="{{ url_for('templates_gallery.index') }}" style="color: var(--blue); font-weight: 600;">CV and resume templates</a> &middot;
-      <a href="{{ url_for('main.pricing') }}" style="color: var(--blue); font-weight: 600;">CV maker pricing</a> &middot;
-      <a href="{{ url_for('guide.index') }}" style="color: var(--blue); font-weight: 600;">how to make a CV online</a> &middot;
-      <a href="{{ url_for('auth.register') }}" style="color: var(--blue); font-weight: 600;">create your free account</a>
-    </p>
-  </div>
-</section>
-
 <!-- HOW IT WORKS -->
-<section id="how" style="padding: 96px 0;">
+<section id="how" class="section">
   <div class="wrap">
-    <p class="eyebrow">How it works</p>
-      <h2 style="font-weight: 800; font-size: clamp(2rem, 4vw, 3rem); line-height: 1.08;">From blank page to finished CV in three steps</h2>
-    <ol class="grid md:grid-cols-3 gap-10" style="margin-top: 52px; list-style: none; padding: 0;">
-      {% for num, title, desc in [
-        ('1', 'Add your details', 'Fill in the guided builder, or start from what you already have.'),
-        ('2', 'Improve and match', 'The AI rewrites your content, compares it with the job description and flags keywords a screener could miss.'),
-        ('3', 'Preview, then download', 'Build and preview free. Choose a plan to download a clean PDF, with Word (DOCX) on eligible plans.'),
-      ] %}
-      <li>
-        <span class="display" style="display: grid; place-items: center; width: 52px; height: 52px; border-radius: 50%; background: var(--navy); color: #fff; font-weight: 800; font-size: 22px;">{{ num }}</span>
-        <h3 style="font-weight: 700; font-size: 22px; margin-top: 20px;">{{ title }}</h3>
-        <p style="color: var(--ink-2); line-height: 1.6; margin-top: 8px; max-width: 22em;">{{ desc }}</p>
-      </li>
-      {% endfor %}
-    </ol>
+    <div style="max-width: 36em;">
+      <p class="eyebrow">How it works</p>
+      <h2 class="h-display h-lg" style="margin-top: 14px;">From blank page to application sent in three steps</h2>
+    </div>
+    <div class="steps reveal" style="margin-top: 44px;">
+      <div class="step"><h3 class="display" style="font-weight: 800; font-size: 21px; color: var(--navy-800);">Build or upload your CV</h3><p style="color: var(--ink-2); line-height: 1.6; margin-top: 10px;">Answer a few guided questions, or upload the CV you already have and let the AI tighten it. Preview it free.</p></div>
+      <div class="step"><h3 class="display" style="font-weight: 800; font-size: 21px; color: var(--navy-800);">Match it to a real job</h3><p style="color: var(--ink-2); line-height: 1.6; margin-top: 10px;">Find a vacancy or paste one in, check your ATS score, fix the gaps and generate a cover letter for that role.</p></div>
+      <div class="step"><h3 class="display" style="font-weight: 800; font-size: 21px; color: var(--navy-800);">Apply and keep track</h3><p style="color: var(--ink-2); line-height: 1.6; margin-top: 10px;">Download your PDF or Word file, apply on the employer's site, and log it in your workspace with its deadline.</p></div>
+    </div>
   </div>
 </section>
 
 <!-- PRICING -->
-<section style="background: var(--mist); padding: 96px 0;">
+<section class="section section-mist">
   <div class="wrap">
     <div style="max-width: 36em;">
       <p class="eyebrow">Pricing</p>
-      <h2 style="font-weight: 800; font-size: clamp(2rem, 4vw, 3rem); line-height: 1.08;">Start free. Pay only if you need more.</h2>
-      <p style="font-size: 18px; color: var(--ink-2); margin-top: 16px;">Pay by debit or credit card through Paystack, or by M-Pesa in Kenya, for the period shown. Prices are in Kenyan shillings (KES). Plans do not renew automatically.</p>
+      <h2 class="h-display h-lg" style="margin-top: 14px;">Start free. Pay only if you need more.</h2>
+      <p class="lead" style="margin-top: 16px;">Pay by debit or credit card through Paystack, or by M-Pesa in Kenya, for the period shown. Prices are in Kenyan shillings (KES). Plans do not renew automatically.</p>
     </div>
 
     <div class="plans" style="margin-top: 48px;">
       {% for plan in plans %}
-      <div class="relative" style="background: #fff; border-radius: 20px; padding: 32px;
-           border: {% if plan.is_popular %}2px solid var(--navy){% else %}1px solid var(--line){% endif %};">
+      <div class="relative" style="background: #fff; border-radius: 20px; padding: 32px; box-shadow: {% if plan.is_popular %}var(--shadow){% else %}var(--shadow-sm){% endif %};
+           border: {% if plan.is_popular %}2px solid var(--navy-800){% else %}1px solid var(--line){% endif %};">
         {% if plan.is_popular %}
-        <span style="position: absolute; top: -14px; left: 28px; background: var(--orange); color: var(--navy-deep); font-weight: 700; font-size: 13px; padding: 5px 14px; border-radius: 999px;">Most popular</span>
+        <span style="position: absolute; top: -14px; left: 28px; background: var(--orange-500); color: var(--navy-950); font-weight: 700; font-size: 13px; padding: 5px 14px; border-radius: 999px;">Most popular</span>
         {% endif %}
-        <p style="font-weight: 700; font-size: 20px; color: var(--navy);">{{ plan.name }}</p>
+        <p style="font-weight: 700; font-size: 20px; color: var(--navy-800);">{{ plan.name }}</p>
         <p style="margin: 12px 0 20px;">
           {% if plan.price_kes == 0 %}
-          <span class="display" style="font-weight: 800; font-size: 40px;">Free</span>
+          <span class="display" style="font-weight: 800; font-size: 40px; color: var(--navy-800);">Free</span>
           {% else %}
-          {% if plan.live_offer %}<span style="display:block; font-size: 18px; color: var(--ink-2); text-decoration: line-through;">KES {{ plan.base_price }}</span>{% endif %}<span class="display" style="font-weight: 800; font-size: 40px;">KES {{ plan.display_price }}</span>
+          {% if plan.live_offer %}<span style="display:block; font-size: 18px; color: var(--ink-2); text-decoration: line-through;">KES {{ plan.base_price }}</span>{% endif %}<span class="display" style="font-weight: 800; font-size: 40px; color: var(--navy-800);">KES {{ plan.display_price }}</span>
           <span style="color: var(--ink-2);">/{{ plan.billing_period }}</span>
           {% endif %}
         </p>
@@ -449,22 +290,22 @@
     </div>
 
     <div style="margin-top: 32px;">{% include "_payment_methods.html" %}</div>
-
-    <p style="margin-top: 28px;"><a href="{{ url_for('main.pricing') }}" class="underline" style="font-weight: 600; color: var(--navy);">Compare every feature</a></p>
+    <p style="margin-top: 28px;"><a href="{{ url_for('main.pricing') }}" class="underline" style="font-weight: 600; color: var(--navy-800);">Compare every feature</a></p>
   </div>
 </section>
 
 <!-- FAQ -->
-<section style="padding: 96px 0;">
+<section class="section">
   <div class="wrap grid lg:grid-cols-[1fr_1.4fr] gap-14">
     <div>
       <p class="eyebrow">FAQ</p>
-      <h2 style="font-weight: 800; font-size: clamp(2rem, 4vw, 3rem); line-height: 1.08;">Questions before you start</h2>
+      <h2 class="h-display h-lg" style="margin-top: 14px;">Questions before you start</h2>
+      <p class="lead" style="margin-top: 14px;">Still unsure? <a href="{{ url_for('support.index') }}" class="underline" style="color: var(--navy-800); font-weight: 600;">Ask our support assistant</a>.</p>
     </div>
-    <div style="border-top: 1px solid var(--line);">
+    <div class="faq" style="border-top: 1px solid var(--line);">
       {% for q, a in faqs %}
-      <details style="border-bottom: 1px solid var(--line);">
-        <summary class="flex items-center justify-between gap-4" style="min-height: 64px; font-weight: 600; font-size: 18px; padding: 12px 0; color: var(--navy);">
+      <details>
+        <summary class="flex items-center justify-between gap-4" style="min-height: 64px; font-weight: 600; font-size: 18px; padding: 12px 0; color: var(--navy-800);">
           {{ q }}
           <span class="plus display" style="font-size: 28px; line-height: 1; flex: none;" aria-hidden="true">+</span>
         </summary>
@@ -476,54 +317,18 @@
 </section>
 
 <!-- FINAL CTA -->
-<section style="background: var(--navy); color: #fff; padding: 88px 0;">
-  <div class="wrap" style="text-align: left;">
-    <h2 style="font-weight: 800; font-size: clamp(2.2rem, 5vw, 3.4rem); line-height: 1.06; max-width: 14em; color: #fff;">The closing date won't move. Your CV can be ready today.</h2>
-    <p style="margin-top: 16px; font-size: 18px; color: #D6E4F2; max-width: 32em;">Create your account, build and preview your CV for free, and choose a plan only when you are ready to download.</p>
-    <a href="{{ url_for('auth.register') }}" class="btn btn-accent" style="margin-top: 32px;">Build my CV free</a>
+<section class="cta-band" style="padding: 88px 0;">
+  <div class="wrap">
+    <h2 class="h-display" style="font-size: clamp(2.1rem, 5vw, 3.3rem); color: #fff; max-width: 14em;">The closing date won't move. Your CV can be ready today.</h2>
+    <p style="margin-top: 16px; font-size: 18px; color: #d6e4f2; max-width: 32em;">Create your account, build and preview your CV for free, and choose a plan only when you are ready to download.</p>
+    <div class="flex flex-col sm:flex-row gap-3" style="margin-top: 30px;">
+      <a href="{{ url_for('auth.register') }}" class="btn btn-accent btn-lg">Build my CV free</a>
+      <a href="{{ url_for('templates_gallery.index') }}" class="btn btn-lg" style="color: #fff; border-color: rgba(255,255,255,.35);">Browse templates</a>
+    </div>
   </div>
 </section>
 
 </main>
 
-<!-- FOOTER -->
-<footer style="background: #fff; color: var(--ink-2); padding: 56px 0 32px; border-top: 1px solid var(--line);">
-  <div class="wrap grid md:grid-cols-4 gap-10">
-    <div>
-      <img src="{{ url_for('static', filename='logo-full.webp') }}" alt="CVForge — Building your professional future" width="170" height="67" style="height: 67px; width: auto;" loading="lazy"/>
-      <p style="font-size: 15px; line-height: 1.6; margin-top: 14px; max-width: 18em;">A professional CV and resume builder for job seekers worldwide. Cards via Paystack; M-Pesa in Kenya.</p>
-    </div>
-    <div>
-      <p style="color: var(--navy); font-weight: 600; margin-bottom: 12px;">Product</p>
-      <ul style="display: grid; gap: 8px; font-size: 15px; padding: 0; list-style: none;">
-        <li><a href="{{ url_for('templates_gallery.index') }}" class="hover:underline">Templates</a></li>
-        <li><a href="{{ url_for('cv_examples.index') }}" class="hover:underline">CV examples</a></li>
-        <li><a href="{{ url_for('free_ats.checker') }}" class="hover:underline">Free ATS checker</a></li>
-        <li><a href="{{ url_for('main.pricing') }}" class="hover:underline">Pricing</a></li>
-        <li><a href="{{ url_for('guide.index') }}" class="hover:underline">User Guide</a></li>
-        <li><a href="{{ url_for('support.index') }}" class="hover:underline">Support</a></li>
-      </ul>
-    </div>
-    <div>
-      <p style="color: var(--navy); font-weight: 600; margin-bottom: 12px;">Company</p>
-      <ul style="display: grid; gap: 8px; font-size: 15px; padding: 0; list-style: none;">
-        <li><a href="{{ url_for('main.about') }}" class="hover:underline">About</a></li>
-        <li><a href="{{ url_for('main.privacy') }}" class="hover:underline">Privacy Policy</a></li>
-        <li><a href="{{ url_for('main.terms') }}" class="hover:underline">Terms of Service</a></li>
-      </ul>
-    </div>
-    <div>
-      <p style="color: var(--navy); font-weight: 600; margin-bottom: 12px;">Account</p>
-      <ul style="display: grid; gap: 8px; font-size: 15px; padding: 0; list-style: none;">
-        <li><a href="{{ url_for('auth.login') }}" class="hover:underline">Sign in</a></li>
-        <li><a href="{{ url_for('auth.register') }}" class="hover:underline">Create free account</a></li>
-      </ul>
-    </div>
-  </div>
-  <div class="wrap" style="margin-top: 40px; padding-top: 24px; border-top: 1px solid var(--line); font-size: 14px;">
-    &copy; 2026 CVForge AI. Built in Kenya, for job seekers worldwide.
-  </div>
-</footer>
-
-</div>
+{% include "_public_footer.html" %}
 {% endblock %}

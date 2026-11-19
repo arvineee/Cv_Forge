@@ -1,0 +1,46 @@
+{# Shared header for public pages. Pass nothing; active link comes from request.endpoint. #}
+{% set _links = [
+  ('templates_gallery.index', 'Templates'),
+  ('cv_examples.index', 'CV examples'),
+  ('free_ats.checker', 'Free ATS checker'),
+  ('main.pricing', 'Pricing'),
+  ('guide.index', 'Guide'),
+] %}
+<header class="pub-nav" x-data="{ open: false }" @keydown.escape.window="open = false" @click.outside="open = false">
+  <div class="wrap flex items-center justify-between gap-4" style="min-height: 72px;">
+    <a href="{{ url_for('main.index') }}" class="flex items-center" style="min-height: 48px;" aria-label="CVForge home">
+      <img src="{{ url_for('static', filename='logo-nav.webp') }}" alt="CVForge" width="116" height="45" style="height: 45px; width: auto;"/>
+    </a>
+
+    <nav class="hidden lg:flex items-center gap-7" aria-label="Main">
+      {% for endpoint, label in _links %}
+      <a href="{{ url_for(endpoint) }}" class="navlink" {% if request.endpoint == endpoint %}aria-current="page"{% endif %}>{{ label }}</a>
+      {% endfor %}
+    </nav>
+
+    <div class="flex items-center gap-2">
+      {% if current_user.is_authenticated %}
+      <a href="{{ url_for('dashboard.index') }}" class="btn btn-primary">Open dashboard</a>
+      {% else %}
+      <a href="{{ url_for('auth.login') }}" class="hidden sm:inline-flex items-center px-3 font-semibold" style="min-height: 44px; color: var(--navy-800);">Sign in</a>
+      <a href="{{ url_for('auth.register') }}" class="btn btn-primary">Start free</a>
+      {% endif %}
+      <button type="button" class="lg:hidden inline-flex items-center justify-center" style="min-width: 44px; min-height: 44px; color: var(--navy-800);"
+              @click="open = !open" :aria-expanded="open.toString()" aria-controls="pub-mobile-menu" aria-label="Toggle menu">
+        <svg x-show="!open" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
+        <svg x-show="open" x-cloak class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div id="pub-mobile-menu" x-show="open" x-cloak x-transition.opacity class="lg:hidden" style="border-top: 1px solid var(--line); background: #fff;">
+    <ul class="wrap flex flex-col pb-3" style="font-weight: 500;">
+      {% for endpoint, label in _links %}
+      <li><a href="{{ url_for(endpoint) }}" class="flex items-center justify-between" style="min-height: 52px; border-bottom: 1px solid var(--line);">{{ label }}<span aria-hidden="true" style="color: var(--ink-3);">›</span></a></li>
+      {% endfor %}
+      {% if not current_user.is_authenticated %}
+      <li><a href="{{ url_for('auth.login') }}" class="flex items-center" style="min-height: 52px;">Sign in</a></li>
+      {% endif %}
+    </ul>
+  </div>
+</header>
