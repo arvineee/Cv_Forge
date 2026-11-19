@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}{{ job.title }}{% if job.company_name %} at {{ job.company_name }}{% endif %} | CVForge Jobs{% endblock %}
+{% block meta_description %}{{ (job.title ~ ' — ' ~ job.company_name ~ '. ' ~ (job.location or job.country) ~ '. ') ~ (job.description|striptags|truncate(125, True, '…')) }}{% endblock %}
+{% block meta_keywords %}{{ job.title }}, {{ job.company_name }}, jobs in {{ job.country }}, {{ job.location or 'job vacancies' }}, vacancies, CVForge jobs{% endblock %}
+{% block canonical %}{{ site_url }}{{ url_for('dashboard.public_job_detail', job_id=job.id) }}{% endblock %}
+{% block robots %}index, follow, max-image-preview:large{% endblock %}
+{% block og_type %}article{% endblock %}
+{% block structured_data %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebPage",
+  "name": {{ job.title|tojson }},
+  "description": {{ (job.description|striptags|truncate(300, True, '…'))|tojson }},
+  "url": {{ (site_url ~ url_for('dashboard.public_job_detail', job_id=job.id))|tojson }},
+  "datePublished": {{ (job.published_at or job.created_at).isoformat()|tojson }},
+  "isPartOf": {"@type": "WebSite", "name": "CVForge", "url": {{ (site_url ~ '/')|tojson }}},
+  "about": {"@type": "Thing", "name": "Job vacancy"}
+}
+</script>
+{% endblock %}
+{% block body %}
+<header class="bg-white border-b border-gray-200">
+  <div class="max-w-5xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-4">
+    <a href="{{ url_for('main.index') }}" class="font-extrabold text-xl tracking-tight text-slate-900">CVForge<span class="text-blue-600">.</span></a>
+    <nav class="flex items-center gap-3 text-sm font-semibold">
+      <a href="{{ url_for('dashboard.job_discovery') }}" class="text-gray-600 hover:text-blue-700">All jobs</a>
+      {% if current_user.is_authenticated %}<a href="{{ url_for('dashboard.index') }}" class="text-gray-600 hover:text-blue-700">Dashboard</a>{% else %}<a href="{{ url_for('auth.login') }}" class="text-gray-600 hover:text-blue-700">Log in</a>{% endif %}
+    </nav>
+  </div>
+</header>
+<main id="main-content" class="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
+  <a href="{{ url_for('dashboard.job_discovery') }}" class="text-sm font-semibold text-blue-700">← Back to job search</a>
+  <article class="mt-5 bg-white border border-gray-200 rounded-2xl p-6 sm:p-8">
+    <p class="text-xs font-bold uppercase tracking-wider text-blue-700">{{ job.source_name }} · {{ job.country }}</p>
+    <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-3">{{ job.title }}</h1>
+    <p class="text-base text-gray-600 mt-2">{{ job.company_name }}{% if job.location %} · {{ job.location }}{% endif %}{% if job.employment_type %} · {{ job.employment_type }}{% endif %}</p>
+    {% if job.published_at %}<p class="text-sm text-gray-500 mt-2">Published <time datetime="{{ job.published_at.isoformat() }}">{{ job.published_at.strftime('%d %B %Y') }}</time></p>{% endif %}
+    <div class="flex flex-wrap gap-3 mt-6">
+      <a href="{{ job.url }}" target="_blank" rel="nofollow noopener noreferrer" class="rounded-xl bg-blue-600 text-white font-semibold px-5 py-3">View original listing and apply ↗</a>
+      {% if current_user.is_authenticated %}
+        <form method="POST" action="{{ url_for('dashboard.save_discovered_job', job_id=job.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="rounded-xl border border-gray-300 px-5 py-3 font-semibold">Save opportunity</button></form>
+        <a href="{{ url_for('dashboard.career_match', job_id=job.id) }}" class="rounded-xl bg-indigo-50 text-indigo-700 px-5 py-3 font-semibold">Match my CV</a>
+      {% else %}
+        <a href="{{ url_for('auth.login', next=url_for('dashboard.public_job_detail', job_id=job.id)) }}" class="rounded-xl border border-gray-300 px-5 py-3 font-semibold">Log in to save or match your CV</a>
+      {% endif %}
+    </div>
+    <div class="border-t border-gray-100 mt-7 pt-6">
+      <h2 class="text-xl font-bold text-slate-900 mb-4">Job description</h2>
+      <div class="prose prose-slate max-w-none text-gray-700 whitespace-pre-line">{{ job.description|striptags }}</div>
+    </div>
+    <p class="text-xs text-gray-500 border-t border-gray-100 mt-7 pt-5">Vacancy information is provided by {{ job.source_name }}. Check the original publisher's website for the latest details, eligibility requirements, closing date and application instructions. CVForge cannot guarantee that this vacancy remains open.</p>
+  </article>
+</main>
+{% endblock %}

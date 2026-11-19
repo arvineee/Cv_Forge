@@ -312,7 +312,6 @@ def save_match_as_application(match_id):
 
 # ── Job discovery ─────────────────────────────────────────────────
 @dashboard_bp.route("/career/jobs")
-@login_required
 def job_discovery():
     term = (request.args.get("q") or "").strip()[:100]
     country = (request.args.get("country") or "").strip()[:80]
